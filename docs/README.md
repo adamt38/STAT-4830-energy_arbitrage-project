@@ -8,7 +8,7 @@ This folder holds **course template** files plus project-specific writeups and r
 |------|------|
 | [`finding_project_ideas.md`](finding_project_ideas.md) | Early project ideation |
 | [`assignments/`](assignments/) | Course assignment text |
-| [`llm_exploration/`](llm_exploration/) | AI-assisted working notes |
+| [`llm_exploration/`](llm_exploration/) | AI-assisted working notes ([`week4_log.md`](llm_exploration/week4_log.md), [`session_template.md`](llm_exploration/session_template.md), [`final_report_structure_session.md`](llm_exploration/final_report_structure_session.md)) |
 | [`development_log.md`](development_log.md) | Progress and decisions |
 
 ## Milestones (this project)

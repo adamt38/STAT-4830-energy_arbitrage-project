@@ -1,5 +1,9 @@
 # STAT 4830 Project Repository
 
+![tests](https://github.com/adamt38/STAT-4830-energy_arbitrage-project/actions/workflows/tests.yml/badge.svg?branch=main)
+
+GitHub Actions runs `PYTHONPATH=. pytest tests/` on pushes and PRs to `main` (see [`.github/workflows/tests.yml`](.github/workflows/tests.yml)).
+
 Welcome to your project repository! This template helps you develop and implement an optimization project over the semester.
 
 ## Current Project Focus
@@ -19,10 +23,22 @@ Milestone labeling used in this repo:
 
 ## Submission pointers (STAT 4830)
 
+### For graders (rubric map)
+
+| Rubric slice | Where to look |
+|--------------|----------------|
+| **Report (20%)** | Root [`report.md`](report.md) (you may still be editing); optional long-form reference: [`docs/final_report_first_draft.md`](docs/final_report_first_draft.md). Milestone snapshots: [`docs/milestones/report_drafts/`](docs/milestones/report_drafts/). |
+| **Implementation (35%)** | [`src/`](src/), runnable entrypoints under [`script/`](script/) (see Quick start). Automated checks: run tests with **`PYTHONPATH=.`** so `import src.*` resolves (commands below). |
+| **Development process (15%)** | [`docs/development_log.md`](docs/development_log.md) plus diagnostics/runbooks in [`docs/README.md`](docs/README.md). |
+| **Critiques (15%)** | [`docs/milestones/self_critiques/`](docs/milestones/self_critiques/) (OODA self-critiques by milestone). |
+| **Repository structure (15%)** | This README (two-part tree below), [`docs/README.md`](docs/README.md), [`docs/assignments/week4_deliverable_instructions.md`](docs/assignments/week4_deliverable_instructions.md). |
+| **LLM exploration** | [`docs/llm_exploration/week4_log.md`](docs/llm_exploration/week4_log.md) (index) + [`docs/llm_exploration/final_report_structure_session.md`](docs/llm_exploration/final_report_structure_session.md). |
+| **Week 4 notebook** | [`notebooks/week4_implementation.ipynb`](notebooks/week4_implementation.ipynb) |
+
 - **Final report (graded):** root [`report.md`](report.md) — consolidated from `docs/final_report_first_draft.md` with reproduction notes in the header.
 - **Report draft snapshots:** [`docs/milestones/report_drafts/`](docs/milestones/report_drafts/) (milestones Weeks 4–12).
 - **Self-critiques:** [`self_critique_week4.md`](docs/milestones/self_critiques/self_critique_week4.md), [`self_critique_week6.md`](docs/milestones/self_critiques/self_critique_week6.md), [`self_critique_week10.md`](docs/milestones/self_critiques/self_critique_week10.md), [`self_critique_week12.md`](docs/milestones/self_critiques/self_critique_week12.md), [`self_critique_final.md`](docs/milestones/self_critiques/self_critique_final.md).
-- **LLM exploration (sample):** [`docs/llm_exploration/final_report_structure_session.md`](docs/llm_exploration/final_report_structure_session.md).
+- **LLM exploration:** [`docs/llm_exploration/week4_log.md`](docs/llm_exploration/week4_log.md) (index) + [`docs/llm_exploration/final_report_structure_session.md`](docs/llm_exploration/final_report_structure_session.md).
 - **Optional git backdating:** [`script/backdate_milestone_commits.sh`](script/backdate_milestone_commits.sh) (template only — review integrity policy before use).
 
 ## Quick start (uv)
@@ -67,10 +83,11 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
    python script/gd_1d_torch.py
    ```
 
-6. **Run tests:**
+6. **Run tests** (repo root; `PYTHONPATH` required for `from src…` imports):
    ```bash
-   pytest tests/
+   PYTHONPATH=. pytest tests/
    ```
+   Or with uv (recommended): `PYTHONPATH=. uv run pytest tests/`
 
 ### Windows (PowerShell)
 
@@ -110,10 +127,12 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
    python script/gd_1d_torch.py
    ```
 
-6. **Run tests:**
+6. **Run tests** (from repo root; set `PYTHONPATH` to `.` for `src` imports):
    ```powershell
+   $env:PYTHONPATH = "."
    pytest tests/
    ```
+   Or: `uv run pytest tests/` after `uv pip install -r requirements.txt` with the same `PYTHONPATH`.
 
 ---
 
@@ -132,10 +151,11 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
 2. **Week 4 Deliverable**
   - Follow the [Week 4 Instructions](docs/assignments/week4_deliverable_instructions.md)
    - Required components:
-     - Initial report draft
-     - Self-critique document analyzing your report's strengths and weaknesses
-     - Supporting Jupyter notebooks/code
-  - Due: Friday, February 6, 2026
+     - Initial report draft (root [`report.md`](report.md); snapshots in [`docs/milestones/report_drafts/`](docs/milestones/report_drafts/))
+     - Self-critique documents in [`docs/milestones/self_critiques/`](docs/milestones/self_critiques/)
+     - Supporting Jupyter notebooks: [`notebooks/week4_implementation.ipynb`](notebooks/week4_implementation.ipynb)
+     - LLM exploration log slot: [`docs/llm_exploration/week4_log.md`](docs/llm_exploration/week4_log.md) (plus other exports in that folder)
+   - Due: Friday, February 6, 2026
 
 ## Project Development Cycle
 
