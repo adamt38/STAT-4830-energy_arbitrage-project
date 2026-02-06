@@ -123,3 +123,5 @@ We assume tag-based domain mapping is reliable enough for constraints, but tag g
 - Success criterion: constrained holdout should beat matched-horizon baseline on Sortino ratio or max drawdown.
 - Secondary criterion: weight trajectories should be smoother (less oscillation) than the Week 8 run.
 - Document results in `docs/week9_diagnostics_report.md` after the run completes.
+
+*Milestone: Week 4 STAT 4830 self-critique deliverable (author date aligned to syllabus).*
