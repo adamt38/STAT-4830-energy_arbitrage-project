@@ -20,8 +20,8 @@ Milestone labeling used in this repo:
 ## Submission pointers (STAT 4830)
 
 - **Final report (graded):** root [`report.md`](report.md) — consolidated from `docs/final_report_first_draft.md` with reproduction notes in the header.
-- **Report draft snapshots:** [`docs/report_drafts/`](docs/report_drafts/) (milestones Weeks 4–12).
-- **Self-critiques:** [`docs/self_critique_week4.md`](docs/self_critique_week4.md), [`docs/self_critique_week6.md`](docs/self_critique_week6.md), [`docs/self_critique_week10.md`](docs/self_critique_week10.md), [`docs/self_critique_week12.md`](docs/self_critique_week12.md), [`docs/self_critique_final.md`](docs/self_critique_final.md).
+- **Report draft snapshots:** [`docs/milestones/report_drafts/`](docs/milestones/report_drafts/) (milestones Weeks 4–12).
+- **Self-critiques:** [`self_critique_week4.md`](docs/milestones/self_critiques/self_critique_week4.md), [`self_critique_week6.md`](docs/milestones/self_critiques/self_critique_week6.md), [`self_critique_week10.md`](docs/milestones/self_critiques/self_critique_week10.md), [`self_critique_week12.md`](docs/milestones/self_critiques/self_critique_week12.md), [`self_critique_final.md`](docs/milestones/self_critiques/self_critique_final.md).
 - **LLM exploration (sample):** [`docs/llm_exploration/final_report_structure_session.md`](docs/llm_exploration/final_report_structure_session.md).
 - **Optional git backdating:** [`script/backdate_milestone_commits.sh`](script/backdate_milestone_commits.sh) (template only — review integrity policy before use).
 
@@ -191,18 +191,50 @@ Remember:
 
 ## Repository Structure
 
+### Course template (required)
+
+Syllabus baseline layout:
+
 ```
 your-repo/
 ├── README.md                    # This file
 ├── report.md                    # Your project report
 ├── notebooks/                   # Jupyter notebooks
-├── src/                        # Source code
-├── tests/                      # Test files
+├── src/                         # Source code
+├── tests/                       # Test files
 └── docs/
     ├── finding_project_ideas.md    # Guide to finding your project
     ├── assignments/                # Assignment instructions
-    ├── llm_exploration/           # AI conversation logs
-    └── development_log.md         # Progress & decisions
+    ├── llm_exploration/            # AI conversation logs
+    └── development_log.md          # Progress & decisions
+```
+
+### This repository (full)
+
+Everything in the template, plus data, figures, orchestration scripts, and extra documentation (see also [`docs/README.md`](docs/README.md)):
+
+```
+STAT-4830-energy_arbitrage-project/
+├── README.md
+├── report.md
+├── requirements.txt
+├── notebooks/
+├── script/                 # Runnable pipelines (e.g. week8, Kelly, post-hocs)
+├── src/
+├── tests/
+├── data/                   # Raw + processed experiment artifacts
+├── figures/                # Generated plots
+└── docs/
+    ├── README.md           # Index of docs/
+    ├── assignments/
+    ├── development_log.md
+    ├── finding_project_ideas.md
+    ├── llm_exploration/
+    ├── milestones/         # Report draft snapshots + self-critiques
+    │   ├── report_drafts/
+    │   └── self_critiques/
+    ├── slides/             # Course slide PDFs
+    └── …                   # Diagnostics, runbooks, presentation guides, PDF drafts
 ```
 
 ## Development Environment

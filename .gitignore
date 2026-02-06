@@ -5,6 +5,9 @@ docs/figures/*
 
 local/
 
+# Empty duplicate of script/ (IDE sometimes creates scripts/)
+scripts/
+
 # Virtual environment and Python
 .venv/
 __pycache__/

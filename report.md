@@ -8,7 +8,7 @@ April 2026
 
 **Reproduction.** From repo root: `bash script/install.sh`, `source .venv/bin/activate`, `pytest tests/`, then the pipelines linked in [`README.md`](README.md) (for example `python script/polymarket_week8_pipeline.py`, `python script/multiplatform_pipeline.py`, and the Week 10 Kelly script). Optuna QMC sampling may require `scipy` (listed in `requirements.txt`).
 
-**Milestone report drafts** (snapshots): [`docs/report_drafts/`](docs/report_drafts/).
+**Milestone report drafts** (snapshots): [`docs/milestones/report_drafts/`](docs/milestones/report_drafts/).
 
 **Round 7 (Kelly fees / DD).** Full default-branch close-out and post-hoc tables: [`docs/week11_round7_diagnostics_report.md`](docs/week11_round7_diagnostics_report.md). K10E/K10F in-optimizer sweeps are documented on GPU runbook branches but **not** populated in §4–5 of that report on `main`.
 

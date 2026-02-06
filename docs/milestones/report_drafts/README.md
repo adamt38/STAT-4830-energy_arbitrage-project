@@ -1,6 +1,6 @@
 # Report draft snapshots
 
-These Markdown files are **milestone snapshots** for STAT 4830 report drafts (Weeks 4–12). The **canonical final report** for grading is the root [`report.md`](../report.md).
+These Markdown files are **milestone snapshots** for STAT 4830 report drafts (Weeks 4–12). The **canonical final report** for grading is the root [`report.md`](../../report.md).
 
 Older drafts are preserved here so history and self-critiques can reference concrete text states without rewriting `git` history.
 
