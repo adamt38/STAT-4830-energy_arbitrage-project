@@ -12,19 +12,19 @@ The core challenge is to determine if the "Optimality Gap" caused by simplifying
 Success is defined by the model's ability to "learn" to buy at troughs and sell at peaks purely via gradient descent. We will measure success by comparing the objective value (profit) and constraint violation rates against the QP baseline.
 
 ### Constraints & Data
-* **Constraints:** The system must strictly respect $0 < SoC < 100$ limits[cite: 14].
-* **Data:** The optimization covers an 8,760-step time series (one year), creating an extremely deep computational graph[cite: 9].
+* **Constraints:** The system must strictly respect $0 < SoC < 100$ limits.
+* **Data:** The optimization covers an 8,760-step time series (one year), creating an extremely deep computational graph.
 
 ### What could go wrong?
-* **Constraint Satisfaction:** Unlike CVXPY, PyTorch does not natively handle hard constraints[cite: 7].
-* **Vanishing Gradients:** The deep computational graph (8,760 steps) risks vanishing gradients, making convergence difficult[cite: 9].
+* **Constraint Satisfaction:** Unlike CVXPY, PyTorch does not natively handle hard constraints.
+* **Vanishing Gradients:** The deep computational graph (8,760 steps) risks vanishing gradients, making convergence difficult.
 
 ---
 
 ## Technical Approach
 
 ### Mathematical Formulation
-[cite_start]We maximize an objective function $J$ composed of Arbitrage Profit minus a Degradation Penalty[cite: 17, 19, 22]:
+We maximize an objective function $J$ composed of Arbitrage Profit minus a Degradation Penalty:
 
 $$
 \text{Maximize } J = \sum_{t=1}^{T} \left( P_t (d_t - c_t) - \lambda (c_t + d_t)^2 \right)
@@ -33,12 +33,12 @@ $$
 Where:
 * $P_t$: Price at time $t$
 * $d_t, c_t$: Discharge and Charge amounts
-* $\lambda$: Degradation penalty coefficient. [cite_start]We derive this such that the quadratic penalty roughly equals the average cost per MWh ($k$) at nominal power ($P_{nom}$): $\lambda \approx \frac{k}{P_{nom}}$[cite: 27, 29].
+* $\lambda$: Degradation penalty coefficient. We derive this such that the quadratic penalty roughly equals the average cost per MWh ($k$) at nominal power ($P_{nom}$): $\lambda \approx \frac{k}{P_{nom}}$.
 
 ### Algorithm & Implementation
-* **Architecture:** We are implementing a custom `DifferentiableBattery` class in PyTorch to simulate charge/discharge dynamics[cite: 12].
-* **Optimization:** We use the Adam optimizer to update control variables[cite: 13].
-* **Constraint Strategy:** To handle the lack of native constraints, we are implementing stable **Projected Gradient Descent** or **Lagrangian Relaxations** to enforce limits without causing gradient explosion[cite: 8].
+* **Architecture:** We are implementing a custom `DifferentiableBattery` class in PyTorch to simulate charge/discharge dynamics.
+* **Optimization:** We use the Adam optimizer to update control variables.
+* **Constraint Strategy:** To handle the lack of native constraints, we are implementing stable **Projected Gradient Descent** or **Lagrangian Relaxations** to enforce limits without causing gradient explosion.
 
 ### Validation Methods
 We utilize a "Proof of Life" experiment: training the model on a synthetic "Sine Wave" price curve to verify gradient propagation before introducing real-world data noise.
