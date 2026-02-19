@@ -2,6 +2,58 @@
 
 Welcome to your project repository! This template helps you develop and implement an optimization project over the semester.
 
+## Quick start (uv)
+
+The project is runnable on macOS, Linux, and Windows using [uv](https://docs.astral.sh/uv/).
+
+### macOS / Linux
+
+1. **Install dependencies and create the virtual environment** (from the repo root):
+   ```bash
+   bash script/install.sh
+   ```
+   This checks for `uv` and installs it via the [official Astral installer](https://astral.sh/uv/install.sh) if missing, creates `.venv`, and installs packages from `requirements.txt`. If `uv` was just installed, it is added to your PATH in `~/.zshrc` or `~/.bashrc`; open a new terminal or run `source ~/.zshrc` (or `source ~/.bashrc`) so the `uv` command is found.
+
+2. **Activate the virtual environment:**
+   ```bash
+   source .venv/bin/activate
+   ```
+
+3. **Run the main script:**
+   ```bash
+   python script/gd_1d_torch.py
+   ```
+
+4. **Run tests:**
+   ```bash
+   pytest tests/
+   ```
+
+### Windows (PowerShell)
+
+1. **Install dependencies and create the virtual environment** (from the repo root):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\script\install.ps1
+   ```
+   This checks for `uv` and installs it via the [official Astral installer](https://astral.sh/uv/install.ps1) if missing, creates `.venv`, and installs packages from `requirements.txt`.
+
+2. **Activate the virtual environment:**
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+3. **Run the main script:**
+   ```powershell
+   python script/gd_1d_torch.py
+   ```
+
+4. **Run tests:**
+   ```powershell
+   pytest tests/
+   ```
+
+---
+
 ## Getting Started
 
 1. **Finding Your Project Idea**

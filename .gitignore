@@ -4,3 +4,10 @@ docs/figures/*
 !docs/figures/*.tex
 
 local/
+
+# Virtual environment and Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.mplconfig/
