@@ -24,6 +24,7 @@ def main() -> None:
         history.append(loss.item())
         loss.backward()
         with torch.no_grad():
+            assert x.grad is not None
             x.sub_(x.grad, alpha=lr)
             x.grad.zero_()
 
