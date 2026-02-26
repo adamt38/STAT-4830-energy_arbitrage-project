@@ -1,4 +1,4 @@
-# Development Log
+# Development Log (Old, need to update for our new project idea)
 
 ## Week 4 — Initial Implementation (Jan 27 – Feb 6, 2026)
 

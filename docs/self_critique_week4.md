@@ -1,4 +1,4 @@
-# Week 4 Self-Critique
+# Week 4 Self-Critique (Old, need to redo for our new project idea)
 
 ## OBSERVE
 
