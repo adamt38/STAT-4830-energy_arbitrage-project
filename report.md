@@ -1,98 +1,103 @@
-# Project Report: Differentiable Physics vs. Convex Relaxation for Battery Arbitrage
+# Project Report: Cross-Domain Portfolio Optimization on Polymarket
 
 ## Problem Statement
 
 ### What are you optimizing?
-We are rigorously benchmarking **Convex Relaxation (QP)** against **Non-Convex Differentiable Physics (PyTorch)** for battery energy arbitrage. The goal is to maximize financial returns while minimizing battery degradation.
+We optimize a portfolio of Polymarket prediction contracts to maximize risk-adjusted return while penalizing over-allocation to a single event domain (for example politics or crypto).
 
-### Why does this problem matter?
-The core challenge is to determine if the "Optimality Gap" caused by simplifying physics (to achieve convexity) is greater than the "Convergence Error" introduced by the instability of gradient descent in a constrained, non-convex landscape.
+### Why does this matter?
+Prediction markets are exposed to event clustering risk. A portfolio that appears diversified by the number of positions may still be concentrated in one real-world driver. Our project tests whether explicit domain-level constraints reduce tail risk versus a naive equal-weight allocation.
 
-### How will you measure success?
-Success is defined by the model's ability to "learn" to buy at troughs and sell at peaks purely via gradient descent. We will measure success by comparing the objective value (profit) and constraint violation rates against the QP baseline.
+### How do we measure success?
+Success is measured against an equal-weight baseline using:
+- Sortino ratio (risk-adjusted return),
+- maximum drawdown,
+- domain exposure concentration.
 
-### Constraints & Data
-* **Constraints:** The system must strictly respect $0 \le SoC \le 1$ MWh capacity limits.
-* **Data:** The current implementation optimizes over a single day of NYISO 5-minute real-time LMP data (~288 intervals). The long-term goal is to scale to an 8,760-step annual time series.
+### Data and constraints
+- **Data source:** `gamma-api.polymarket.com/events` (market discovery and tags) + `clob.polymarket.com/prices-history` (token price history).
+- **Optimization constraint:** penalize any domain exposure above a limit `L_k` via a differentiable quadratic penalty.
+- **Project objective:** maximize `Sortino_t(R_p) - lambda * sum_k max(0, S_k - L_k)^2`.
 
-### What could go wrong?
-* **Constraint Satisfaction:** Unlike CVXPY, PyTorch does not natively handle hard constraints.
-* **Vanishing Gradients:** The deep computational graph (8,760 steps) risks vanishing gradients, making convergence difficult.
+### Risks
+- API coverage may be uneven by market and domain.
+- Domain mapping from tags is noisy and needs normalization.
+- First-pass online optimization may be unstable and overfit.
 
 ---
 
 ## Technical Approach
 
-### Mathematical Formulation
-We maximize an objective function $J$ composed of Arbitrage Profit minus a Degradation Penalty:
+### Data pipeline
+We implemented a reproducible pipeline in `src/polymarket_data.py` that:
+1. pulls paginated active events,
+2. flattens event/market records,
+3. maps event tags to coarse domains,
+4. selects binary market tokens,
+5. fetches token-level historical prices,
+6. caches outputs in `data/raw` and `data/processed`.
 
-$$
-\text{Maximize } J = \sum_{t=1}^{T} \Big( \underbrace{P_t (d_t - c_t)}_{\text{Revenue}} - \underbrace{\lambda (c_t + d_t)^2}_{\text{Degradation Penalty}} \Big)
-$$
+### Baseline
+`src/baseline.py` computes:
+- equal-weight market allocation,
+- portfolio return series,
+- cumulative return,
+- max drawdown,
+- Sortino ratio,
+- domain exposure shares.
 
-Where:
-* $P_t$: Price at time $t$
-* $d_t, c_t$: Discharge and Charge amounts
-* $\lambda$: Degradation penalty coefficient. We derive this such that the quadratic penalty roughly equals the average cost per MWh ($k$) at nominal power ($P_{nom}$): $\lambda \approx \frac{k}{P_{nom}}$.
-
-### Algorithm & Implementation
-* **Architecture:** We are implementing a custom `DifferentiableBattery` class in PyTorch to simulate charge/discharge dynamics.
-* **Optimization:** We use the Adam optimizer to update control variables.
-* **Constraint Strategy:** To handle the lack of native constraints, we use a **soft quadratic penalty** on SoC violations (penalty coefficient = 2,000), which penalizes any excursion outside the $[0, SoC_{max}]$ bounds. Future work will explore Projected Gradient Descent and Lagrangian Relaxation as alternatives.
-
-### Validation Methods
-We utilize a "Proof of Life" validation suite: training the model on three synthetic price scenarios (flat prices, negative prices, and a single price spike) to verify that the optimizer learns qualitatively correct behavior before evaluating on real-world data.
-
----
-
-## Initial Results
-
-### Evidence of a Working Implementation
-We ran our differentiable battery on **live NYISO real-time 5-minute LMP data** for the N.Y.C. zone (177 intervals, average price \$80.71/MWh). The optimizer was configured with Adam (lr=0.1), 1,000 epochs, a soft SoC penalty coefficient of 2,000, and a degradation penalty $\lambda = 5.0$. Key observations:
-
-* **Profit Trajectory:** The model showed clear learning, rising from \$0 at epoch 0 to \$12.87 by epoch 100, reaching \$59.86 by epoch 500. However, convergence was **highly oscillatory** — profit dropped to \$27.09 at epoch 600 (with 42 transient SoC violations), recovered to \$49.81 by epoch 800, and ended at \$54.85 at epoch 900. This instability is a central finding: gradient descent on this non-convex landscape is noisy, confirming the "Convergence Error" concern from our problem statement.
-* **Constraint Satisfaction:** The soft-penalty approach achieved **zero SoC violations** for the majority of epochs, though transient violations (42 at epoch 600) appeared during oscillatory phases. These violations are quickly corrected by the penalty term, but their presence underscores the fragility of the soft-constraint approach.
-
-### Validation Suite Results
-We designed three synthetic test cases to verify qualitative behavior:
-
-| Test Case | Expected Behavior | Profit | Max SoC Violation | Runtime |
-|---|---|---|---|---|
-| Flat Prices ($50/MWh) | Discharge initial stored energy (SoC starts at 50%), then idle | $13.96 | 0.0000 | 0.30 s |
-| Negative Prices (-$5 to -$10) | Charge (action > 0) | $1.91 | 0.0000 | 0.27 s |
-| Single Price Spike ($500 at t=50) | Discharge at spike | $46.43 | 0.0000 | 0.26 s |
-
-All three tests pass the "eye test": the model charges during negative prices, discharges into the spike, and sells its initial stored energy when prices are flat. The profit in the flat case (\$13.96) comes from selling the battery's initial 50% SoC — this is physically correct behavior, not residual cycling. The degradation penalty ($\lambda = 5.0$) is included in both the main loop and validation, reducing unnecessary cycling.
-
-### Current Limitations
-* **Convergence Instability:** The profit oscillation during training suggests that lr=0.1 may be too aggressive, or that the penalty-based constraint strategy creates a rugged loss landscape. A learning-rate schedule or Lagrangian relaxation may help.
-* **No QP Baseline Yet:** We cannot quantify the "Optimality Gap" until the CVXPY benchmark is implemented.
-* **Short Horizon:** The current experiment uses a single day of 5-minute data (~177 steps), far short of the planned 8,760-step annual horizon. Scaling up may exacerbate vanishing-gradient issues.
-
-### Resource Usage
-Each validation case (1,000 epochs on a 100-step horizon) ran in under 0.31 seconds and used less than 0.02 MB of peak memory. The full ~177-step main optimization (1,000 epochs) completed in seconds on a CPU, indicating that compute is not a bottleneck at this scale.
+### Constrained optimizer
+`src/constrained_optimizer.py` implements a first OGD/SGD-style online routine in PyTorch:
+- rolling-window updates,
+- softmax weights over markets,
+- Sortino-based objective with domain-penalty term,
+- small grid search over learning rate, penalty lambda, and window length.
 
 ---
 
-## Next Steps
+## Week 4 Prototype Results (Completed Work So Far)
 
-### Immediate Improvements
-* **Stabilize Convergence:** Implement a learning-rate scheduler (e.g., cosine annealing or reduce-on-plateau) and experiment with lower initial learning rates. Evaluate whether Lagrangian relaxation produces smoother convergence than the current quadratic penalty.
-* ~~**Unify Revenue Formulation:**~~ *Done.* The main training loop and validation runner now use the same revenue formulation (`−control × price − λ × control²`), directly implementing the report's mathematical objective.
-* ~~**Add the Degradation Penalty:**~~ *Done.* The $\lambda(c_t + d_t)^2$ degradation term is now included in both the main optimization loop and the validation runner, with $\lambda = 5.0$.
+Artifacts were generated through `script/polymarket_week8_pipeline.py`.
 
-### Technical Challenges to Address
-* **Implement the QP Baseline (CVXPY):** This is critical for the core research question. Without the convex benchmark, we cannot measure the optimality gap.
-* **Scale to a Full Year:** Move from a single day (~177 steps) to a full year (8,760 hourly steps). Monitor for vanishing gradients and memory growth, and consider chunked / truncated backpropagation through time if needed.
-* **Projected Gradient Descent:** Explore hard projection of SoC after each optimizer step (clamp SoC to $[0, SoC_{max}]$) as an alternative to the soft penalty, and compare feasibility and profit.
+### Dataset quality snapshot
+- markets retained: **19**
+- history points: **12,509**
+- missing-history markets: **0**
+- non-monotonic token series: **0**
+- duplicate timestamp-token points: **0**
 
-### Questions for Course Staff
-* Is there a recommended approach for benchmarking non-convex PyTorch solutions against CVXPY on problems of this size (8,760 variables)?
-* Are there best practices for balancing penalty coefficients vs. Lagrangian multiplier updates in differentiable physics settings?
+### Baseline (equal-weight)
+- Sortino: **0.0706**
+- Max drawdown: **-14.35%**
+- Mean return per step: **0.000309**
+- Volatility: **0.01451**
+- Category exposure now spans many categories, including: `us-presidential-election`, `world-elections`, `global-elections`, `sports`, `soccer`, `serie-a`, `la-liga`, `movies`, `jerome-powell`, `airdrops`, `politics`, `world`, and `elections`.
 
-### Alternative Approaches to Try
-* **Augmented Lagrangian Method:** Replace the fixed penalty with adaptive dual-variable updates for tighter constraint satisfaction.
-* **Neural Network Policy:** Instead of directly optimizing per-step actions, train a small network that maps price features to actions, enabling generalization to unseen price trajectories.
+### Constrained first iteration (best grid point)
+- learning rate: **0.05**
+- lambda penalty: **10.0**
+- rolling window: **48**
+- Sortino: **0.0148**
+- Max drawdown: **-84.18%**
+- Mean return per step: **0.000729**
+- Volatility: **0.03591**
 
-### What We've Learned So Far
-Gradient descent *can* learn basic arbitrage behavior (buy low, sell high) from price signals alone, and the `tanh` parameterization effectively enforces power limits without projection. However, the convergence path is far noisier than expected, reinforcing the value of the planned comparison with a convex solver.
+### Interpretation
+The constrained model currently does **not** beat baseline on risk-adjusted quality or drawdown. This is our Week 4 prototype baseline and establishes a working benchmark for the next iteration.
+
+---
+
+## Week 8 Iteration (Current Work)
+
+### Week 8 achieved updates
+1. Expanded from coarse domains to high-liquidity tag categories.
+2. Rebuilt dataset with category-balanced selection targeting 50-100 categories.
+3. Implemented category-equal baseline weighting (equal total allocation per category).
+4. Regenerated artifacts with renamed Week 8 files (`week8_*` and `week8_iteration_*`).
+
+### Week 8 latest metrics
+- markets retained: **80**
+- categories retained: **80**
+- baseline category exposure: **equal at 1.25% per category**
+- baseline Sortino: **0.0730**
+- baseline max drawdown: **-4.73%**

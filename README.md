@@ -2,6 +2,21 @@
 
 Welcome to your project repository! This template helps you develop and implement an optimization project over the semester.
 
+## Current Project Focus
+
+This repository is now focused on **Cross-Domain Portfolio Optimization on Polymarket**.
+
+Primary implementation artifacts:
+- `src/polymarket_data.py` (ingestion, filtering, tagging, caching, data-quality checks)
+- `src/baseline.py` (equal-weight baseline + Sortino/drawdown/exposure metrics)
+- `src/constrained_optimizer.py` (first constrained OGD/SGD experiments)
+- `script/polymarket_week8_pipeline.py` (end-to-end run for Week 8 artifacts)
+- `notebooks/week8_iteration_flash_results.ipynb` (Week 8 flash-presentation notebook)
+
+Milestone labeling used in this repo:
+- **Week 4:** completed prototype baseline and initial constrained model pass.
+- **Week 8:** expanded-category iteration and flash-presentation artifacts.
+
 ## Quick start (uv)
 
 The project is runnable on macOS, Linux, and Windows using [uv](https://docs.astral.sh/uv/).
@@ -19,12 +34,18 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
    source .venv/bin/activate
    ```
 
-3. **Run the main script:**
+3. **Run the Week 8 Polymarket pipeline:**
+   ```bash
+   python script/polymarket_week8_pipeline.py
+   ```
+   This generates cached data artifacts in `data/processed/week8_*` and figure outputs in `figures/week8_iteration_*`.
+
+4. **(Optional) Run the template demo script:**
    ```bash
    python script/gd_1d_torch.py
    ```
 
-4. **Run tests:**
+5. **Run tests:**
    ```bash
    pytest tests/
    ```
@@ -42,12 +63,18 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
    .\.venv\Scripts\Activate.ps1
    ```
 
-3. **Run the main script:**
+3. **Run the Week 8 Polymarket pipeline:**
+   ```powershell
+   python .\script\polymarket_week8_pipeline.py
+   ```
+   This generates cached data artifacts in `data\\processed\\week8_*` and figure outputs in `figures\\week8_iteration_*`.
+
+4. **(Optional) Run the template demo script:**
    ```powershell
    python script/gd_1d_torch.py
    ```
 
-4. **Run tests:**
+5. **Run tests:**
    ```powershell
    pytest tests/
    ```

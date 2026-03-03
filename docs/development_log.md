@@ -1,57 +1,78 @@
-# Development Log (Old, need to update for our new project idea)
+# Development Log
 
-## Week 4 — Initial Implementation (Jan 27 – Feb 6, 2026)
+## Week 4 Prototype (Completed)
 
-### Goals
-- Define the optimization problem and mathematical formulation.
-- Build a working differentiable battery model in PyTorch.
-- Run initial experiments on real electricity price data.
-- Set up a validation suite to sanity-check optimizer behavior.
+### Objective of this cycle
+- Pivot from battery arbitrage to the proposal topic: cross-domain portfolio optimization on Polymarket.
+- Follow execution-first order: code and experiments first, then notebook figures, then documentation.
 
-### Key Decisions
+### Work completed
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Optimization framework | PyTorch (Adam) | Enables differentiable physics simulation with autograd; Adam handles sparse gradients well. |
-| Constraint handling | Soft quadratic penalty on SoC bounds | Simpler to implement than Lagrangian relaxation; penalty coefficient (2000) chosen empirically to eliminate violations. |
-| Power-limit enforcement | `tanh` parameterization | Squashes raw actions to $[-1, 1]$ and scales by max power, guaranteeing power limits without projection. |
-| Data source | NYISO real-time 5-min LMP (N.Y.C. zone) via `gridstatus` | Freely available, high-resolution, and representative of volatile urban pricing. |
-| Battery parameters | 1 MWh / 1 MW / 90% round-trip efficiency | Standard utility-scale BESS assumptions for a first pass. |
+1. **Data engineering pipeline (completed)**
+   - Added `src/polymarket_data.py` with:
+     - paginated event retrieval from Gamma API,
+     - event-market flattening,
+     - tag-to-domain mapping,
+     - token-level price history pulls from CLOB API,
+     - cached outputs in `data/raw` and `data/processed`,
+     - quality checks (missingness, duplicates, monotonic timestamps, domain coverage).
+   - Added package marker `src/__init__.py`.
 
-### Progress
+2. **Baseline metrics (completed)**
+   - Added `src/baseline.py` with equal-weight benchmark and metrics:
+     - Sortino ratio,
+     - max drawdown,
+     - return volatility,
+     - domain exposure shares.
+   - Outputs persisted to:
+     - `data/processed/baseline_metrics.json`
+     - `data/processed/baseline_timeseries.csv`
 
-1. **Problem formulation (Days 1–2):**
-   - Wrote out the objective function, SoC dynamics, and constraints in LaTeX.
-   - Identified the core research question: Optimality Gap (convex relaxation) vs. Convergence Error (gradient descent).
-   - Documented the formulation in the notebook's Problem Setup section and in `report.md`.
+3. **First constrained experiments (completed)**
+   - Added `src/constrained_optimizer.py`:
+     - rolling-window OGD/SGD-style updates in PyTorch,
+     - differentiable domain-overexposure penalty,
+     - grid search over learning rate, penalty lambda, and window length.
+   - Outputs persisted to:
+     - `data/processed/constrained_experiment_grid.csv`
+     - `data/processed/constrained_best_metrics.json`
+     - `data/processed/constrained_best_timeseries.csv`
 
-2. **Implementation (Days 2–3):**
-   - Built the `DifferentiableBattery` class (`nn.Module`) with learnable per-step actions.
-   - Implemented the forward pass: `tanh` → charge/discharge split → efficiency-adjusted energy delta → `cumsum` for SoC.
-   - Set up the training loop with Adam, revenue calculation, and soft SoC penalty.
-   - Fetched live NYISO data via `gridstatus` and ran the first optimization (259 intervals, 1000 epochs).
+4. **Reproducible orchestration + figures (completed)**
+   - Added `script/polymarket_week8_pipeline.py`:
+     - runs data build -> baseline -> constrained experiments,
+     - generates Week 8 figure artifacts:
+       - `figures/week8_equity_curve_comparison.png`
+       - `figures/week8_drawdown_comparison.png`
+       - `figures/week8_domain_exposure_comparison.png`
 
-3. **Validation (Days 3–4):**
-   - Designed three synthetic test cases: flat prices, negative prices, and a single price spike.
-   - Wrapped the validation runner in a `measure_resources` decorator to track execution time and memory.
-   - All three tests produce qualitatively correct behavior with zero constraint violations.
+5. **Notebook packaging (completed)**
+   - Added `notebooks/week8_flash_results.ipynb` to display metrics and figures from cached artifacts.
 
-4. **Report & documentation (Days 4–5):**
-   - Completed Problem Statement and Technical Approach sections of `report.md`.
-   - Wrote Initial Results and Next Steps sections based on observed training behavior.
-   - Created self-critique following the OODA framework.
+### Current empirical snapshot
+- Markets retained: 7
+- Price history points: 4,547
+- Baseline: Sortino 0.0274, max drawdown -26.30%
+- Best constrained run: Sortino 0.0115, max drawdown -61.92%
 
-### Challenges & Failed Attempts
+### What failed / limitations observed
+- First constrained setup is currently less stable than baseline on risk metrics.
+- Domain coverage is skewed toward crypto in this first data slice.
+- Small number of retained markets limits diversification quality.
 
-- **Learning rate sensitivity:** Initial experiments with lr=0.01 converged very slowly (profit barely moved after 1000 epochs). Switching to lr=0.1 accelerated learning but introduced large oscillations. A scheduler is needed.
-- **Revenue sign convention confusion:** The main training loop uses `−control × price` while the validation loop explicitly separates charge cost and discharge revenue. This led to initially inconsistent profit numbers. Needs to be unified.
-- **Penalty coefficient tuning:** Tried penalty_coeff=100 first; SoC violations appeared. Increased to 2000, which eliminated violations but may be contributing to the rugged loss landscape.
+## Week 8 Iteration (Now In Progress)
 
-### Open Questions
-- Will `torch.cumsum` propagate gradients cleanly over 8,760 steps, or will we hit vanishing gradients?
-- Is there a principled way to set the penalty coefficient, or should we switch to an augmented Lagrangian scheme?
-- How do we fairly compare wall-clock time between CVXPY (which uses compiled solvers) and PyTorch (which uses Python-level autograd)?
+### Planned Week 8 upgrades
+1. Expand from coarse domains to many specific category tags.
+2. Increase event universe and use category-balanced sampling.
+3. Re-run baseline and constrained experiments with expanded categories.
+4. Refresh notebook and figure outputs for flash presentation.
 
----
-
-*Next entry: Week 5 — QP baseline implementation and convergence stabilization.*
+### Week 8 update (applied)
+- Category mapping now uses specific tag slugs (not only coarse buckets).
+- Latest run retained 80 markets and 80 categories selected from high-liquidity groups.
+- Baseline now uses equal category weights by construction (each category gets the same total allocation).
+- Artifacts are now consistently prefixed and renamed for Week 8 iteration:
+  - `data/processed/week8_*`
+  - `figures/week8_iteration_*`
+  - `notebooks/week8_iteration_flash_results.ipynb`
