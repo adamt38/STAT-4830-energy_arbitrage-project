@@ -102,13 +102,74 @@ $$
 
 How the math is applied in the current pipeline:
 
-- **Data to returns ($r_t$):** `src/baseline.py::_build_price_matrix` aligns token prices by timestamp; `_compute_returns` converts prices to step returns.
-- **Portfolio return ($R_t=w_t^\top r_t$):** realized in baseline via `portfolio_returns = returns_matrix @ weights`, and in constrained online updates via `float(returns_matrix[t] @ current_weights)`.
-- **Sortino objective:** implemented in constrained training as `_sortino_torch(portfolio)` in `src/constrained_optimizer.py`.
-- **Domain penalty ($P_{\mathrm{domain}}$):** implemented in `_domain_penalty`, aggregating weights by domain and penalizing excess above `domain_limit`.
-- **Concentration + entropy terms:** implemented in `_run_online_pass` using `max_weight` cap penalty and entropy bonus to discourage collapse.
-- **Simplex weights ($w_t\in\Delta^N$):** enforced by `softmax(logits)` and mixed with uniform allocation (`uniform_mix`) for a diversification floor.
-- **Walk-forward and holdout:** hyperparameters are selected on rolling walk-forward validation, then evaluated on holdout (`holdout_fraction`) to produce final reported metrics.
+### Objective term-by-term: what it does, where computed, how used
+
+1. **Input returns $r_t$ (data -> model input):**
+   - Built from cached market histories in `data/processed/week8_price_history.csv`.
+   - `src/baseline.py::_build_price_matrix` aligns all token prices onto a common timestamp grid and fills missing values (forward/back fill).
+   - `src/baseline.py::_compute_returns` computes per-token step returns:
+     $$
+     r_{t,i} = \frac{p_{t+1,i}-p_{t,i}}{p_{t,i}}
+     $$
+   - In constrained optimization, this becomes `returns_matrix` loaded by `src/constrained_optimizer.py::_load_returns_and_domains`.
+
+2. **Weights $\tilde{w}_t$ (feasible allocation at each update):**
+   - Raw trainable parameters are unconstrained logits `z_t` in `_run_online_pass`.
+   - `softmax(z_t)` converts logits to nonnegative weights summing to 1 (simplex constraint).
+   - The code then mixes with uniform weights:
+     $$
+     \tilde{w}_t=(1-\alpha)\,\mathrm{softmax}(z_t)+\alpha u
+     $$
+     where `alpha = uniform_mix`.
+   - Practical effect: even if optimization pushes toward concentration, uniform mixing keeps a diversification floor.
+
+3. **Portfolio returns $R_t=\tilde{w}_t^\top r_t$ (signal optimized by the objective):**
+   - Inside each rolling window, the model forms `portfolio = window @ weights` (vector of window returns).
+   - Realized out-of-window step return is computed as `returns_matrix[t] @ current_weights`.
+   - These realized returns are what later feed cumulative return, drawdown, and holdout metrics.
+
+4. **Sortino term $\mathrm{Sortino}(R_{\mathrm{window}})$ (reward for upside per downside risk):**
+   - Implemented as `_sortino_torch(portfolio)`:
+     - mean return in numerator
+     - square-root downside semivariance in denominator.
+   - This term is the main reward signal; increasing it pushes the optimizer toward high mean return while penalizing negative-tail variability.
+   - Because the optimizer minimizes loss, code sets `loss = -objective`, so higher Sortino reduces loss.
+
+5. **Domain overexposure penalty $-\lambda P_{\mathrm{domain}}(\tilde{w}_t)$:**
+   - Implemented in `_domain_penalty(weights, domains, domain_limit)`.
+   - The function groups asset indices by domain, computes each domain weight sum $S_d(\tilde{w}_t)$, then applies hinge-squared penalty:
+     $$
+     \max(0,S_d-L_d)^2
+     $$
+   - Weighted in objective by `penalty_lambda` (`\lambda`).
+   - Practical effect: no penalty below the cap; rapidly increasing penalty above the cap, which pushes allocations back under the limit.
+
+6. **Concentration penalty $-\lambda_c P_{\mathrm{conc}}(\tilde{w}_t)$:**
+   - Implemented directly in `_run_online_pass` as:
+     - `torch.sum(torch.clamp(weights - max_weight, min=0.0).pow(2))`
+   - This is an asset-level cap, separate from domain-level caps.
+   - Role in training: prevents a single market from dominating even when domain exposure is technically within bounds.
+
+7. **Entropy bonus $+\lambda_e B_{\mathrm{ent}}(\tilde{w}_t)$:**
+   - Implemented as:
+     - `-torch.sum(weights * torch.log(weights + 1e-8))`
+   - Added with positive coefficient `entropy_lambda`.
+   - Effect: encourages spread-out weight vectors and stabilizes optimization by resisting sharp, brittle allocations.
+
+8. **Full objective assembly and gradient step:**
+   - In `_run_online_pass`, objective is assembled exactly as:
+     - Sortino
+     - minus domain penalty term
+     - minus concentration penalty term
+     - plus entropy bonus term.
+   - Then `loss = -objective`; `loss.backward()` computes gradients through all differentiable pieces; `optimizer.step()` updates logits.
+   - This update occurs sequentially for each time index and repeats `steps_per_window` times per window.
+
+9. **Where objective outputs are used in selection/evaluation:**
+   - **Tuning stage:** `run_experiment_grid` runs many hyperparameter combinations and scores each by walk-forward Sortino (with recorded drawdown/volatility/exposure).
+   - **Feasibility filter:** among candidates, preference is given to those with `max_domain_exposure <= max_domain_exposure_threshold`.
+   - **Holdout stage:** selected params are rerun on holdout, generating final metrics (`holdout_sortino_ratio`, `holdout_max_drawdown`, mean return, volatility) and saved to `week8_constrained_best_metrics.json`.
+   - **Visualization stage:** holdout series from `week8_constrained_best_timeseries.csv` are compared against baseline in equity/drawdown/distribution/exposure plots.
 
 ---
 
