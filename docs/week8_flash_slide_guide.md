@@ -4,6 +4,7 @@
 
 - Prediction markets are a real-money, real-time setting where beliefs update quickly.
 - Categories (sports, elections, geopolitics, macro, etc.) create a natural cross-domain diversification problem.
+- Core proposal idea: explicitly penalize over-exposure to a single event domain to reduce tail risk.
 - A naive equal-weight portfolio is simple but may miss structure in return/risk dynamics.
 - A constrained online optimizer can adapt over time while respecting diversification limits.
 
@@ -30,6 +31,9 @@ Definitions:
 
 - $r_t \in \mathbb{R}^N$: vector of token returns at step $t$
 - $w_t \in \Delta^N$: portfolio weights on simplex, $\sum_i w_{t,i}=1$ and $w_{t,i}\ge 0$
+- $\mathcal{D}$: set of event domains/categories
+- $S_d(w)=\sum_{i\in d} w_i$: total capital allocated to domain $d$
+- $L_d$: domain limit for domain $d$
 
 Step return:
 
@@ -58,7 +62,7 @@ $$
 Domain overexposure penalty:
 
 $$
-P_{\mathrm{domain}}(w)=\sum_d \max\!\left(0,\sum_{i\in d} w_i - L_d\right)^2
+P_{\mathrm{domain}}(w)=\sum_{d\in\mathcal{D}} \max\!\left(0,S_d(w)-L_d\right)^2
 $$
 
 Concentration penalty:
@@ -90,6 +94,12 @@ $$
 \right]
 $$
 
+Proposal baseline objective (special case framing):
+
+$$
+\max\ \mathrm{Sortino}_t(R_p)-\lambda\sum_{d\in\mathcal{D}}\left[\max(0,S_d-L_d)\right]^2
+$$
+
 ---
 
 ## 4) Where we are so far (Week 8)
@@ -109,15 +119,19 @@ Interpretation:
 
 ---
 
-## 5) Recommended slide figure order
+## 5) Recommended flash slide order (proposal-aligned)
 
-1. `figures/week8_iteration_equity_curve_comparison.png`
-2. `figures/week8_iteration_drawdown_comparison.png`
-3. `figures/week8_iteration_risk_return_snapshot.png`
-4. `figures/week8_iteration_rolling_mean_return_comparison.png`
-5. `figures/week8_iteration_return_distribution_comparison.png`
-6. `figures/week8_iteration_category_exposure_comparison.png`
-7. `figures/week8_iteration_top_exposure_deltas.png`
+1. **Problem statement + objective:** maximize risk-adjusted return while capping domain exposure.
+2. **Method:** online optimization (OGD/SGD-style sequential updates) with differentiable domain penalties.
+3. **Math/definitions:** use section 3 formulas with $S_d$, $L_d$, and constrained objective.
+4. **Equity comparison:** `figures/week8_iteration_equity_curve_comparison.png`
+5. **Drawdown comparison:** `figures/week8_iteration_drawdown_comparison.png`
+6. **Risk-return snapshot:** `figures/week8_iteration_risk_return_snapshot.png`
+7. **Rolling mean return:** `figures/week8_iteration_rolling_mean_return_comparison.png`
+8. **Return distribution:** `figures/week8_iteration_return_distribution_comparison.png`
+9. **Domain exposure bars:** `figures/week8_iteration_category_exposure_comparison.png`
+10. **Top exposure deltas:** `figures/week8_iteration_top_exposure_deltas.png`
+11. **Success metric close:** baseline outperformance + drawdown context relative to prior PRISM benchmark (60.6% historical drawdown).
 
 ---
 
