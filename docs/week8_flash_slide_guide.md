@@ -24,45 +24,71 @@
 
 ## 3) Core math formulas (one slide)
 
-Cursor-preview-safe notation (plain text):
+Use LaTeX math blocks for rendering:
 
-```text
 Definitions:
-- r_t in R^N  : vector of token returns at step t
-- w_t in Delta^N : portfolio weights on simplex (sum(w_t)=1, w_t >= 0)
+
+- $r_t \in \mathbb{R}^N$: vector of token returns at step $t$
+- $w_t \in \Delta^N$: portfolio weights on simplex, $\sum_i w_{t,i}=1$ and $w_{t,i}\ge 0$
 
 Step return:
-R_t = w_t^T r_t
+
+$$
+R_t = w_t^\top r_t
+$$
 
 Cumulative value:
-V_t = product_{s=1..t} (1 + R_s)
+
+$$
+V_t = \prod_{s=1}^{t} (1 + R_s)
+$$
 
 Drawdown:
-DD_t = V_t / max_{s<=t}(V_s) - 1
+
+$$
+\mathrm{DD}_t = \frac{V_t}{\max_{s \le t} V_s} - 1
+$$
 
 Sortino:
-Sortino(R) = E[R] / ( sqrt( E[(min(R,0))^2] ) + eps )
+
+$$
+\mathrm{Sortino}(R)=\frac{\mathbb{E}[R]}{\sqrt{\mathbb{E}\!\left[(\min(R,0))^2\right]}+\varepsilon}
+$$
 
 Domain overexposure penalty:
-P_domain(w) = sum_d max(0, sum_{i in d} w_i - L_d)^2
+
+$$
+P_{\mathrm{domain}}(w)=\sum_d \max\!\left(0,\sum_{i\in d} w_i - L_d\right)^2
+$$
 
 Concentration penalty:
-P_conc(w) = sum_i max(0, w_i - w_max)^2
+
+$$
+P_{\mathrm{conc}}(w)=\sum_i \max(0, w_i - w_{\max})^2
+$$
 
 Entropy bonus:
-B_ent(w) = -sum_i w_i * log(w_i + eps)
 
-Weight mixing with uniform allocation u:
-w_tilde = (1 - alpha) * softmax(z_t) + alpha * u
+$$
+B_{\mathrm{ent}}(w)=-\sum_i w_i\log(w_i+\varepsilon)
+$$
+
+Weight mixing with uniform allocation $u$:
+
+$$
+\tilde{w}_t=(1-\alpha)\,\mathrm{softmax}(z_t)+\alpha\,u
+$$
 
 Objective per update window:
-maximize [
-  Sortino(R_window)
-  - lambda * P_domain(w_tilde)
-  - lambda_c * P_conc(w_tilde)
-  + lambda_e * B_ent(w_tilde)
-]
-```
+
+$$
+\max \left[
+\mathrm{Sortino}(R_{\mathrm{window}})
+-\lambda\,P_{\mathrm{domain}}(\tilde{w}_t)
+-\lambda_c\,P_{\mathrm{conc}}(\tilde{w}_t)
++\lambda_e\,B_{\mathrm{ent}}(\tilde{w}_t)
+\right]
+$$
 
 ---
 
