@@ -39,7 +39,8 @@ def _build_category_returns(
     category_returns = np.zeros((returns_matrix.shape[0], len(categories)), dtype=float)
     for j, category in enumerate(categories):
         indices = category_to_indices[category]
-        category_returns[:, j] = np.mean(returns_matrix[:, indices], axis=1)
+        category_returns[:, j] = np.nanmean(returns_matrix[:, indices], axis=1)
+    category_returns = np.nan_to_num(category_returns, nan=0.0)
     return categories, category_returns
 
 
@@ -52,7 +53,15 @@ def run_covariance_diagnostics(
     out_dir = project_root / "data" / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    cov_matrix = np.cov(category_returns, rowvar=False)
+    if len(categories) == 0 or category_returns.size == 0:
+        raise RuntimeError("No category returns available for covariance diagnostics.")
+
+    cov_matrix = np.atleast_2d(np.cov(category_returns, rowvar=False))
+    if cov_matrix.shape != (len(categories), len(categories)):
+        if len(categories) == 1:
+            cov_matrix = np.array([[float(np.var(category_returns[:, 0]))]], dtype=float)
+        else:
+            raise RuntimeError("Unexpected covariance matrix shape for category returns.")
     std = np.sqrt(np.clip(np.diag(cov_matrix), 0.0, None))
     denom = np.outer(std, std)
     corr_matrix = np.divide(
@@ -113,10 +122,11 @@ def run_covariance_diagnostics(
     eigvals_sum = float(np.sum(eigvals))
     top_eig_share = float(eigvals[-1] / eigvals_sum) if eigvals_sum > 0 else 0.0
 
+    pairwise_upper = np.abs(corr_matrix[np.triu_indices_from(corr_matrix, k=1)])
     summary = {
         "category_count": len(categories),
-        "avg_abs_correlation": float(np.mean(np.abs(corr_matrix[np.triu_indices_from(corr_matrix, k=1)]))),
-        "max_abs_correlation": float(np.max(np.abs(corr_matrix[np.triu_indices_from(corr_matrix, k=1)]))),
+        "avg_abs_correlation": float(np.mean(pairwise_upper)) if pairwise_upper.size else 0.0,
+        "max_abs_correlation": float(np.max(pairwise_upper)) if pairwise_upper.size else 0.0,
         "pairs_abs_corr_ge_0p8": int(
             sum(1 for row in pair_rows_sorted if float(row["abs_correlation"]) >= 0.8)
         ),

@@ -1,0 +1,59 @@
+{
+  "generated_at_utc": "2026-03-13T22:57:11.766824+00:00",
+  "artifact_prefix": "week8",
+  "config_hash": "1c1d2c590d881c1b5b8e41e39bf71a7da1dfb45ae9e2db892c10def61e95b786",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build": 162.56758633299614,
+    "baseline": 2.5050893340085167,
+    "constrained_grid_and_holdout": 73605.544679625,
+    "covariance_diagnostics": 2.5471965840260964,
+    "figure_generation": 0.5458520840038545,
+    "week9_report_generation": 0.02026250000926666,
+    "total": 73773.73216791698
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/raw/week8_events_raw.json",
+      "markets_filtered": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_markets_filtered.csv",
+      "price_history": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_price_history.csv",
+      "data_quality": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_data_quality.json",
+      "category_liquidity": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_category_liquidity.csv",
+      "considered_domains": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_considered_domains.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_baseline_timeseries.csv",
+      "baseline_metrics": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_baseline_metrics.json"
+    },
+    "constrained": {
+      "constrained_grid": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_experiment_grid.csv",
+      "constrained_best_metrics": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_metrics.json",
+      "constrained_best_timeseries": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_timeseries.csv",
+      "constrained_best_market_return_contributions": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_market_return_contributions.csv",
+      "constrained_best_domain_return_contributions": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_domain_return_contributions.csv",
+      "constrained_best_step_top_contributors": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_step_top_contributors.csv",
+      "constrained_best_top_market_correlation": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_top_market_correlation.csv",
+      "constrained_best_top_market_correlation_pairs": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_top_market_correlation_pairs.csv",
+      "constrained_best_attribution_summary": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_constrained_best_attribution_summary.json"
+    },
+    "covariance": {
+      "category_covariance": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_category_covariance.csv",
+      "category_correlation": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_category_correlation.csv",
+      "top_correlation_pairs": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_top_correlation_pairs.csv",
+      "covariance_summary": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_covariance_summary.json"
+    },
+    "figures": {
+      "equity_curve": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_equity_curve_comparison.png",
+      "drawdown_curve": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_drawdown_comparison.png",
+      "domain_exposure": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_category_exposure_comparison.png",
+      "category_exposure_table": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_category_exposure_table.csv",
+      "rolling_mean_return": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_rolling_mean_return_comparison.png",
+      "return_distribution": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_return_distribution_comparison.png",
+      "top_exposure_deltas": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_top_exposure_deltas.png",
+      "risk_return_snapshot": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/figures/week8_iteration_risk_return_snapshot.png"
+    },
+    "reports": {
+      "week9_diagnostics_report": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/docs/week9_diagnostics_report.md"
+    }
+  }
+}

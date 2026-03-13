@@ -18,13 +18,19 @@ CLOB_BASE_URL = "https://clob.polymarket.com"
 DEFAULT_CATEGORY_LIMIT = 16
 
 
+class NoMarketsAfterHistoryFilterError(RuntimeError):
+    """Raised when all selected markets fail history quality filters."""
+
+
 @dataclass(frozen=True)
 class BuildConfig:
     """Configuration for building a local Polymarket analysis dataset."""
 
     max_events: int = 60
+    max_closed_events: int = 0
+    include_closed_events: bool = False
     events_page_limit: int = 50
-    min_event_markets: int = 1
+    min_event_markets: int = 5
     min_history_points: int = 20
     min_history_days: float = 14.0
     max_markets: int = 24
@@ -43,6 +49,9 @@ class BuildConfig:
     history_fidelity: int = 60
     request_timeout_sec: int = 20
     sleep_between_requests_sec: float = 0.05
+    use_cached_events_if_available: bool = True
+    history_priority_enabled: bool = True
+    history_priority_oversample_factor: int = 4
 
 
 def _request_json(
@@ -67,17 +76,23 @@ def _request_json(
     raise RuntimeError(f"Request failed for {url} with params={params}") from last_error
 
 
-def fetch_active_events(config: BuildConfig) -> list[dict[str, Any]]:
-    """Fetch paginated active events with nested markets and tags."""
+def _fetch_events_by_status(
+    config: BuildConfig,
+    *,
+    active: bool,
+    closed: bool,
+    max_events: int,
+) -> list[dict[str, Any]]:
+    """Fetch paginated events for a specific active/closed status pair."""
     events: list[dict[str, Any]] = []
     offset = 0
 
-    while len(events) < config.max_events:
+    while len(events) < max_events:
         page = _request_json(
             f"{GAMMA_BASE_URL}/events",
             {
-                "active": "true",
-                "closed": "false",
+                "active": "true" if active else "false",
+                "closed": "true" if closed else "false",
                 "limit": config.events_page_limit,
                 "offset": offset,
             },
@@ -90,7 +105,29 @@ def fetch_active_events(config: BuildConfig) -> list[dict[str, Any]]:
         offset += config.events_page_limit
         time.sleep(config.sleep_between_requests_sec)
 
-    return events[: config.max_events]
+    return events[:max_events]
+
+
+def fetch_active_events(config: BuildConfig) -> list[dict[str, Any]]:
+    """Fetch paginated active (open) events with nested markets and tags."""
+    return _fetch_events_by_status(
+        config,
+        active=True,
+        closed=False,
+        max_events=config.max_events,
+    )
+
+
+def fetch_closed_events(config: BuildConfig) -> list[dict[str, Any]]:
+    """Fetch paginated closed events to extend historical depth when requested."""
+    if config.max_closed_events <= 0:
+        return []
+    return _fetch_events_by_status(
+        config,
+        active=False,
+        closed=True,
+        max_events=config.max_closed_events,
+    )
 
 
 def _parse_json_list_field(raw_value: Any) -> list[str]:
@@ -107,6 +144,20 @@ def _parse_json_list_field(raw_value: Any) -> list[str]:
         except json.JSONDecodeError:
             pass
     return []
+
+
+def _safe_float(raw_value: Any) -> float | None:
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(raw_value: Any) -> int | None:
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _derive_fallback_domain_from_tags(event_tags: list[dict[str, Any]]) -> str:
@@ -149,12 +200,15 @@ def _derive_category_from_tags(event_tags: list[dict[str, Any]]) -> str:
         "finance",
         "crypto",
     }
+    excluded_prefixes = ("rewards-", "earn-", "hide-from-", "parent-for-", "pre-market")
     candidate_slugs: list[str] = []
     for tag in event_tags:
         slug = str(tag.get("slug", "")).strip().lower()
         if not slug:
             continue
         if slug in generic:
+            continue
+        if any(slug.startswith(prefix) for prefix in excluded_prefixes):
             continue
         candidate_slugs.append(slug)
     if candidate_slugs:
@@ -221,7 +275,7 @@ def flatten_event_markets(
     events: list[dict[str, Any]],
     min_event_markets: int,
 ) -> list[dict[str, Any]]:
-    """Flatten nested event+market records into market-level rows."""
+    """Flatten nested event+market records into binary Yes/No market rows."""
     rows: list[dict[str, Any]] = []
 
     for event in events:
@@ -245,16 +299,16 @@ def flatten_event_markets(
 
             outcomes = _parse_json_list_field(market.get("outcomes"))
             clob_ids = _parse_json_list_field(market.get("clobTokenIds"))
-            if len(outcomes) < 1 or len(clob_ids) < 1:
+            # Keep only binary Yes/No markets and track the Yes-side token only.
+            if len(outcomes) != 2 or len(clob_ids) != 2:
                 continue
-
-            # Prefer "Yes" token for interpretable binary-return convention.
-            yes_index = 0
-            for index, outcome in enumerate(outcomes):
-                if outcome.lower() == "yes":
-                    yes_index = index
-                    break
-            yes_token_id = clob_ids[min(yes_index, len(clob_ids) - 1)]
+            normalized_outcomes = [outcome.strip().lower() for outcome in outcomes]
+            if set(normalized_outcomes) != {"yes", "no"}:
+                continue
+            yes_index = normalized_outcomes.index("yes")
+            yes_token_id = clob_ids[yes_index]
+            if not str(yes_token_id).strip():
+                continue
 
             rows.append(
                 {
@@ -266,7 +320,7 @@ def flatten_event_markets(
                     "question": question,
                     "yes_token_id": yes_token_id,
                     "domain": domain,
-                    "market_liquidity": float(market.get("liquidity", 0.0) or 0.0),
+                    "market_liquidity": float(_safe_float(market.get("liquidity", 0.0)) or 0.0),
                     "tag_labels": "|".join(tag_labels),
                     "tag_slugs": "|".join(tag_slugs),
                     "event_start": str(event.get("startDate", "")),
@@ -303,16 +357,16 @@ def fetch_price_history(
     for point in history:
         if not isinstance(point, dict):
             continue
-        ts = point.get("t")
-        price = point.get("p")
+        ts = _safe_int(point.get("t"))
+        price = _safe_float(point.get("p"))
         if ts is None or price is None:
             continue
         rows.append(
             {
                 "token_id": token_id,
-                "timestamp": int(ts),
-                "datetime_utc": dt.datetime.fromtimestamp(int(ts), tz=dt.timezone.utc).isoformat(),
-                "price": float(price),
+                "timestamp": ts,
+                "datetime_utc": dt.datetime.fromtimestamp(ts, tz=dt.timezone.utc).isoformat(),
+                "price": price,
             }
         )
     return rows
@@ -379,6 +433,46 @@ def _compute_data_quality(
     }
 
 
+def _select_history_priority_market_rows(
+    market_rows: list[dict[str, Any]],
+    token_to_history_days: dict[str, float],
+    max_markets: int,
+) -> list[dict[str, Any]]:
+    """Prioritize longest-history markets while preserving category breadth."""
+    if not market_rows or max_markets <= 0:
+        return []
+
+    by_domain: dict[str, list[dict[str, Any]]] = {}
+    for row in market_rows:
+        by_domain.setdefault(str(row.get("domain", "other")), []).append(row)
+
+    for domain in by_domain:
+        by_domain[domain] = sorted(
+            by_domain[domain],
+            key=lambda row: (
+                float(token_to_history_days.get(str(row.get("yes_token_id", "")), 0.0)),
+                float(row.get("market_liquidity", 0.0)),
+            ),
+            reverse=True,
+        )
+
+    selected: list[dict[str, Any]] = []
+    domains = sorted(by_domain.keys())
+    idx = 0
+    done = False
+    while not done and len(selected) < max_markets:
+        done = True
+        for domain in domains:
+            rows = by_domain.get(domain, [])
+            if idx < len(rows):
+                selected.append(rows[idx])
+                done = False
+                if len(selected) >= max_markets:
+                    break
+        idx += 1
+    return selected
+
+
 def build_dataset(
     project_root: pathlib.Path,
     config: BuildConfig | None = None,
@@ -388,18 +482,46 @@ def build_dataset(
     data_raw = project_root / "data" / "raw"
     data_processed = project_root / "data" / "processed"
 
-    events = fetch_active_events(cfg)
     raw_events_path = data_raw / f"{cfg.artifact_prefix}_events_raw.json"
-    raw_events_path.parent.mkdir(parents=True, exist_ok=True)
-    raw_events_path.write_text(json.dumps(events, indent=2), encoding="utf-8")
+    events: list[dict[str, Any]]
+    if cfg.use_cached_events_if_available and raw_events_path.exists():
+        try:
+            loaded = json.loads(raw_events_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                events = loaded
+            else:
+                events = []
+        except json.JSONDecodeError:
+            events = []
+    else:
+        events = []
+
+    if not events:
+        events = fetch_active_events(cfg)
+        if cfg.include_closed_events:
+            closed_events = fetch_closed_events(cfg)
+            # Merge without duplicate IDs so active and closed pools can be combined safely.
+            seen_event_ids: set[str] = set()
+            merged: list[dict[str, Any]] = []
+            for event in events + closed_events:
+                event_id = str(event.get("id", ""))
+                if event_id and event_id in seen_event_ids:
+                    continue
+                if event_id:
+                    seen_event_ids.add(event_id)
+                merged.append(event)
+            events = merged
+        raw_events_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_events_path.write_text(json.dumps(events, indent=2), encoding="utf-8")
 
     market_rows = flatten_event_markets(events, min_event_markets=cfg.min_event_markets)
 
+    candidate_target = max(cfg.max_markets * max(cfg.history_priority_oversample_factor, 1), cfg.max_markets)
     filtered_market_rows = _select_balanced_market_rows(
         market_rows=market_rows,
         max_categories=cfg.max_categories,
         per_category_market_cap=cfg.per_category_market_cap,
-        max_markets=cfg.max_markets,
+        max_markets=candidate_target,
         min_category_liquidity=cfg.min_category_liquidity,
         excluded_categories=set(cfg.excluded_category_slugs),
     )
@@ -417,10 +539,13 @@ def build_dataset(
     selected_categories = sorted({row["domain"] for row in filtered_market_rows})
 
     histories: list[dict[str, Any]] = []
+    token_to_history_days: dict[str, float] = {}
     dropped_by_short_history_days = 0
     dropped_by_short_history_points = 0
     for row in filtered_market_rows:
         token_id = row["yes_token_id"]
+        if not token_id:
+            continue
         token_history = fetch_price_history(token_id, cfg)
         history_days = _history_span_days(token_history)
         if len(token_history) < cfg.min_history_points:
@@ -432,20 +557,32 @@ def build_dataset(
             time.sleep(cfg.sleep_between_requests_sec)
             continue
         if len(token_history) >= cfg.min_history_points:
+            token_to_history_days[token_id] = history_days
             histories.extend(token_history)
         time.sleep(cfg.sleep_between_requests_sec)
 
     # Keep only markets with sufficient history.
     valid_tokens = {row["token_id"] for row in histories}
-    final_market_rows = [
+    candidate_final_rows = [
         row for row in filtered_market_rows if row["yes_token_id"] in valid_tokens
     ]
+    if cfg.history_priority_enabled:
+        final_market_rows = _select_history_priority_market_rows(
+            market_rows=candidate_final_rows,
+            token_to_history_days=token_to_history_days,
+            max_markets=cfg.max_markets,
+        )
+    else:
+        final_market_rows = candidate_final_rows[: cfg.max_markets]
+    final_tokens = {str(row.get("yes_token_id", "")) for row in final_market_rows}
+    histories = [row for row in histories if str(row.get("token_id", "")) in final_tokens]
 
     markets_path = data_processed / f"{cfg.artifact_prefix}_markets_filtered.csv"
     prices_path = data_processed / f"{cfg.artifact_prefix}_price_history.csv"
     quality_path = data_processed / f"{cfg.artifact_prefix}_data_quality.json"
     category_liquidity_path = data_processed / f"{cfg.artifact_prefix}_category_liquidity.csv"
     considered_domains_path = data_processed / f"{cfg.artifact_prefix}_considered_domains.json"
+    selected_categories = sorted({row["domain"] for row in final_market_rows})
 
     _write_csv(
         markets_path,
@@ -517,6 +654,15 @@ def build_dataset(
     quality["dropped_by_short_history_days"] = dropped_by_short_history_days
     quality["dropped_by_short_history_points"] = dropped_by_short_history_points
     quality_path.write_text(json.dumps(quality, indent=2), encoding="utf-8")
+
+    if not final_market_rows:
+        raise NoMarketsAfterHistoryFilterError(
+            "No markets survived history filters. "
+            f"min_history_days={cfg.min_history_days}, "
+            f"dropped_by_short_history_days={dropped_by_short_history_days}, "
+            f"dropped_by_short_history_points={dropped_by_short_history_points}. "
+            "Try lowering min_history_days or increasing max_closed_events."
+        )
 
     return {
         "events_raw": raw_events_path,

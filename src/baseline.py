@@ -50,20 +50,25 @@ def _build_price_matrix(
         j = token_index[token]
         matrix[i, j] = float(row["price"])
 
-    # Forward fill + back fill missing values per market.
+    # Forward-fill only after each token's first observation.
+    # Keep pre-listing points as NaN so assets can enter over time.
     for col in range(matrix.shape[1]):
         col_vals = matrix[:, col]
         valid = np.where(~np.isnan(col_vals))[0]
         if len(valid) == 0:
             continue
         first = valid[0]
-        col_vals[:first] = col_vals[first]
         for idx in range(first + 1, len(col_vals)):
             if np.isnan(col_vals[idx]):
                 col_vals[idx] = col_vals[idx - 1]
         matrix[:, col] = col_vals
 
-    keep_cols = ~np.isnan(matrix).any(axis=0)
+    if not np.any(~np.isnan(matrix)):
+        return [], np.array([], dtype=float), []
+
+    # Keep tokens with at least one valid observation; dynamic-universe logic
+    # downstream will renormalize weights among currently available assets.
+    keep_cols = np.any(~np.isnan(matrix), axis=0)
     kept_tokens = [token for token, keep in zip(tokens, keep_cols, strict=False) if keep]
     filtered = matrix[:, keep_cols]
     return ts_values, filtered, kept_tokens
@@ -74,13 +79,30 @@ def _compute_returns(price_matrix: np.ndarray) -> np.ndarray:
         return np.array([], dtype=float)
     prev = price_matrix[:-1]
     nxt = price_matrix[1:]
-    returns = np.divide(
-        nxt - prev,
-        np.clip(prev, 1e-6, None),
-        out=np.zeros_like(nxt),
-        where=prev > 0,
-    )
+    returns = (nxt - prev) / np.clip(prev, 1e-6, None)
     return returns
+
+
+def _dynamic_portfolio_returns(returns_matrix: np.ndarray, base_weights: np.ndarray) -> np.ndarray:
+    """Compute returns with time-varying available asset set."""
+    if returns_matrix.size == 0 or base_weights.size == 0:
+        return np.array([], dtype=float)
+    out: list[float] = []
+    for t in range(returns_matrix.shape[0]):
+        step = returns_matrix[t]
+        valid = np.isfinite(step)
+        if not np.any(valid):
+            out.append(0.0)
+            continue
+        masked_weights = np.where(valid, base_weights, 0.0)
+        weight_sum = float(np.sum(masked_weights))
+        if weight_sum <= 0.0:
+            masked_weights = np.where(valid, 1.0, 0.0)
+            weight_sum = float(np.sum(masked_weights))
+        step_weights = masked_weights / max(weight_sum, 1e-12)
+        step_returns = np.nan_to_num(step, nan=0.0)
+        out.append(float(step_returns @ step_weights))
+    return np.array(out, dtype=float)
 
 
 def _sortino_ratio(returns: np.ndarray, eps: float = 1e-8) -> float:
@@ -148,7 +170,7 @@ def run_equal_weight_baseline(
         per_market_weight = domain_share / float(len(tokens_in_domain))
         for token in tokens_in_domain:
             weights[token_index[token]] = per_market_weight
-    portfolio_returns = returns_matrix @ weights
+    portfolio_returns = _dynamic_portfolio_returns(returns_matrix, weights)
     cumulative = np.cumprod(1.0 + portfolio_returns)
     drawdown, max_dd = _max_drawdown(cumulative)
 

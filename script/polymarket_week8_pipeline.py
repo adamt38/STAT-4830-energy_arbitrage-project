@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import csv
+import datetime as dt
+import hashlib
 import json
 import os
 import pathlib
 import sys
+import time
+from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 os.environ.setdefault("MPLCONFIGDIR", str(REPO_ROOT / ".mplconfig"))
@@ -22,13 +26,282 @@ import numpy as np
 from src.baseline import pretty_float, pretty_pct, run_equal_weight_baseline, save_baseline_outputs
 from src.constrained_optimizer import ExperimentConfig, run_experiment_grid
 from src.covariance_diagnostics import run_covariance_diagnostics
-from src.polymarket_data import BuildConfig, build_dataset
+from src.polymarket_data import BuildConfig, NoMarketsAfterHistoryFilterError, build_dataset
 
 
 def _read_series(path: pathlib.Path) -> list[dict[str, str]]:
     with path.open("r", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         return list(reader)
+
+
+def _read_json(path: pathlib.Path) -> dict[str, object]:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _sortino_np(returns: np.ndarray) -> float:
+    if returns.size == 0:
+        return 0.0
+    downside = np.minimum(returns, 0.0)
+    downside_dev = float(np.sqrt(np.mean(np.square(downside))))
+    return float(np.mean(returns) / (downside_dev + 1e-8))
+
+
+def _to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _config_hash(build_cfg: BuildConfig, experiment_cfg: ExperimentConfig) -> str:
+    payload = {
+        "build": build_cfg.__dict__,
+        "experiment": experiment_cfg.__dict__,
+    }
+    serialized = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _write_run_manifest(
+    project_root: pathlib.Path,
+    *,
+    artifact_prefix: str,
+    config_hash: str,
+    stage_durations_sec: dict[str, float],
+    used_min_history_days: float,
+    artifact_groups: dict[str, dict[str, str]],
+) -> pathlib.Path:
+    processed = project_root / "data" / "processed"
+    processed.mkdir(parents=True, exist_ok=True)
+    manifest_path = processed / f"{artifact_prefix}_run_manifest.json"
+    payload = {
+        "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "artifact_prefix": artifact_prefix,
+        "config_hash": config_hash,
+        "min_history_days_used": used_min_history_days,
+        "stage_durations_sec": stage_durations_sec,
+        "artifacts": artifact_groups,
+    }
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return manifest_path
+
+
+def _make_week9_diagnostics_report(
+    project_root: pathlib.Path,
+    *,
+    artifact_prefix: str,
+    min_history_days_used: float,
+) -> pathlib.Path:
+    """Create a compact week 9 markdown report from latest artifacts."""
+    processed = project_root / "data" / "processed"
+    docs_dir = project_root / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    baseline_metrics = _read_json(processed / f"{artifact_prefix}_baseline_metrics.json")
+    constrained_metrics = _read_json(processed / f"{artifact_prefix}_constrained_best_metrics.json")
+    covariance_summary = _read_json(processed / f"{artifact_prefix}_covariance_summary.json")
+    attribution_summary = _read_json(
+        processed / f"{artifact_prefix}_constrained_best_attribution_summary.json"
+    )
+    market_contrib = _read_series(
+        processed / f"{artifact_prefix}_constrained_best_market_return_contributions.csv"
+    )
+    domain_contrib = _read_series(
+        processed / f"{artifact_prefix}_constrained_best_domain_return_contributions.csv"
+    )
+    corr_pairs = _read_series(
+        processed / f"{artifact_prefix}_constrained_best_top_market_correlation_pairs.csv"
+    )
+    baseline_ts = _read_series(processed / f"{artifact_prefix}_baseline_timeseries.csv")
+
+    split_info_obj = constrained_metrics.get("data_split", {})
+    split_info = split_info_obj if isinstance(split_info_obj, dict) else {}
+    holdout_steps_total = _to_int(split_info.get("holdout_steps_total", 0), default=0)
+    baseline_holdout_rows = baseline_ts[-holdout_steps_total:] if holdout_steps_total > 0 else []
+    baseline_holdout_rets = np.array(
+        [float(row["portfolio_return"]) for row in baseline_holdout_rows], dtype=float
+    )
+    if baseline_holdout_rets.size > 0:
+        baseline_holdout_cum = np.cumprod(1.0 + baseline_holdout_rets)
+        baseline_holdout_peak = np.maximum.accumulate(baseline_holdout_cum)
+        baseline_holdout_dd = baseline_holdout_cum / np.clip(baseline_holdout_peak, 1e-8, None) - 1.0
+        baseline_holdout_max_dd = float(np.min(baseline_holdout_dd))
+    else:
+        baseline_holdout_max_dd = 0.0
+
+    best_params_obj = constrained_metrics.get("best_params", {})
+    best_params = best_params_obj if isinstance(best_params_obj, dict) else {}
+    top_market_obj = attribution_summary.get("top_market_by_abs_contribution", {})
+    top_domain_obj = attribution_summary.get("top_domain_by_abs_contribution", {})
+    top_market_summary = top_market_obj if isinstance(top_market_obj, dict) else {}
+    top_domain_summary = top_domain_obj if isinstance(top_domain_obj, dict) else {}
+    top_markets = market_contrib[:10]
+    top_domains = domain_contrib[:10]
+    top_corr_pairs = corr_pairs[:5]
+
+    token_lookup: dict[str, dict[str, str]] = {}
+    for row in market_contrib:
+        token_lookup[row.get("token_id", "")] = {
+            "question": row.get("question", ""),
+            "slug": row.get("market_slug", ""),
+            "domain": row.get("domain", "other"),
+        }
+
+    def _market_label(token_id: str) -> str:
+        info = token_lookup.get(token_id, {})
+        question = info.get("question", "")
+        if question:
+            return question
+        slug = info.get("slug", "")
+        return slug if slug else token_id[:16] + "..."
+
+    top_market_question = top_market_summary.get("question", "") or top_market_summary.get("market_slug", "")
+    top_market_domain = top_market_summary.get("domain", "other")
+    top_market_contrib_val = _to_float(top_market_summary.get("contribution_share_of_total_return", 0.0))
+
+    constrained_sortino = _to_float(best_params.get("holdout_sortino_ratio", 0.0))
+    baseline_sortino_holdout = _sortino_np(baseline_holdout_rets)
+    sortino_delta = constrained_sortino - baseline_sortino_holdout
+    constrained_dd = _to_float(best_params.get("holdout_max_drawdown", 0.0))
+    dd_delta = constrained_dd - baseline_holdout_max_dd
+
+    lines = [
+        "# Week 9 Diagnostics Report",
+        "",
+        "## Run Context",
+        f"- artifact prefix: `{artifact_prefix}`",
+        f"- min history days used after backoff: `{min_history_days_used}`",
+        f"- market count: `{_to_int(baseline_metrics.get('market_count', 0), default=0)}`",
+        f"- tuning steps: `{_to_int(split_info.get('tuning_steps', 0), default=0)}`",
+        f"- holdout steps: `{holdout_steps_total}`",
+        f"- objective: `{_to_float(best_params.get('variance_penalty', 0.0)):.1f}`-var / `{_to_float(best_params.get('downside_penalty', 0.0)):.1f}`-downside mean-downside surrogate"
+        if "holdout_sortino_ratio" in best_params
+        else "",
+        "",
+        "## Holdout Performance Comparison",
+        "",
+        "| Metric | Baseline | Constrained | Delta |",
+        "|--------|----------|-------------|-------|",
+        f"| Sortino ratio | {baseline_sortino_holdout:.4f} | {constrained_sortino:.4f} | {sortino_delta:+.4f} |",
+        f"| Max drawdown | {baseline_holdout_max_dd:.4%} | {constrained_dd:.4%} | {dd_delta:+.4%} |",
+        f"| Mean return | {float(np.mean(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0:.8f} | {_to_float(best_params.get('holdout_mean_return', 0.0)):.8f} | {_to_float(best_params.get('holdout_mean_return', 0.0)) - (float(np.mean(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0):+.8f} |",
+        f"| Volatility | {float(np.std(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0:.8f} | {_to_float(best_params.get('holdout_volatility', 0.0)):.8f} | {_to_float(best_params.get('holdout_volatility', 0.0)) - (float(np.std(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0):+.8f} |",
+        "",
+        "## Full-Series Baseline Reference",
+        f"- baseline sortino (full): `{_to_float(baseline_metrics.get('sortino_ratio', 0.0)):.4f}`",
+        f"- baseline max drawdown (full): `{_to_float(baseline_metrics.get('max_drawdown', 0.0)):.4%}`",
+        "",
+        "## Attribution — What Drove Returns",
+        "",
+        f"**Biggest single market:** {top_market_question} (`{top_market_domain}`) — {top_market_contrib_val:.1%} of total return",
+        f"**Biggest domain:** `{top_domain_summary.get('domain', 'other')}` — {_to_float(top_domain_summary.get('contribution_share_of_total_return', 0.0)):.1%} of total return",
+        "",
+        "### Top 10 Market Contributors",
+        "",
+        "| # | Market | Domain | Contribution | Share | Weight |",
+        "|---|--------|--------|-------------|-------|--------|",
+    ]
+    for rank, row in enumerate(top_markets, 1):
+        question = row.get("question", "") or row.get("market_slug", "")
+        lines.append(
+            "| {} | {} | `{}` | {:.6f} | {:.1%} | {:.4f} |".format(
+                rank,
+                question,
+                row.get("domain", "other"),
+                float(row.get("total_contribution", 0.0)),
+                float(row.get("contribution_share_of_total_return", 0.0)),
+                float(row.get("mean_weight", 0.0)),
+            )
+        )
+
+    lines.extend([
+        "",
+        "### Top 10 Domain Contributors",
+        "",
+        "| # | Domain | Contribution | Share |",
+        "|---|--------|-------------|-------|",
+    ])
+    for rank, row in enumerate(top_domains, 1):
+        lines.append(
+            "| {} | `{}` | {:.6f} | {:.1%} |".format(
+                rank,
+                row.get("domain", "other"),
+                float(row.get("total_contribution", 0.0)),
+                float(row.get("contribution_share_of_total_return", 0.0)),
+            )
+        )
+
+    lines.extend([
+        "",
+        "### Top 5 Correlated Contributor Pairs",
+        "",
+        "| Market A | Market B | Correlation |",
+        "|----------|----------|-------------|",
+    ])
+    for row in top_corr_pairs:
+        label_a = _market_label(row.get("token_a", ""))
+        label_b = _market_label(row.get("token_b", ""))
+        lines.append(
+            "| {} | {} | {:.4f} |".format(
+                label_a,
+                label_b,
+                float(row.get("corr", 0.0)),
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Correlation and Risk Structure",
+            f"- category count: `{_to_int(covariance_summary.get('category_count', 0), default=0)}`",
+            f"- avg abs category correlation: `{_to_float(covariance_summary.get('avg_abs_correlation', 0.0)):.4f}`",
+            f"- max abs category correlation: `{_to_float(covariance_summary.get('max_abs_correlation', 0.0)):.4f}`",
+            f"- top eigenvalue share: `{_to_float(covariance_summary.get('top_eigenvalue_share', 0.0)):.4f}`",
+            f"- variance ratio constrained vs baseline: `{_to_float(covariance_summary.get('variance_ratio_constrained_vs_baseline', 0.0)):.4f}`",
+            "",
+            "## Interpretation Checklist",
+            f"- [{'x' if sortino_delta > 0 else ' '}] Constrained holdout Sortino beats baseline ({sortino_delta:+.4f})",
+            f"- [{'x' if dd_delta > 0 else ' '}] Constrained holdout drawdown better than baseline ({dd_delta:+.4%})",
+            f"- [{'x' if _to_float(covariance_summary.get('max_abs_correlation', 0.0)) < 0.3 else ' '}] Top contributor pairs not excessively correlated (max abs corr: {_to_float(covariance_summary.get('max_abs_correlation', 0.0)):.4f})",
+            f"- [{'x' if _to_float(top_domain_summary.get('contribution_share_of_total_return', 0.0)) < 0.5 else ' '}] No single domain dominates returns (top domain share: {_to_float(top_domain_summary.get('contribution_share_of_total_return', 0.0)):.1%})",
+        ]
+    )
+
+    report_path = docs_dir / "week9_diagnostics_report.md"
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return report_path
+
+
+def _build_dataset_with_history_backoff(
+    project_root: pathlib.Path,
+    base_config: BuildConfig,
+    history_day_candidates: tuple[float, ...] = (60.0, 45.0, 36.0, 30.0, 24.0),
+) -> tuple[dict[str, pathlib.Path], float]:
+    """Try stricter-to-looser history windows until markets survive."""
+    last_error: RuntimeError | None = None
+    for min_days in history_day_candidates:
+        cfg = BuildConfig(**{**base_config.__dict__, "min_history_days": float(min_days)})
+        try:
+            artifacts = build_dataset(project_root=project_root, config=cfg)
+            return artifacts, float(min_days)
+        except NoMarketsAfterHistoryFilterError as exc:
+            last_error = exc
+            print(
+                f"No markets at min_history_days={min_days}; "
+                "retrying with a less strict history filter..."
+            )
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Dataset build failed without a captured error.")
 
 
 def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
@@ -228,36 +501,113 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
 
 def main() -> None:
     project_root = REPO_ROOT
+    run_started = time.perf_counter()
 
-    data_artifacts = build_dataset(
-        project_root=project_root,
-        config=BuildConfig(
-            max_events=500,
-            events_page_limit=60,
-            min_history_points=12,
-            min_history_days=21.0,
-            max_markets=100,
-            max_categories=80,
-            per_category_market_cap=1,
-            min_category_liquidity=150000.0,
-            excluded_category_slugs=(
-                "hide-from-new",
-                "parent-for-derivative",
-                "earn-4",
-                "pre-market",
-                "rewards-20-4pt5-50",
-            ),
-            artifact_prefix="week8",
-            history_interval="max",
-            history_fidelity=60,
+    base_build_config = BuildConfig(
+        max_events=1000,
+        max_closed_events=4000,
+        include_closed_events=True,
+        events_page_limit=60,
+        min_event_markets=1,
+        min_history_points=24,
+        min_history_days=24.0,
+        max_markets=260,
+        max_categories=120,
+        per_category_market_cap=4,
+        min_category_liquidity=0.0,
+        excluded_category_slugs=(
+            "hide-from-new",
+            "parent-for-derivative",
+            "earn-4",
+            "pre-market",
+            "rewards-20-4pt5-50",
         ),
+        artifact_prefix="week8",
+        history_interval="max",
+        history_fidelity=60,
+        use_cached_events_if_available=True,
+        history_priority_enabled=True,
+        history_priority_oversample_factor=5,
     )
+    # ── Toggle: set QUICK_SANITY_CHECK = False for the full grid run ──
+    QUICK_SANITY_CHECK = False
+
+    if QUICK_SANITY_CHECK:
+        experiment_config = ExperimentConfig(
+            learning_rates=(0.02,),
+            penalties_lambda=(1.0,),
+            rolling_windows=(48,),
+            steps_per_window=3,
+            objective="mean_downside",
+            variance_penalty=1.0,
+            downside_penalty=2.0,
+            evaluation_modes=("online",),
+            primary_evaluation_mode="online",
+            enable_two_stage_search=False,
+            stage2_top_k=4,
+            max_parallel_workers=4,
+            early_prune_enabled=True,
+            early_prune_exposure_factor=1.5,
+            domain_limits=(0.06,),
+            max_weights=(0.03,),
+            concentration_penalty_lambdas=(120.0,),
+            covariance_penalty_lambdas=(10.0,),
+            covariance_shrinkages=(0.05,),
+            entropy_lambdas=(0.0,),
+            uniform_mixes=(0.1,),
+            max_domain_exposure_threshold=0.04,
+            holdout_fraction=0.2,
+            walkforward_train_steps=240,
+            walkforward_test_steps=48,
+            seed=7,
+        )
+    else:
+        experiment_config = ExperimentConfig(
+            learning_rates=(0.01, 0.03),
+            penalties_lambda=(1.0, 2.0),
+            rolling_windows=(48, 96),
+            steps_per_window=3,
+            objective="mean_downside",
+            variance_penalty=1.0,
+            downside_penalty=2.0,
+            evaluation_modes=("online",),
+            primary_evaluation_mode="online",
+            enable_two_stage_search=True,
+            stage2_top_k=8,
+            max_parallel_workers=4,
+            early_prune_enabled=True,
+            early_prune_exposure_factor=1.5,
+            domain_limits=(0.06, 0.08),
+            max_weights=(0.03, 0.04),
+            concentration_penalty_lambdas=(120.0,),
+            covariance_penalty_lambdas=(10.0, 20.0),
+            covariance_shrinkages=(0.05,),
+            entropy_lambdas=(0.0,),
+            uniform_mixes=(0.1,),
+            max_domain_exposure_threshold=0.04,
+            holdout_fraction=0.2,
+            walkforward_train_steps=240,
+            walkforward_test_steps=48,
+            seed=7,
+        )
+    config_hash = _config_hash(base_build_config, experiment_config)
+
+    stage_started = time.perf_counter()
+    data_artifacts, used_min_history_days = _build_dataset_with_history_backoff(
+        project_root=project_root,
+        base_config=base_build_config,
+        history_day_candidates=(24.0,),
+    )
+    data_sec = time.perf_counter() - stage_started
     print("Data artifacts:")
+    print(f"- min_history_days_used: {used_min_history_days}")
     for key, value in data_artifacts.items():
         print(f"- {key}: {value}")
 
+    stage_started = time.perf_counter()
     baseline_result = run_equal_weight_baseline(project_root, artifact_prefix="week8")
     baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix="week8")
+    baseline_sec = time.perf_counter() - stage_started
     print("\nBaseline summary:")
     print(f"- markets: {baseline_result.market_count}")
     print(f"- sortino: {pretty_float(baseline_result.sortino)}")
@@ -265,39 +615,66 @@ def main() -> None:
     for key, value in baseline_artifacts.items():
         print(f"- {key}: {value}")
 
+    stage_started = time.perf_counter()
     constrained_artifacts = run_experiment_grid(
         project_root,
         artifact_prefix="week8",
-        config=ExperimentConfig(
-            learning_rates=(0.05,),
-            penalties_lambda=(1.0,),
-            rolling_windows=(24,),
-            steps_per_window=1,
-            domain_limit=0.12,
-            max_weight=0.05,
-            concentration_penalty_lambda=80.0,
-            entropy_lambda=0.02,
-            uniform_mix=0.88,
-            max_domain_exposure_threshold=0.05,
-            holdout_fraction=0.2,
-            walkforward_train_steps=120,
-            walkforward_test_steps=24,
-            seed=7,
-        ),
+        config=experiment_config,
     )
+    constrained_sec = time.perf_counter() - stage_started
     print("\nConstrained experiment artifacts:")
     for key, value in constrained_artifacts.items():
         print(f"- {key}: {value}")
 
+    stage_started = time.perf_counter()
     covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix="week8")
+    covariance_sec = time.perf_counter() - stage_started
     print("\nCovariance diagnostics artifacts:")
     for key, value in covariance_artifacts.items():
         print(f"- {key}: {value}")
 
+    stage_started = time.perf_counter()
     figure_artifacts = _make_figures(project_root)
+    figures_sec = time.perf_counter() - stage_started
     print("\nFigure artifacts:")
     for key, value in figure_artifacts.items():
         print(f"- {key}: {value}")
+
+    stage_started = time.perf_counter()
+    week9_report_path = _make_week9_diagnostics_report(
+        project_root=project_root,
+        artifact_prefix="week8",
+        min_history_days_used=used_min_history_days,
+    )
+    report_sec = time.perf_counter() - stage_started
+    print("\nWeek 9 report artifact:")
+    print(f"- diagnostics_report: {week9_report_path}")
+
+    manifest_path = _write_run_manifest(
+        project_root=project_root,
+        artifact_prefix="week8",
+        config_hash=config_hash,
+        stage_durations_sec={
+            "data_build": data_sec,
+            "baseline": baseline_sec,
+            "constrained_grid_and_holdout": constrained_sec,
+            "covariance_diagnostics": covariance_sec,
+            "figure_generation": figures_sec,
+            "week9_report_generation": report_sec,
+            "total": time.perf_counter() - run_started,
+        },
+        used_min_history_days=used_min_history_days,
+        artifact_groups={
+            "data": {k: str(v) for k, v in data_artifacts.items()},
+            "baseline": {k: str(v) for k, v in baseline_artifacts.items()},
+            "constrained": {k: str(v) for k, v in constrained_artifacts.items()},
+            "covariance": {k: str(v) for k, v in covariance_artifacts.items()},
+            "figures": {k: str(v) for k, v in figure_artifacts.items()},
+            "reports": {"week9_diagnostics_report": str(week9_report_path)},
+        },
+    )
+    print("\nRun manifest artifact:")
+    print(f"- run_manifest: {manifest_path}")
 
 
 if __name__ == "__main__":
