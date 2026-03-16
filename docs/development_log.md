@@ -203,3 +203,79 @@ to overcome all these forces pulling toward equal-weight.
    actively rewarding the optimizer for staying at equal-weight, counteracting
    the return signal. Diversification is still enforced by the domain penalty,
    concentration penalty, and the remaining 10% uniform floor.
+
+### Week 9 run 3 results (uniform_mix=0.1, entropy=0.0)
+- Grid search completed in ~1,233 minutes (~20.6 hours) on M2 Air, 64 stage-1 candidates.
+- Best config selected: lr=0.03, penalty=1.0, window=96, covariance_penalty=20.0, uniform_mix=0.1.
+- Holdout results:
+
+| Metric | Baseline | Constrained | Delta |
+|--------|----------|-------------|-------|
+| Sortino | 0.3277 | 0.3137 | -0.0140 |
+| Max drawdown | -1.56% | -1.74% | -0.18% |
+| Mean return | 0.000176 | 0.000169 | -0.000006 |
+| Volatility | 0.00225 | 0.00211 | -0.00013 |
+
+- **Diagnosis: weights still near-uniform despite uniform_mix=0.1.**
+  Every market had mean_weight ≈ 0.0077 (1-market domains) or ≈ 0.0115 (2-market
+  domains). The exposure delta chart showed maximum deviations of ±0.003 — the
+  optimizer was making only tiny adjustments around equal-weight.
+
+### Root cause: too many markets for the signal strength
+With 260 markets and only 24 days of hourly data, three structural problems
+prevented the optimizer from learning meaningful tilts:
+
+1. **Extreme dilution.** Each market carries weight ≈ 1/260 = 0.0038. Even a
+   large relative tilt (e.g. doubling one weight) produces a portfolio-level
+   effect of only 0.4%, invisible against noise.
+2. **Massively underdetermined problem.** The optimizer must learn 260 weight
+   parameters from ~24 days of noisy returns — far too few observations per
+   parameter for the gradient to distinguish signal from noise.
+3. **Penalties still dominate.** `concentration_penalty_lambda=120.0` penalizes
+   any weight deviation quadratically. With the return gradient being noisy and
+   tiny per-market, the penalty gradient always wins, pulling weights back to
+   uniform. `covariance_penalty_lambda=10.0/20.0` similarly favors the
+   minimum-variance portfolio, which for 260 near-uncorrelated assets is
+   approximately equal-weight.
+4. **Constraint thresholds irrelevant.** `max_weight=0.03` and `domain_limit=0.06`
+   were never binding — equal-weight per market is 0.0038, and domain exposure
+   peaks at 0.0115. The optimizer had no constraint pressure to respond to.
+
+### Changes applied (run 4 configuration)
+
+#### 1. Reduced `max_markets` from 260 to 40
+The single most impactful change. With 40 markets:
+- Equal weight per market = 1/40 = 2.5%, making tilts visible.
+- The optimizer learns 40 parameters instead of 260 — much better determined.
+- Per-candidate runtime drops ~6.5× (linear in market count for the inner loop).
+- Constraint thresholds become meaningful (see below).
+
+#### 2. Rescaled constraint thresholds for a 40-market portfolio
+- `max_weight`: (0.03, 0.04) → (0.06, 0.08, 0.10). Equal weight is now 2.5%,
+  so these caps at 6-10% allow meaningful concentration without collapse.
+- `domain_limit`: (0.06, 0.08) → (0.10, 0.15, 0.20). With fewer markets per
+  domain, these thresholds now actually constrain the optimizer.
+- `max_domain_exposure_threshold`: 0.04 → 0.12. Feasibility filter adjusted to
+  match the new domain limits.
+
+#### 3. Reduced penalty strengths
+- `concentration_penalty_lambda`: 120.0 → search over (5.0, 10.0, 20.0).
+  At 120 the penalty gradient overwhelmed the return signal; at 5-20 it still
+  discourages extreme concentration but lets the optimizer express views.
+- `covariance_penalty_lambda`: (10.0, 20.0) → (1.0, 5.0, 10.0).
+  Lower values let the optimizer take on some correlated risk when the return
+  signal justifies it.
+
+#### 4. Widened the hyperparameter grid
+- `learning_rates`: (0.01, 0.03) → (0.01, 0.05, 0.1). Higher LRs may help
+  the optimizer move faster given the short data window.
+- `penalties_lambda`: (1.0, 2.0) → (0.5, 1.0, 2.0). Lower domain penalty
+  weight gives more freedom.
+- `rolling_windows`: (48, 96) → (24, 48, 96). Shorter windows capture more
+  recent signal, which may matter for fast-moving prediction markets.
+- `uniform_mixes`: (0.1,) → (0.0, 0.1). Includes a fully optimizer-controlled
+  variant alongside the 10% floor.
+
+#### 5. Two-stage search retained
+Stage 1 coarse grid is now 3×3×3×3×3×3×3×1×1×2 = 4,374 combinations (before
+coarse subsetting). The two-stage approach prunes this to a manageable set.

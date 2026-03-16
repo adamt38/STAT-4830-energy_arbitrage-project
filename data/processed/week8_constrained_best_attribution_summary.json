@@ -1,27 +1,27 @@
 {
-  "steps": 3170,
+  "steps": 3194,
   "asset_count": 260,
-  "total_portfolio_return": 0.5443221358995917,
+  "total_portfolio_return": 0.5401319236663684,
   "top_market_by_abs_contribution": {
     "token_id": "57448448736863973758595083634439217999760683155034404253676400541638226438054",
     "domain": "other",
     "question": "Will the Edmonton Oilers win the 2025\u20132026 NHL Presidents' Trophy?",
     "market_id": "644942",
     "market_slug": "nhl-2025-26-presidents-trophy-winner-edmonton-oilers",
-    "mean_weight": 0.0038420604566870146,
-    "total_contribution": 0.13269445146920458,
-    "mean_step_contribution": 4.185944841299829e-05,
-    "contribution_share_of_total_return": 0.2437792673081406
+    "mean_weight": 0.00381092574116736,
+    "total_contribution": 0.14983098523630825,
+    "mean_step_contribution": 4.6910139397717046e-05,
+    "contribution_share_of_total_return": 0.2773970185270083
   },
   "top_domain_by_abs_contribution": {
     "domain": "other",
-    "total_contribution": 0.18420842375069385,
-    "contribution_share_of_total_return": 0.3384180278581833
+    "total_contribution": 0.2043419092781267,
+    "contribution_share_of_total_return": 0.37831851872607647
   },
   "top_abs_corr_pair": {
     "token_a": "21259830334465500833312317438349276989384953586749699755938037455040151552654",
     "token_b": "65176599937650721299696179144517618396201227982573075840784084320548883939839",
-    "corr": 0.04925434247985173,
-    "abs_corr": 0.04925434247985173
+    "corr": 0.05497183704724869,
+    "abs_corr": 0.05497183704724869
   }
 }

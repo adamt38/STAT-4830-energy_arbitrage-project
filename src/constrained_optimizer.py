@@ -6,6 +6,8 @@ import csv
 import itertools
 import json
 import pathlib
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from typing import Any, TypedDict
@@ -843,23 +845,42 @@ def run_experiment_grid(
 
     def _evaluate_candidate_list(
         candidates: list[CandidateConfig],
+        stage_label: str = "Grid",
     ) -> list[tuple[CandidateConfig, tuple[dict[str, Any], SelectedExperimentPayload] | None]]:
         if not candidates:
             return []
+        total = len(candidates)
+        counter_lock = threading.Lock()
+        completed_count = [0]
+        batch_start = time.perf_counter()
+
+        def _log_progress(candidate: CandidateConfig) -> None:
+            with counter_lock:
+                completed_count[0] += 1
+                done = completed_count[0]
+            elapsed = time.perf_counter() - batch_start
+            avg = elapsed / done
+            remaining = avg * (total - done)
+            mins_left = remaining / 60.0
+            print(
+                f"  [{stage_label}] {done}/{total} candidates done "
+                f"({elapsed / 60:.1f}m elapsed, ~{mins_left:.1f}m remaining)",
+                flush=True,
+            )
+
         if cfg.max_parallel_workers <= 1:
-            return [
-                (
-                    candidate,
-                    _evaluate_candidate(
-                        candidate=candidate,
-                        tuning_returns=tuning_returns,
-                        domains=domains,
-                        cfg=cfg,
-                    ),
+            outputs: list[tuple[CandidateConfig, tuple[dict[str, Any], SelectedExperimentPayload] | None]] = []
+            for candidate in candidates:
+                result = _evaluate_candidate(
+                    candidate=candidate,
+                    tuning_returns=tuning_returns,
+                    domains=domains,
+                    cfg=cfg,
                 )
-                for candidate in candidates
-            ]
-        outputs: list[tuple[CandidateConfig, tuple[dict[str, Any], SelectedExperimentPayload] | None]] = []
+                outputs.append((candidate, result))
+                _log_progress(candidate)
+            return outputs
+        outputs = []
         with ThreadPoolExecutor(max_workers=cfg.max_parallel_workers) as executor:
             future_map = {
                 executor.submit(
@@ -874,8 +895,10 @@ def run_experiment_grid(
             for future in as_completed(future_map):
                 candidate = future_map[future]
                 outputs.append((candidate, future.result()))
+                _log_progress(candidate)
         return outputs
 
+    grid_start = time.perf_counter()
     if cfg.enable_two_stage_search:
         stage1_candidates = _build_candidates(
             learning_rates=_coarse_subset_float(cfg.learning_rates),
@@ -890,7 +913,10 @@ def run_experiment_grid(
             uniform_mixes=_coarse_subset_float(cfg.uniform_mixes),
             modes=modes,
         )
-        _consume_results(_evaluate_candidate_list(stage1_candidates))
+        print(f"\n{'='*60}", flush=True)
+        print(f"STAGE 1 (coarse): {len(stage1_candidates)} candidates", flush=True)
+        print(f"{'='*60}", flush=True)
+        _consume_results(_evaluate_candidate_list(stage1_candidates, stage_label="Stage 1"))
 
         top_rows = sorted(summary_rows, key=lambda row: float(row["sortino_ratio"]), reverse=True)[
             : max(1, cfg.stage2_top_k)
@@ -939,7 +965,15 @@ def run_experiment_grid(
             for value in _neighbor_values_float(candidate.uniform_mix, cfg.uniform_mixes):
                 stage2_set.add(replace(candidate, uniform_mix=value))
         stage2_candidates = [candidate for candidate in stage2_set if candidate not in evaluated_candidates]
-        _consume_results(_evaluate_candidate_list(stage2_candidates))
+        stage1_elapsed = time.perf_counter() - grid_start
+        print(f"\n{'='*60}", flush=True)
+        print(
+            f"STAGE 2 (fine-tune): {len(stage2_candidates)} new candidates "
+            f"(stage 1 took {stage1_elapsed / 60:.1f}m)",
+            flush=True,
+        )
+        print(f"{'='*60}", flush=True)
+        _consume_results(_evaluate_candidate_list(stage2_candidates, stage_label="Stage 2"))
     else:
         full_candidates = _build_candidates(
             learning_rates=cfg.learning_rates,
@@ -954,7 +988,19 @@ def run_experiment_grid(
             uniform_mixes=cfg.uniform_mixes,
             modes=modes,
         )
-        _consume_results(_evaluate_candidate_list(full_candidates))
+        print(f"\n{'='*60}", flush=True)
+        print(f"GRID SEARCH: {len(full_candidates)} candidates", flush=True)
+        print(f"{'='*60}", flush=True)
+        _consume_results(_evaluate_candidate_list(full_candidates, stage_label="Grid"))
+
+    grid_elapsed = time.perf_counter() - grid_start
+    print(f"\n{'='*60}", flush=True)
+    print(
+        f"Grid search complete — {len(summary_rows)} candidates evaluated "
+        f"in {grid_elapsed / 60:.1f}m ({grid_elapsed / 3600:.1f}h)",
+        flush=True,
+    )
+    print(f"{'='*60}\n", flush=True)
 
     summary_path = out_dir / f"{artifact_prefix}_constrained_experiment_grid.csv"
     with summary_path.open("w", newline="", encoding="utf-8") as handle:

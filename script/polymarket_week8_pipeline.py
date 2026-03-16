@@ -511,7 +511,7 @@ def main() -> None:
         min_event_markets=1,
         min_history_points=24,
         min_history_days=24.0,
-        max_markets=260,
+        max_markets=40,
         max_categories=120,
         per_category_market_cap=4,
         min_category_liquidity=0.0,
@@ -534,7 +534,7 @@ def main() -> None:
 
     if QUICK_SANITY_CHECK:
         experiment_config = ExperimentConfig(
-            learning_rates=(0.02,),
+            learning_rates=(0.05,),
             penalties_lambda=(1.0,),
             rolling_windows=(48,),
             steps_per_window=3,
@@ -548,14 +548,14 @@ def main() -> None:
             max_parallel_workers=4,
             early_prune_enabled=True,
             early_prune_exposure_factor=1.5,
-            domain_limits=(0.06,),
-            max_weights=(0.03,),
-            concentration_penalty_lambdas=(120.0,),
-            covariance_penalty_lambdas=(10.0,),
+            domain_limits=(0.15,),
+            max_weights=(0.08,),
+            concentration_penalty_lambdas=(10.0,),
+            covariance_penalty_lambdas=(5.0,),
             covariance_shrinkages=(0.05,),
             entropy_lambdas=(0.0,),
             uniform_mixes=(0.1,),
-            max_domain_exposure_threshold=0.04,
+            max_domain_exposure_threshold=0.12,
             holdout_fraction=0.2,
             walkforward_train_steps=240,
             walkforward_test_steps=48,
@@ -563,9 +563,9 @@ def main() -> None:
         )
     else:
         experiment_config = ExperimentConfig(
-            learning_rates=(0.01, 0.03),
-            penalties_lambda=(1.0, 2.0),
-            rolling_windows=(48, 96),
+            learning_rates=(0.01, 0.05, 0.1),
+            penalties_lambda=(0.5, 1.0),
+            rolling_windows=(24, 48, 96),
             steps_per_window=3,
             objective="mean_downside",
             variance_penalty=1.0,
@@ -577,14 +577,14 @@ def main() -> None:
             max_parallel_workers=4,
             early_prune_enabled=True,
             early_prune_exposure_factor=1.5,
-            domain_limits=(0.06, 0.08),
-            max_weights=(0.03, 0.04),
-            concentration_penalty_lambdas=(120.0,),
-            covariance_penalty_lambdas=(10.0, 20.0),
+            domain_limits=(0.10, 0.20),
+            max_weights=(0.06, 0.10),
+            concentration_penalty_lambdas=(5.0, 10.0, 20.0),
+            covariance_penalty_lambdas=(1.0, 5.0),
             covariance_shrinkages=(0.05,),
             entropy_lambdas=(0.0,),
-            uniform_mixes=(0.1,),
-            max_domain_exposure_threshold=0.04,
+            uniform_mixes=(0.0, 0.1),
+            max_domain_exposure_threshold=0.12,
             holdout_fraction=0.2,
             walkforward_train_steps=240,
             walkforward_test_steps=48,
@@ -592,6 +592,14 @@ def main() -> None:
         )
     config_hash = _config_hash(base_build_config, experiment_config)
 
+    def _stage_banner(name: str) -> None:
+        elapsed_total = time.perf_counter() - run_started
+        print(f"\n{'#'*60}", flush=True)
+        print(f"  PIPELINE STAGE: {name}", flush=True)
+        print(f"  (total elapsed: {elapsed_total / 60:.1f}m)", flush=True)
+        print(f"{'#'*60}\n", flush=True)
+
+    _stage_banner("Data Build")
     stage_started = time.perf_counter()
     data_artifacts, used_min_history_days = _build_dataset_with_history_backoff(
         project_root=project_root,
@@ -599,22 +607,24 @@ def main() -> None:
         history_day_candidates=(24.0,),
     )
     data_sec = time.perf_counter() - stage_started
-    print("Data artifacts:")
+    print(f"Data build complete in {data_sec / 60:.1f}m")
     print(f"- min_history_days_used: {used_min_history_days}")
     for key, value in data_artifacts.items():
         print(f"- {key}: {value}")
 
+    _stage_banner("Equal-Weight Baseline")
     stage_started = time.perf_counter()
     baseline_result = run_equal_weight_baseline(project_root, artifact_prefix="week8")
     baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix="week8")
     baseline_sec = time.perf_counter() - stage_started
-    print("\nBaseline summary:")
+    print(f"Baseline complete in {baseline_sec:.1f}s")
     print(f"- markets: {baseline_result.market_count}")
     print(f"- sortino: {pretty_float(baseline_result.sortino)}")
     print(f"- max_drawdown: {pretty_pct(baseline_result.max_drawdown)}")
     for key, value in baseline_artifacts.items():
         print(f"- {key}: {value}")
 
+    _stage_banner("Constrained Grid Search (this is the long one)")
     stage_started = time.perf_counter()
     constrained_artifacts = run_experiment_grid(
         project_root,
@@ -622,24 +632,27 @@ def main() -> None:
         config=experiment_config,
     )
     constrained_sec = time.perf_counter() - stage_started
-    print("\nConstrained experiment artifacts:")
+    print(f"\nConstrained grid complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
     for key, value in constrained_artifacts.items():
         print(f"- {key}: {value}")
 
+    _stage_banner("Covariance Diagnostics")
     stage_started = time.perf_counter()
     covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix="week8")
     covariance_sec = time.perf_counter() - stage_started
-    print("\nCovariance diagnostics artifacts:")
+    print(f"Covariance diagnostics complete in {covariance_sec:.1f}s")
     for key, value in covariance_artifacts.items():
         print(f"- {key}: {value}")
 
+    _stage_banner("Figure Generation")
     stage_started = time.perf_counter()
     figure_artifacts = _make_figures(project_root)
     figures_sec = time.perf_counter() - stage_started
-    print("\nFigure artifacts:")
+    print(f"Figures complete in {figures_sec:.1f}s")
     for key, value in figure_artifacts.items():
         print(f"- {key}: {value}")
 
+    _stage_banner("Week 9 Diagnostics Report")
     stage_started = time.perf_counter()
     week9_report_path = _make_week9_diagnostics_report(
         project_root=project_root,
@@ -647,7 +660,7 @@ def main() -> None:
         min_history_days_used=used_min_history_days,
     )
     report_sec = time.perf_counter() - stage_started
-    print("\nWeek 9 report artifact:")
+    print(f"Report complete in {report_sec:.1f}s")
     print(f"- diagnostics_report: {week9_report_path}")
 
     manifest_path = _write_run_manifest(
@@ -673,7 +686,11 @@ def main() -> None:
             "reports": {"week9_diagnostics_report": str(week9_report_path)},
         },
     )
-    print("\nRun manifest artifact:")
+    total_sec = time.perf_counter() - run_started
+    print(f"\n{'#'*60}", flush=True)
+    print(f"  PIPELINE COMPLETE", flush=True)
+    print(f"  Total time: {total_sec / 60:.1f}m ({total_sec / 3600:.1f}h)", flush=True)
+    print(f"{'#'*60}", flush=True)
     print(f"- run_manifest: {manifest_path}")
 
 
