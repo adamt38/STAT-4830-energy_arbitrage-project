@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.baseline import pretty_float, pretty_pct, run_equal_weight_baseline, save_baseline_outputs
-from src.constrained_optimizer import ExperimentConfig, run_experiment_grid
+from src.constrained_optimizer import ExperimentConfig, run_experiment_grid, run_optuna_search
 from src.covariance_diagnostics import run_covariance_diagnostics
 from src.polymarket_data import BuildConfig, NoMarketsAfterHistoryFilterError, build_dataset
 
@@ -524,72 +524,51 @@ def main() -> None:
         ),
         artifact_prefix="week8",
         history_interval="max",
-        history_fidelity=60,
+        history_fidelity=10,
         use_cached_events_if_available=True,
         history_priority_enabled=True,
         history_priority_oversample_factor=5,
     )
-    # ── Toggle: set QUICK_SANITY_CHECK = False for the full grid run ──
+    # ── Toggle: set QUICK_SANITY_CHECK = False for the full Optuna run ──
     QUICK_SANITY_CHECK = False
+    OPTUNA_N_TRIALS = 5 if QUICK_SANITY_CHECK else 100
 
-    if QUICK_SANITY_CHECK:
-        experiment_config = ExperimentConfig(
-            learning_rates=(0.05,),
-            penalties_lambda=(1.0,),
-            rolling_windows=(48,),
-            steps_per_window=3,
-            objective="mean_downside",
-            variance_penalty=1.0,
-            downside_penalty=2.0,
-            evaluation_modes=("online",),
-            primary_evaluation_mode="online",
-            enable_two_stage_search=False,
-            stage2_top_k=4,
-            max_parallel_workers=4,
-            early_prune_enabled=True,
-            early_prune_exposure_factor=1.5,
-            domain_limits=(0.15,),
-            max_weights=(0.08,),
-            concentration_penalty_lambdas=(10.0,),
-            covariance_penalty_lambdas=(5.0,),
-            covariance_shrinkages=(0.05,),
-            entropy_lambdas=(0.0,),
-            uniform_mixes=(0.1,),
-            max_domain_exposure_threshold=0.12,
-            holdout_fraction=0.2,
-            walkforward_train_steps=240,
-            walkforward_test_steps=48,
-            seed=7,
-        )
+    # With 10-min data we have ~6× more time steps; scale walk-forward so fold count stays similar
+    if base_build_config.history_fidelity <= 10:
+        walkforward_train_steps = 1440  # ~10 days in 10-min steps
+        walkforward_test_steps = 288    # ~2 days in 10-min steps
     else:
-        experiment_config = ExperimentConfig(
-            learning_rates=(0.01, 0.05, 0.1),
-            penalties_lambda=(0.5, 1.0),
-            rolling_windows=(24, 48, 96),
-            steps_per_window=3,
-            objective="mean_downside",
-            variance_penalty=1.0,
-            downside_penalty=2.0,
-            evaluation_modes=("online",),
-            primary_evaluation_mode="online",
-            enable_two_stage_search=True,
-            stage2_top_k=8,
-            max_parallel_workers=4,
-            early_prune_enabled=True,
-            early_prune_exposure_factor=1.5,
-            domain_limits=(0.10, 0.20),
-            max_weights=(0.06, 0.10),
-            concentration_penalty_lambdas=(5.0, 10.0, 20.0),
-            covariance_penalty_lambdas=(1.0, 5.0),
-            covariance_shrinkages=(0.05,),
-            entropy_lambdas=(0.0,),
-            uniform_mixes=(0.0, 0.1),
-            max_domain_exposure_threshold=0.12,
-            holdout_fraction=0.2,
-            walkforward_train_steps=240,
-            walkforward_test_steps=48,
-            seed=7,
-        )
+        walkforward_train_steps = 240
+        walkforward_test_steps = 48
+
+    experiment_config = ExperimentConfig(
+        learning_rates=(0.005, 0.01, 0.02, 0.05, 0.1, 0.2),
+        penalties_lambda=(0.25, 0.5, 1.0, 2.0),
+        rolling_windows=(24, 48, 96, 144, 288),
+        steps_per_window=3,
+        objective="mean_downside",
+        variance_penalty=1.0,
+        downside_penalty=2.0,
+        evaluation_modes=("online",),
+        primary_evaluation_mode="online",
+        enable_two_stage_search=False,
+        stage2_top_k=8,
+        max_parallel_workers=1,
+        early_prune_enabled=True,
+        early_prune_exposure_factor=1.5,
+        domain_limits=(0.08, 0.12, 0.18, 0.25),
+        max_weights=(0.04, 0.06, 0.10, 0.15),
+        concentration_penalty_lambdas=(2.0, 5.0, 10.0, 20.0, 50.0),
+        covariance_penalty_lambdas=(0.5, 1.0, 5.0, 10.0),
+        covariance_shrinkages=(0.02, 0.05, 0.10),
+        entropy_lambdas=(0.0, 0.01, 0.02),
+        uniform_mixes=(0.0, 0.05, 0.1, 0.2),
+        max_domain_exposure_threshold=0.12,
+        holdout_fraction=0.2,
+        walkforward_train_steps=walkforward_train_steps,
+        walkforward_test_steps=walkforward_test_steps,
+        seed=7,
+    )
     config_hash = _config_hash(base_build_config, experiment_config)
 
     def _stage_banner(name: str) -> None:
@@ -624,15 +603,16 @@ def main() -> None:
     for key, value in baseline_artifacts.items():
         print(f"- {key}: {value}")
 
-    _stage_banner("Constrained Grid Search (this is the long one)")
+    _stage_banner(f"Optuna Bayesian Search ({OPTUNA_N_TRIALS} trials)")
     stage_started = time.perf_counter()
-    constrained_artifacts = run_experiment_grid(
+    constrained_artifacts = run_optuna_search(
         project_root,
         artifact_prefix="week8",
         config=experiment_config,
+        n_trials=OPTUNA_N_TRIALS,
     )
     constrained_sec = time.perf_counter() - stage_started
-    print(f"\nConstrained grid complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
+    print(f"\nOptuna search complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
     for key, value in constrained_artifacts.items():
         print(f"- {key}: {value}")
 

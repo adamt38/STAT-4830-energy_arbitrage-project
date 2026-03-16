@@ -39,7 +39,8 @@ def _build_category_returns(
     category_returns = np.zeros((returns_matrix.shape[0], len(categories)), dtype=float)
     for j, category in enumerate(categories):
         indices = category_to_indices[category]
-        category_returns[:, j] = np.nanmean(returns_matrix[:, indices], axis=1)
+        if indices:
+            category_returns[:, j] = np.nanmean(returns_matrix[:, indices], axis=1)
     category_returns = np.nan_to_num(category_returns, nan=0.0)
     return categories, category_returns
 

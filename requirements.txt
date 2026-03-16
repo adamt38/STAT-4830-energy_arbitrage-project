@@ -4,3 +4,4 @@ numpy
 pytest
 jupyter
 requests
+optuna

@@ -279,3 +279,31 @@ The single most impactful change. With 40 markets:
 #### 5. Two-stage search retained
 Stage 1 coarse grid is now 3×3×3×3×3×3×3×1×1×2 = 4,374 combinations (before
 coarse subsetting). The two-stage approach prunes this to a manageable set.
+
+## Optuna Run 1 and Pruner Fix
+
+### What happened on first Optuna run (100 trials)
+- **Result:** 16 completed, 84 pruned. Total time ~1.2h. Best trial had holdout Sortino 0.043.
+- **Weights unchanged:** The "best" config produced a portfolio with domain exposures all ~2.5% (1/40). Every market had mean_weight ≈ 0.025. So the optimizer was effectively outputting equal-weight despite different hyperparameters.
+
+### Why weights looked equal (two causes)
+1. **Structural (data regime):** With 40 markets and ~28 days of hourly data, the return signal is weak and the penalties (domain, concentration, covariance) pull weights toward uniform. This is the same finding as earlier grid runs — not a bug in Optuna.
+2. **Pruning too aggressive:** We used `MedianPruner(n_warmup_steps=2)`. Pruning started after **2 walk-forward folds** out of ~210 (~1% of the run). Early-fold Sortino is very noisy, so the pruner treated most trials as "below median" and pruned them. The 16 "completed" trials were mostly the ones that got lucky in the first few folds, not necessarily better configs. So the search did not meaningfully explore the space.
+
+### Changes made
+- **Pruner:** `n_warmup_steps` is now set from the number of folds: warmup ≈ 10% of folds, minimum 5, cap 25 (e.g. ~21–25 folds). We only prune after enough folds that the reported Sortino has some signal. Expect many more completed trials on the next run.
+- **Covariance diagnostics:** Guard added so we only compute category returns when the category has at least one asset (avoids "Mean of empty slice" warning).
+
+### Data granularity and grid (later run)
+- **10-minute price history:** Pipeline and data build now use `history_fidelity=10` so we get ~6× more observations per market for the same calendar window. This improves the T vs N regime for the optimizer. With 10-min data, `rolling_window` is in 10-min steps (e.g. 144 ≈ 1 day, 288 ≈ 2 days). Walk-forward steps are scaled when fidelity ≤ 10: `walkforward_train_steps=1440`, `walkforward_test_steps=288` (~10 days train, 2 days test per fold) so fold count stays similar to the hourly setup.
+- **Wider Optuna search:** Hyperparameter ranges were widened so Optuna can explore more of the space:
+  - `learning_rates`: (0.005, 0.01, 0.02, 0.05, 0.1, 0.2)
+  - `penalties_lambda`: (0.25, 0.5, 1.0, 2.0)
+  - `rolling_windows`: (24, 48, 96, 144, 288) [10-min steps]
+  - `domain_limits`: (0.08, 0.12, 0.18, 0.25)
+  - `max_weights`: (0.04, 0.06, 0.10, 0.15)
+  - `concentration_penalty_lambdas`: (2.0, 5.0, 10.0, 20.0, 50.0)
+  - `covariance_penalty_lambdas`: (0.5, 1.0, 5.0, 10.0)
+  - `covariance_shrinkages`: (0.02, 0.05, 0.10)
+  - `entropy_lambdas`: (0.0, 0.01, 0.02)
+  - `uniform_mixes`: (0.0, 0.05, 0.1, 0.2)

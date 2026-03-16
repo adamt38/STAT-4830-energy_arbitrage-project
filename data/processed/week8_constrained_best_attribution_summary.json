@@ -1,27 +1,27 @@
 {
-  "steps": 3194,
-  "asset_count": 260,
-  "total_portfolio_return": 0.5401319236663684,
+  "steps": 2590,
+  "asset_count": 40,
+  "total_portfolio_return": 0.15253019942916338,
   "top_market_by_abs_contribution": {
-    "token_id": "57448448736863973758595083634439217999760683155034404253676400541638226438054",
-    "domain": "other",
-    "question": "Will the Edmonton Oilers win the 2025\u20132026 NHL Presidents' Trophy?",
-    "market_id": "644942",
-    "market_slug": "nhl-2025-26-presidents-trophy-winner-edmonton-oilers",
-    "mean_weight": 0.00381092574116736,
-    "total_contribution": 0.14983098523630825,
-    "mean_step_contribution": 4.6910139397717046e-05,
-    "contribution_share_of_total_return": 0.2773970185270083
+    "token_id": "14018274637090307878372326472471535510234764986484318979992031495866993899114",
+    "domain": "anthropic",
+    "question": "Will Anthropic\u2019s market cap be less than $100B at market close on IPO day?",
+    "market_id": "608404",
+    "market_slug": "will-anthropics-market-cap-be-less-than-100b-at-market-close-on-ipo-day",
+    "mean_weight": 0.025021137189278272,
+    "total_contribution": 0.04839107880915124,
+    "mean_step_contribution": 1.8683814212027506e-05,
+    "contribution_share_of_total_return": 0.31725572372062993
   },
   "top_domain_by_abs_contribution": {
-    "domain": "other",
-    "total_contribution": 0.2043419092781267,
-    "contribution_share_of_total_return": 0.37831851872607647
+    "domain": "anthropic",
+    "total_contribution": 0.04839107880915124,
+    "contribution_share_of_total_return": 0.31725572372062993
   },
   "top_abs_corr_pair": {
-    "token_a": "21259830334465500833312317438349276989384953586749699755938037455040151552654",
-    "token_b": "65176599937650721299696179144517618396201227982573075840784084320548883939839",
-    "corr": 0.05497183704724869,
-    "abs_corr": 0.05497183704724869
+    "token_a": "110251828161543119357013227499774714771527179764174739487025581227481937033858",
+    "token_b": "46188547148926039629401836600536046235686521298444227481497804189293437954585",
+    "corr": 0.13846166546995345,
+    "abs_corr": 0.13846166546995345
   }
 }

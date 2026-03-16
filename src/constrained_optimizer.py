@@ -1215,3 +1215,434 @@ def run_experiment_grid(
 
     return artifacts
 
+
+def run_optuna_search(
+    project_root: pathlib.Path,
+    config: ExperimentConfig | None = None,
+    artifact_prefix: str = "week8",
+    n_trials: int = 100,
+    timeout_sec: int | None = None,
+) -> dict[str, pathlib.Path]:
+    """Run Bayesian hyperparameter optimization via Optuna TPE sampler.
+
+    Drop-in replacement for ``run_experiment_grid`` that uses Optuna's
+    Tree-structured Parzen Estimator with MedianPruner for early stopping
+    of unpromising trials during walk-forward validation folds.
+    """
+    import optuna
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    cfg = config or ExperimentConfig()
+    mode = cfg.primary_evaluation_mode
+
+    returns_matrix, kept_tokens, domains, _, token_to_meta = _load_returns_and_domains(
+        project_root, artifact_prefix=artifact_prefix
+    )
+    if returns_matrix.size == 0:
+        raise RuntimeError("No returns data available. Run data build first.")
+
+    split_idx = max(
+        int((1.0 - cfg.holdout_fraction) * returns_matrix.shape[0]),
+        cfg.walkforward_train_steps,
+    )
+    split_idx = min(split_idx, returns_matrix.shape[0] - 1)
+    tuning_returns = returns_matrix[:split_idx]
+
+    out_dir = project_root / "data" / "processed"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    def _suggest(
+        trial: optuna.Trial,
+        name: str,
+        values: tuple[float, ...],
+        log: bool = False,
+    ) -> float:
+        lo, hi = float(min(values)), float(max(values))
+        if lo == hi:
+            return lo
+        if log and lo <= 0:
+            return trial.suggest_float(name, lo, hi, log=False)
+        return trial.suggest_float(name, lo, hi, log=log)
+
+    search_start = time.perf_counter()
+
+    def objective(trial: optuna.Trial) -> float:
+        lr = _suggest(trial, "lr", cfg.learning_rates, log=True)
+        penalty_lambda = _suggest(trial, "penalty_lambda", cfg.penalties_lambda)
+        rolling_window = int(
+            trial.suggest_categorical("rolling_window", list(cfg.rolling_windows))
+        )
+        domain_limit = _suggest(trial, "domain_limit", cfg.domain_limits)
+        max_weight = _suggest(trial, "max_weight", cfg.max_weights)
+        conc_lambda = _suggest(
+            trial, "concentration_penalty_lambda", cfg.concentration_penalty_lambdas, log=True
+        )
+        cov_lambda = _suggest(
+            trial, "covariance_penalty_lambda", cfg.covariance_penalty_lambdas, log=True
+        )
+        cov_shrinkage = _suggest(trial, "covariance_shrinkage", cfg.covariance_shrinkages)
+        ent_lambda = _suggest(trial, "entropy_lambda", cfg.entropy_lambdas)
+        uniform_mix = _suggest(trial, "uniform_mix", cfg.uniform_mixes)
+
+        train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
+        test_steps = max(cfg.walkforward_test_steps, 1)
+        all_fold_returns: list[float] = []
+        fold_weights_list: list[np.ndarray] = []
+        fold_idx = 0
+        start = 0
+
+        while start + train_steps + test_steps <= tuning_returns.shape[0]:
+            segment = tuning_returns[start : start + train_steps + test_steps]
+            fold_payload = _run_online_pass(
+                returns_matrix=segment,
+                domains=domains,
+                lr=lr,
+                penalty_lambda=penalty_lambda,
+                rolling_window=rolling_window,
+                steps_per_window=cfg.steps_per_window,
+                domain_limit=domain_limit,
+                max_weight=max_weight,
+                concentration_penalty_lambda=conc_lambda,
+                covariance_penalty_lambda=cov_lambda,
+                covariance_shrinkage=cov_shrinkage,
+                entropy_lambda=ent_lambda,
+                uniform_mix=uniform_mix,
+                seed=cfg.seed,
+                evaluation_start_t=train_steps,
+                update_after_eval_start=(mode == "online"),
+                objective=cfg.objective,
+                variance_penalty=cfg.variance_penalty,
+                downside_penalty=cfg.downside_penalty,
+            )
+
+            if (
+                cfg.early_prune_enabled
+                and cfg.max_domain_exposure_threshold > 0.0
+                and fold_payload["avg_weights"].size == len(domains)
+            ):
+                fold_exposure: dict[str, float] = {}
+                for idx, domain in enumerate(domains):
+                    fold_exposure[domain] = fold_exposure.get(domain, 0.0) + float(
+                        fold_payload["avg_weights"][idx]
+                    )
+                fold_max_exp = max(fold_exposure.values()) if fold_exposure else 0.0
+                if fold_max_exp > cfg.max_domain_exposure_threshold * cfg.early_prune_exposure_factor:
+                    raise optuna.TrialPruned()
+
+            fold_rets = fold_payload["portfolio_returns"]
+            if isinstance(fold_rets, np.ndarray) and fold_rets.size > 0:
+                all_fold_returns.extend(fold_rets.tolist())
+                if fold_payload["avg_weights"].size > 0:
+                    fold_weights_list.append(fold_payload["avg_weights"])
+
+            if all_fold_returns:
+                intermediate_sortino = _compute_metrics(
+                    np.array(all_fold_returns, dtype=float)
+                )[0]
+                trial.report(intermediate_sortino, fold_idx)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+
+            fold_idx += 1
+            start += test_steps
+
+        if not all_fold_returns:
+            return float("-inf")
+
+        returns_arr = np.array(all_fold_returns, dtype=float)
+        sortino, max_dd, mean_return, volatility, _, _ = _compute_metrics(returns_arr)
+
+        trial.set_user_attr("max_drawdown", float(max_dd))
+        trial.set_user_attr("mean_return", float(mean_return))
+        trial.set_user_attr("volatility", float(volatility))
+
+        if fold_weights_list:
+            avg_weights = np.mean(np.stack(fold_weights_list), axis=0)
+            domain_exposure: dict[str, float] = {}
+            for idx, domain in enumerate(domains):
+                domain_exposure[domain] = domain_exposure.get(domain, 0.0) + float(
+                    avg_weights[idx]
+                )
+            trial.set_user_attr(
+                "max_domain_exposure",
+                float(max(domain_exposure.values())) if domain_exposure else 0.0,
+            )
+            trial.set_user_attr("domain_exposure_json", json.dumps(domain_exposure))
+
+        return sortino
+
+    # Pruner: only prune after many folds so intermediate Sortino has signal.
+    # With n_warmup_steps=2 we were pruning after ~1% of folds (noise) and killed 80%+ of trials.
+    _train = max(cfg.walkforward_train_steps, 96 + 1)
+    _test = max(cfg.walkforward_test_steps, 1)
+    _n_folds = max(1, (tuning_returns.shape[0] - _train) // _test)
+    n_warmup_steps = min(25, max(5, _n_folds // 10))  # warmup ~10% of folds, at least 5, cap 25
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=cfg.seed),
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=n_warmup_steps),
+    )
+
+    trial_start = time.perf_counter()
+
+    def _log_trial(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        elapsed = time.perf_counter() - trial_start
+        n_complete = len(
+            [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+        )
+        n_pruned = len(
+            [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
+        )
+        if trial.state == optuna.trial.TrialState.PRUNED:
+            status = "PRUNED"
+        elif trial.value is not None:
+            status = f"sortino={trial.value:.4f}"
+        else:
+            status = "FAILED"
+        best_val = study.best_value if n_complete > 0 else float("nan")
+        print(
+            f"  Trial {trial.number}: {status} "
+            f"| best={best_val:.4f} | {n_complete} complete, {n_pruned} pruned "
+            f"| {elapsed / 60:.1f}m elapsed",
+            flush=True,
+        )
+
+    print(f"\n{'='*60}", flush=True)
+    print(f"OPTUNA BAYESIAN SEARCH: {n_trials} trials (TPE + MedianPruner)", flush=True)
+    print(f"{'='*60}", flush=True)
+
+    study.optimize(
+        objective,
+        n_trials=n_trials,
+        timeout=timeout_sec,
+        callbacks=[_log_trial],
+        show_progress_bar=False,
+    )
+
+    search_elapsed = time.perf_counter() - search_start
+    completed_trials = [
+        t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE
+    ]
+    pruned_trials = [
+        t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED
+    ]
+
+    print(f"\n{'='*60}", flush=True)
+    print(
+        f"Optuna search complete — {len(completed_trials)} completed, "
+        f"{len(pruned_trials)} pruned in {search_elapsed / 60:.1f}m ({search_elapsed / 3600:.1f}h)",
+        flush=True,
+    )
+    print(f"{'='*60}\n", flush=True)
+
+    summary_rows: list[dict[str, Any]] = []
+    for trial in completed_trials:
+        summary_rows.append(
+            {
+                "learning_rate": trial.params.get("lr", cfg.learning_rates[0]),
+                "lambda_penalty": trial.params.get("penalty_lambda", cfg.penalties_lambda[0]),
+                "rolling_window": trial.params.get("rolling_window", cfg.rolling_windows[0]),
+                "domain_limit": trial.params.get("domain_limit", cfg.domain_limits[0]),
+                "max_weight": trial.params.get("max_weight", cfg.max_weights[0]),
+                "uniform_mix": trial.params.get("uniform_mix", cfg.uniform_mixes[0]),
+                "evaluation_mode": mode,
+                "sortino_ratio": trial.value,
+                "max_drawdown": trial.user_attrs.get("max_drawdown", 0.0),
+                "mean_return": trial.user_attrs.get("mean_return", 0.0),
+                "volatility": trial.user_attrs.get("volatility", 0.0),
+                "concentration_penalty_lambda": trial.params.get(
+                    "concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0]
+                ),
+                "covariance_penalty_lambda": trial.params.get(
+                    "covariance_penalty_lambda", cfg.covariance_penalty_lambdas[0]
+                ),
+                "covariance_shrinkage": trial.params.get(
+                    "covariance_shrinkage", cfg.covariance_shrinkages[0]
+                ),
+                "entropy_lambda": trial.params.get("entropy_lambda", cfg.entropy_lambdas[0]),
+                "max_domain_exposure": trial.user_attrs.get("max_domain_exposure", 0.0),
+                "max_domain_exposure_threshold": cfg.max_domain_exposure_threshold,
+                "domain_exposure_json": trial.user_attrs.get("domain_exposure_json", "{}"),
+            }
+        )
+
+    summary_path = out_dir / f"{artifact_prefix}_constrained_experiment_grid.csv"
+    with summary_path.open("w", newline="", encoding="utf-8") as handle:
+        if summary_rows:
+            writer = csv.DictWriter(handle, fieldnames=list(summary_rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(summary_rows)
+        else:
+            handle.write("")
+
+    if not completed_trials:
+        raise RuntimeError("No valid Optuna trial completed.")
+
+    best_trial = study.best_trial
+    feasible_trials = [
+        t
+        for t in completed_trials
+        if t.user_attrs.get("max_domain_exposure", 1.0) <= cfg.max_domain_exposure_threshold
+    ]
+    if feasible_trials:
+        best_trial = max(
+            feasible_trials,
+            key=lambda t: t.value if t.value is not None else float("-inf"),
+        )
+
+    bp = best_trial.params
+
+    holdout_payload = _run_online_pass(
+        returns_matrix=returns_matrix,
+        domains=domains,
+        lr=float(bp.get("lr", cfg.learning_rates[0])),
+        penalty_lambda=float(bp.get("penalty_lambda", cfg.penalties_lambda[0])),
+        rolling_window=int(bp.get("rolling_window", cfg.rolling_windows[0])),
+        steps_per_window=cfg.steps_per_window,
+        domain_limit=float(bp.get("domain_limit", cfg.domain_limits[0])),
+        max_weight=float(bp.get("max_weight", cfg.max_weights[0])),
+        concentration_penalty_lambda=float(
+            bp.get("concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0])
+        ),
+        covariance_penalty_lambda=float(
+            bp.get("covariance_penalty_lambda", cfg.covariance_penalty_lambdas[0])
+        ),
+        covariance_shrinkage=float(
+            bp.get("covariance_shrinkage", cfg.covariance_shrinkages[0])
+        ),
+        entropy_lambda=float(bp.get("entropy_lambda", cfg.entropy_lambdas[0])),
+        uniform_mix=float(bp.get("uniform_mix", cfg.uniform_mixes[0])),
+        seed=cfg.seed,
+        evaluation_start_t=split_idx,
+        update_after_eval_start=(mode == "online"),
+        capture_diagnostics=True,
+        objective=cfg.objective,
+        variance_penalty=cfg.variance_penalty,
+        downside_penalty=cfg.downside_penalty,
+    )
+
+    holdout_returns = holdout_payload["portfolio_returns"]
+    (
+        holdout_sortino,
+        holdout_max_dd,
+        holdout_mean,
+        holdout_vol,
+        holdout_cumulative,
+        holdout_drawdown,
+    ) = _compute_metrics(holdout_returns)
+
+    avg_holdout_weights = holdout_payload["avg_weights"]
+    if avg_holdout_weights.size == 0:
+        raise RuntimeError(
+            "Holdout window too short for selected rolling_window. "
+            "Increase holdout_fraction or reduce rolling_windows."
+        )
+
+    holdout_domain_exposure: dict[str, float] = {}
+    for idx, domain in enumerate(domains):
+        holdout_domain_exposure[domain] = holdout_domain_exposure.get(domain, 0.0) + float(
+            avg_holdout_weights[idx]
+        )
+
+    selected_params: dict[str, Any] = {
+        "learning_rate": float(bp.get("lr", cfg.learning_rates[0])),
+        "lambda_penalty": float(bp.get("penalty_lambda", cfg.penalties_lambda[0])),
+        "rolling_window": int(bp.get("rolling_window", cfg.rolling_windows[0])),
+        "domain_limit": float(bp.get("domain_limit", cfg.domain_limits[0])),
+        "max_weight": float(bp.get("max_weight", cfg.max_weights[0])),
+        "uniform_mix": float(bp.get("uniform_mix", cfg.uniform_mixes[0])),
+        "evaluation_mode": mode,
+        "concentration_penalty_lambda": float(
+            bp.get("concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0])
+        ),
+        "covariance_penalty_lambda": float(
+            bp.get("covariance_penalty_lambda", cfg.covariance_penalty_lambdas[0])
+        ),
+        "covariance_shrinkage": float(
+            bp.get("covariance_shrinkage", cfg.covariance_shrinkages[0])
+        ),
+        "entropy_lambda": float(bp.get("entropy_lambda", cfg.entropy_lambdas[0])),
+        "selection_source": "optuna_bayesian",
+        "holdout_sortino_ratio": holdout_sortino,
+        "holdout_max_drawdown": holdout_max_dd,
+        "holdout_mean_return": holdout_mean,
+        "holdout_volatility": holdout_vol,
+        "max_domain_exposure": float(max(holdout_domain_exposure.values()))
+        if holdout_domain_exposure
+        else 0.0,
+    }
+
+    best_metrics_path = out_dir / f"{artifact_prefix}_constrained_best_metrics.json"
+    best_metrics_path.write_text(
+        json.dumps(
+            {
+                "strategy": f"constrained_optuna_{cfg.objective}",
+                "best_params": selected_params,
+                "domain_exposure": holdout_domain_exposure,
+                "feasibility_filter": {
+                    "applied_threshold": cfg.max_domain_exposure_threshold,
+                    "feasible_solution_found": len(feasible_trials) > 0,
+                },
+                "data_split": {
+                    "tuning_steps": int(tuning_returns.shape[0]),
+                    "holdout_steps_total": int(returns_matrix.shape[0] - split_idx),
+                    "holdout_fraction": cfg.holdout_fraction,
+                    "walkforward_train_steps": cfg.walkforward_train_steps,
+                    "walkforward_test_steps": cfg.walkforward_test_steps,
+                },
+                "optuna_summary": {
+                    "n_trials": n_trials,
+                    "completed_trials": len(completed_trials),
+                    "pruned_trials": len(pruned_trials),
+                    "best_trial_number": best_trial.number,
+                    "search_time_sec": search_elapsed,
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    best_series_path = out_dir / f"{artifact_prefix}_constrained_best_timeseries.csv"
+    with best_series_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["step", "portfolio_return", "cumulative_return", "drawdown"],
+        )
+        writer.writeheader()
+        for idx, (ret, cum, dd) in enumerate(
+            zip(
+                holdout_returns.tolist(),
+                holdout_cumulative.tolist(),
+                holdout_drawdown.tolist(),
+                strict=False,
+            )
+        ):
+            writer.writerow(
+                {
+                    "step": idx,
+                    "portfolio_return": float(ret),
+                    "cumulative_return": float(cum),
+                    "drawdown": float(dd),
+                }
+            )
+
+    artifacts: dict[str, pathlib.Path] = {
+        "constrained_grid": summary_path,
+        "constrained_best_metrics": best_metrics_path,
+        "constrained_best_timeseries": best_series_path,
+    }
+
+    attribution_artifacts = _build_attribution_artifacts(
+        out_dir=out_dir,
+        artifact_prefix=artifact_prefix,
+        mode_suffix="",
+        holdout_payload=holdout_payload,
+        kept_tokens=kept_tokens,
+        token_to_meta=token_to_meta,
+    )
+    for key, value in attribution_artifacts.items():
+        artifacts[f"constrained_best_{key}"] = value
+
+    return artifacts

@@ -1,16 +1,16 @@
 {
-  "generated_at_utc": "2026-03-14T20:00:11.177734+00:00",
+  "generated_at_utc": "2026-03-16T04:14:05.352519+00:00",
   "artifact_prefix": "week8",
-  "config_hash": "9925812d1dac08abafea8a57abe818095b912b647e81b2e7ffd226d7a5ed447c",
+  "config_hash": "cb5b7d2a2385e8c25906a6313be2eca2d5ff63e405a9c62919d11cbbd26d4a6b",
   "min_history_days_used": 24.0,
   "stage_durations_sec": {
-    "data_build": 156.18085108400555,
-    "baseline": 2.71683237500838,
-    "constrained_grid_and_holdout": 74176.79992358302,
-    "covariance_diagnostics": 3.2075087499979418,
-    "figure_generation": 0.7627277499996126,
-    "week9_report_generation": 0.028723458002787083,
-    "total": 74339.698752208
+    "data_build": 99.02451858395943,
+    "baseline": 0.5653231670148671,
+    "constrained_grid_and_holdout": 4385.978610999999,
+    "covariance_diagnostics": 0.3301267920178361,
+    "figure_generation": 0.45878929196624085,
+    "week9_report_generation": 0.016521666024345905,
+    "total": 4486.374492415984
   },
   "artifacts": {
     "data": {

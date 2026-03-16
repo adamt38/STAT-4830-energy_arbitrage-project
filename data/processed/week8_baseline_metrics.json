@@ -1,15 +1,16 @@
 {
   "strategy": "equal_weight_baseline",
-  "sortino_ratio": 0.021293366212855668,
-  "max_drawdown": -0.07237215452020451,
+  "sortino_ratio": 0.013934945494004269,
+  "max_drawdown": -0.07503310213339587,
   "market_count": 40,
   "exposure_by_domain": {
     "basketball": 0.025,
     "big-tech": 0.025,
     "france": 0.025,
-    "commodities": 0.025,
-    "epstein": 0.025,
     "2025-predictions": 0.025,
+    "epstein": 0.025,
+    "gemini-3": 0.025,
+    "foreign-policy": 0.025,
     "2026-fifa-world-cup": 0.025,
     "bitcoin": 0.025,
     "business": 0.025,
@@ -24,10 +25,10 @@
     "awards": 0.025,
     "brazil": 0.025,
     "best-of-2025": 0.025,
+    "commodities": 0.025,
     "economic-policy": 0.025,
     "formula1": 0.025,
     "democratic-primary": 0.025,
-    "gemini-3": 0.025,
     "bundesliga": 0.025,
     "felix": 0.025,
     "airdrops": 0.025,
@@ -41,10 +42,9 @@
     "fifa-world-cup": 0.025,
     "ethereum": 0.025,
     "databricks": 0.025,
-    "california-midterm": 0.025,
     "climate-science": 0.025,
-    "foreign-policy": 0.025
+    "california-midterm": 0.025
   },
-  "mean_return": 4.651476049645963e-05,
-  "volatility": 0.0022053747356582335
+  "mean_return": 2.3733901442341916e-05,
+  "volatility": 0.0015077576901088446
 }
