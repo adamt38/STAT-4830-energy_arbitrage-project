@@ -36,6 +36,9 @@ class ExperimentConfig:
     objective: str = "mean_downside"
     variance_penalty: float = 1.0
     downside_penalty: float = 2.0
+    variance_penalties: tuple[float, ...] = ()
+    downside_penalties: tuple[float, ...] = ()
+    optimizer_type: str = "sgd"
     evaluation_modes: tuple[str, ...] = ("online",)
     primary_evaluation_mode: str = "online"
     enable_two_stage_search: bool = True
@@ -191,6 +194,7 @@ def _run_online_pass(
     objective: str = "mean_downside",
     variance_penalty: float = 1.0,
     downside_penalty: float = 2.0,
+    optimizer_type: str = "sgd",
 ) -> OnlinePassPayload:
     torch.manual_seed(seed)
     if returns_matrix.shape[0] <= rolling_window:
@@ -203,7 +207,11 @@ def _run_online_pass(
 
     n_assets = returns_matrix.shape[1]
     logits = torch.zeros(n_assets, dtype=torch.float32, requires_grad=True)
-    optimizer = torch.optim.SGD([logits], lr=lr)
+    optimizer = (
+        torch.optim.Adam([logits], lr=lr)
+        if optimizer_type == "adam"
+        else torch.optim.SGD([logits], lr=lr)
+    )
 
     realized_returns: list[float] = []
     weight_snapshots: list[np.ndarray] = []
@@ -663,6 +671,7 @@ def _run_walkforward_validation(
             objective=cfg.objective,
             variance_penalty=cfg.variance_penalty,
             downside_penalty=cfg.downside_penalty,
+            optimizer_type=cfg.optimizer_type,
         )
         if (
             cfg.early_prune_enabled
@@ -707,6 +716,7 @@ def _run_walkforward_validation(
             objective=cfg.objective,
             variance_penalty=cfg.variance_penalty,
             downside_penalty=cfg.downside_penalty,
+            optimizer_type=cfg.optimizer_type,
         )
 
     avg_weights = (
@@ -1105,6 +1115,7 @@ def run_experiment_grid(
             objective=cfg.objective,
             variance_penalty=cfg.variance_penalty,
             downside_penalty=cfg.downside_penalty,
+            optimizer_type=cfg.optimizer_type,
         )
         holdout_returns_realized = holdout_payload["portfolio_returns"]
         (
@@ -1284,6 +1295,16 @@ def run_optuna_search(
         cov_shrinkage = _suggest(trial, "covariance_shrinkage", cfg.covariance_shrinkages)
         ent_lambda = _suggest(trial, "entropy_lambda", cfg.entropy_lambdas)
         uniform_mix = _suggest(trial, "uniform_mix", cfg.uniform_mixes)
+        var_pen = (
+            _suggest(trial, "variance_penalty", cfg.variance_penalties)
+            if cfg.variance_penalties
+            else cfg.variance_penalty
+        )
+        down_pen = (
+            _suggest(trial, "downside_penalty", cfg.downside_penalties)
+            if cfg.downside_penalties
+            else cfg.downside_penalty
+        )
 
         train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
         test_steps = max(cfg.walkforward_test_steps, 1)
@@ -1312,8 +1333,9 @@ def run_optuna_search(
                 evaluation_start_t=train_steps,
                 update_after_eval_start=(mode == "online"),
                 objective=cfg.objective,
-                variance_penalty=cfg.variance_penalty,
-                downside_penalty=cfg.downside_penalty,
+                variance_penalty=var_pen,
+                downside_penalty=down_pen,
+                optimizer_type=cfg.optimizer_type,
             )
 
             if (
@@ -1461,6 +1483,8 @@ def run_optuna_search(
                     "covariance_shrinkage", cfg.covariance_shrinkages[0]
                 ),
                 "entropy_lambda": trial.params.get("entropy_lambda", cfg.entropy_lambdas[0]),
+                "variance_penalty": trial.params.get("variance_penalty", cfg.variance_penalty),
+                "downside_penalty": trial.params.get("downside_penalty", cfg.downside_penalty),
                 "max_domain_exposure": trial.user_attrs.get("max_domain_exposure", 0.0),
                 "max_domain_exposure_threshold": cfg.max_domain_exposure_threshold,
                 "domain_exposure_json": trial.user_attrs.get("domain_exposure_json", "{}"),
@@ -1518,8 +1542,9 @@ def run_optuna_search(
         update_after_eval_start=(mode == "online"),
         capture_diagnostics=True,
         objective=cfg.objective,
-        variance_penalty=cfg.variance_penalty,
-        downside_penalty=cfg.downside_penalty,
+        variance_penalty=float(bp.get("variance_penalty", cfg.variance_penalty)),
+        downside_penalty=float(bp.get("downside_penalty", cfg.downside_penalty)),
+        optimizer_type=cfg.optimizer_type,
     )
 
     holdout_returns = holdout_payload["portfolio_returns"]
@@ -1563,6 +1588,8 @@ def run_optuna_search(
             bp.get("covariance_shrinkage", cfg.covariance_shrinkages[0])
         ),
         "entropy_lambda": float(bp.get("entropy_lambda", cfg.entropy_lambdas[0])),
+        "variance_penalty": float(bp.get("variance_penalty", cfg.variance_penalty)),
+        "downside_penalty": float(bp.get("downside_penalty", cfg.downside_penalty)),
         "selection_source": "optuna_bayesian",
         "holdout_sortino_ratio": holdout_sortino,
         "holdout_max_drawdown": holdout_max_dd,

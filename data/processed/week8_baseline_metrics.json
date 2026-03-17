@@ -1,7 +1,7 @@
 {
   "strategy": "equal_weight_baseline",
-  "sortino_ratio": 0.013934945494004269,
-  "max_drawdown": -0.07503310213339587,
+  "sortino_ratio": 0.01421894933139569,
+  "max_drawdown": -0.07503310213339509,
   "market_count": 40,
   "exposure_by_domain": {
     "basketball": 0.025,
@@ -45,6 +45,6 @@
     "climate-science": 0.025,
     "california-midterm": 0.025
   },
-  "mean_return": 2.3733901442341916e-05,
-  "volatility": 0.0015077576901088446
+  "mean_return": 2.423210774706611e-05,
+  "volatility": 0.0015121504702056334
 }

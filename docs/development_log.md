@@ -307,3 +307,21 @@ coarse subsetting). The two-stage approach prunes this to a manageable set.
   - `covariance_shrinkages`: (0.02, 0.05, 0.10)
   - `entropy_lambdas`: (0.0, 0.01, 0.02)
   - `uniform_mixes`: (0.0, 0.05, 0.1, 0.2)
+
+## How to improve performance (prioritized)
+
+1. **Tune the mean-downside objective** — Make `variance_penalty` and `downside_penalty` searchable in Optuna. Lower downside_penalty lets the optimizer care more about mean return and less about penalizing losses; can help it tilt toward higher-return assets instead of collapsing to equal-weight. (Implemented: optional `variance_penalties` / `downside_penalties` tuples in config.)
+
+2. **More gradient steps per window** — Increase `steps_per_window` from 3 to 5 or 8 so each time step does more optimization work before committing weights. (Implemented: pipeline uses 5.)
+
+3. **Try Adam instead of SGD** — Use `torch.optim.Adam` for the weight logits; often more stable and can escape flat regions better than SGD. (Implemented: optional `optimizer_type="adam"` in config.)
+
+4. **Fewer markets** — Reduce `max_markets` to 25–30. Fewer parameters with the same T gives a better-determined problem so the return gradient can win over the penalties sometimes.
+
+5. **Loosen penalties on the margin** — Ensure the search grid includes low concentration_penalty_lambda and covariance_penalty_lambda (e.g. 0.5, 1.0) so some trials are more return-seeking; feasibility filter still enforces domain exposure for reporting.
+
+6. **Longer rolling window** — Try rolling_window ≥ 144 (1 day in 10-min steps) so the gradient is estimated from more data and is less noisy.
+
+7. **Bootstrap and stress-tests** — Add bootstrap confidence intervals on holdout Sortino so you can say whether constrained vs baseline is statistically different; add a Monte Carlo stress-test (e.g. correlated domain shock) to show that constraints improve tail risk even when average Sortino is similar.
+
+8. **Two-stage: select then optimize** — First select a smaller set of markets (e.g. by liquidity or momentum), then optimize weights over that set so the optimizer has fewer, more impactful knobs.
