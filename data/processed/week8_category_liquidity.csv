@@ -2,7 +2,7 @@ category,total_liquidity,market_count,selected_for_week8,excluded_by_rule,passes
 world-elections,97100128.34498012,1199,0,0,1
 2026-fifa-world-cup,47019044.44798001,60,1,0,1
 economic-policy,24355595.91313001,60,1,0,1
-foreign-policy,16426426.705790002,70,1,0,1
+foreign-policy,16426426.705790002,70,0,0,1
 nba-champion,16000917.052269997,30,0,0,1
 soccer,14257248.997069992,289,0,0,1
 pop-culture,13477238.551869998,1037,0,0,1
@@ -106,7 +106,7 @@ military-strikes,44401.8892,1,0,0,1
 west-virginia-primary,43974.29655,48,0,0,1
 ukraine-map,41219.46489999999,16,0,0,1
 turkey,40824.55622,19,0,0,1
-german-elections,40023.415460000004,24,0,0,1
+german-elections,40023.415460000004,24,1,0,1
 nebraska-midterm,39220.60966,21,0,0,1
 arkansas-midterm,38600.3339,13,1,0,1
 theo,38395.181979999994,4,0,0,1

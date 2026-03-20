@@ -325,3 +325,27 @@ coarse subsetting). The two-stage approach prunes this to a manageable set.
 7. **Bootstrap and stress-tests** — Add bootstrap confidence intervals on holdout Sortino so you can say whether constrained vs baseline is statistically different; add a Monte Carlo stress-test (e.g. correlated domain shock) to show that constraints improve tail risk even when average Sortino is similar.
 
 8. **Two-stage: select then optimize** — First select a smaller set of markets (e.g. by liquidity or momentum), then optimize weights over that set so the optimizer has fewer, more impactful knobs.
+
+## Current Project State (Latest Pipeline Configuration)
+
+### What is now different from earlier runs
+- **Optimization engine:** still online rolling-window optimization, but inner updates now default to **Adam** (`optimizer_type="adam"`) instead of only SGD.
+- **More inner optimization work:** `steps_per_window` increased to **5** (from 3 in prior runs), so each window gets more than one quick update before advancing.
+- **Objective flexibility added:** Optuna now tunes not only structural constraints/hyperparameters but also the mean-downside objective weights:
+  - `variance_penalties=(0.5, 1.0, 2.0)`
+  - `downside_penalties=(1.0, 2.0, 3.0)`
+- **Data granularity changed:** price history uses **10-minute fidelity** (`history_fidelity=10`) instead of hourly, increasing observations per market by roughly ~6x for the same calendar span.
+- **Walk-forward scaling updated for 10-minute data:** walk-forward blocks are scaled to keep fold counts in a comparable range:
+  - `walkforward_train_steps=1440` (~10 days)
+  - `walkforward_test_steps=288` (~2 days)
+- **Wider Optuna search space:** search ranges now include broader learning-rate, penalty, window, and mixing settings to encourage non-uniform solutions when signal supports them.
+
+### Practical impact of these changes
+- **Pros:** richer data, more expressive tuning, and a more robust inner optimizer make it more likely to discover meaningful tilts when signal exists.
+- **Tradeoff:** each completed trial is substantially slower than earlier hourly/SGD runs because:
+  1) there are more timestamps (10-min data), and  
+  2) each timestamp performs more gradient work (`steps_per_window=5`).
+- **Observed behavior so far:** early completed trials now show wider Sortino dispersion than the previous "all-near-equal" regime, which indicates the search is exploring materially different parameter regimes rather than collapsing immediately to one solution.
+
+### Interpretation note for ongoing runs
+Higher trial-to-trial Sortino variation at this stage is expected and desirable. It suggests the optimization landscape is no longer effectively flat under the current settings, and Optuna is testing genuinely different risk/return trade-offs rather than repeatedly reproducing near-identical equal-weight behavior.
