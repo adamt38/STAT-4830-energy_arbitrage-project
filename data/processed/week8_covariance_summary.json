@@ -1,11 +1,11 @@
 {
   "category_count": 40,
-  "avg_abs_correlation": 0.0008685915666880355,
-  "max_abs_correlation": 0.09231219477191085,
+  "avg_abs_correlation": 0.0007819078766437259,
+  "max_abs_correlation": 0.03495397080270374,
   "pairs_abs_corr_ge_0p8": 0,
   "pairs_abs_corr_ge_0p6": 0,
-  "top_eigenvalue_share": 0.34827097028043086,
-  "baseline_portfolio_variance": 2.2892701849888717e-06,
-  "constrained_portfolio_variance": 2.3022803238230787e-06,
-  "variance_ratio_constrained_vs_baseline": 1.005683094516111
+  "top_eigenvalue_share": 0.3936992609528039,
+  "baseline_portfolio_variance": 4.284312049333433e-06,
+  "constrained_portfolio_variance": 4.003757286491289e-06,
+  "variance_ratio_constrained_vs_baseline": 0.9345157963258551
 }

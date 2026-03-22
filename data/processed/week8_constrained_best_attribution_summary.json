@@ -1,27 +1,27 @@
 {
-  "steps": 11421,
+  "steps": 11042,
   "asset_count": 40,
-  "total_portfolio_return": 0.1972101756880985,
+  "total_portfolio_return": 0.6617079688882823,
   "top_market_by_abs_contribution": {
-    "token_id": "14018274637090307878372326472471535510234764986484318979992031495866993899114",
-    "domain": "anthropic",
-    "question": "Will Anthropic\u2019s market cap be less than $100B at market close on IPO day?",
-    "market_id": "608404",
-    "market_slug": "will-anthropics-market-cap-be-less-than-100b-at-market-close-on-ipo-day",
-    "mean_weight": 0.02538479028567939,
-    "total_contribution": 0.06841954211019304,
-    "mean_step_contribution": 5.99067875931994e-06,
-    "contribution_share_of_total_return": 0.34693717944049324
+    "token_id": "82712470265251700739331694672360544122893066934757473974734613171971970115364",
+    "domain": "databricks",
+    "question": "Will Databricks\u2019 market cap be $250B or greater at market close on IPO day?",
+    "market_id": "608390",
+    "market_slug": "will-databricks-market-cap-be-greater-than-250b-at-market-close-on-ipo-day",
+    "mean_weight": 0.022826468712832254,
+    "total_contribution": 0.27566046572064673,
+    "mean_step_contribution": 2.4964722488738158e-05,
+    "contribution_share_of_total_return": 0.4165893093047926
   },
   "top_domain_by_abs_contribution": {
-    "domain": "anthropic",
-    "total_contribution": 0.06841954211019304,
-    "contribution_share_of_total_return": 0.34693717944049324
+    "domain": "databricks",
+    "total_contribution": 0.27566046572064673,
+    "contribution_share_of_total_return": 0.4165893093047926
   },
   "top_abs_corr_pair": {
-    "token_a": "56940108685601594440972125972550948538859641414755179784371446688257727053902",
-    "token_b": "68207341820749052475650610432894562714266620914604033880285153252182288802957",
-    "corr": 0.05967878377053231,
-    "abs_corr": 0.05967878377053231
+    "token_a": "5254288171817620305899304387173316577587455481755582876905938498730493405588",
+    "token_b": "4655209727295513535859117642120184432334179761721646415109648555849060899062",
+    "corr": 0.06932990381674,
+    "abs_corr": 0.06932990381674
   }
 }
