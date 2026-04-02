@@ -52,6 +52,9 @@ class BuildConfig:
     use_cached_events_if_available: bool = True
     history_priority_enabled: bool = True
     history_priority_oversample_factor: int = 4
+    momentum_screening_enabled: bool = False
+    momentum_lookback_days: float = 5.0
+    momentum_top_n: int | None = None
 
 
 def _request_json(
@@ -473,6 +476,69 @@ def _select_history_priority_market_rows(
     return selected
 
 
+def compute_momentum_scores(
+    history_rows: list[dict[str, Any]],
+    valid_tokens: set[str],
+    lookback_days: float = 5.0,
+) -> dict[str, float]:
+    """Compute recent absolute price momentum for each token.
+
+    For each token, measures cumulative return over the last *lookback_days*
+    of its price history.  The score is ``(last - first) / first`` where
+    *first* is the earliest price in the lookback window and *last* is the
+    most recent price.  Returns a dict mapping token_id → momentum score.
+    Tokens without enough data in the lookback window receive a score of 0.
+    """
+    token_prices: dict[str, list[tuple[int, float]]] = {}
+    for row in history_rows:
+        token = str(row.get("token_id", ""))
+        if token not in valid_tokens:
+            continue
+        ts = int(row["timestamp"])
+        price = float(row["price"])
+        token_prices.setdefault(token, []).append((ts, price))
+
+    scores: dict[str, float] = {}
+    lookback_sec = lookback_days * 86400.0
+    for token, series in token_prices.items():
+        series.sort(key=lambda tp: tp[0])
+        if len(series) < 2:
+            scores[token] = 0.0
+            continue
+        latest_ts = series[-1][0]
+        cutoff_ts = latest_ts - lookback_sec
+        window = [(ts, p) for ts, p in series if ts >= cutoff_ts]
+        if len(window) < 2:
+            scores[token] = 0.0
+            continue
+        start_price = window[0][1]
+        end_price = window[-1][1]
+        if abs(start_price) < 1e-9:
+            scores[token] = 0.0
+            continue
+        scores[token] = (end_price - start_price) / start_price
+
+    for token in valid_tokens:
+        if token not in scores:
+            scores[token] = 0.0
+    return scores
+
+
+def select_by_momentum(
+    market_rows: list[dict[str, Any]],
+    momentum_scores: dict[str, float],
+    top_n: int,
+) -> list[dict[str, Any]]:
+    """Select the *top_n* markets with the largest absolute momentum."""
+    scored = []
+    for row in market_rows:
+        token = str(row.get("yes_token_id", ""))
+        score = momentum_scores.get(token, 0.0)
+        scored.append((abs(score), score, row))
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return [row for _, _, row in scored[:top_n]]
+
+
 def build_dataset(
     project_root: pathlib.Path,
     config: BuildConfig | None = None,
@@ -566,7 +632,20 @@ def build_dataset(
     candidate_final_rows = [
         row for row in filtered_market_rows if row["yes_token_id"] in valid_tokens
     ]
-    if cfg.history_priority_enabled:
+    momentum_scores: dict[str, float] | None = None
+    if cfg.momentum_screening_enabled:
+        momentum_scores = compute_momentum_scores(
+            history_rows=histories,
+            valid_tokens={row["yes_token_id"] for row in candidate_final_rows},
+            lookback_days=cfg.momentum_lookback_days,
+        )
+        momentum_n = cfg.momentum_top_n if cfg.momentum_top_n is not None else cfg.max_markets
+        final_market_rows = select_by_momentum(
+            market_rows=candidate_final_rows,
+            momentum_scores=momentum_scores,
+            top_n=momentum_n,
+        )
+    elif cfg.history_priority_enabled:
         final_market_rows = _select_history_priority_market_rows(
             market_rows=candidate_final_rows,
             token_to_history_days=token_to_history_days,
@@ -653,7 +732,30 @@ def build_dataset(
     quality["min_history_days_filter"] = cfg.min_history_days
     quality["dropped_by_short_history_days"] = dropped_by_short_history_days
     quality["dropped_by_short_history_points"] = dropped_by_short_history_points
+    if cfg.momentum_screening_enabled:
+        quality["momentum_screening"] = {
+            "enabled": True,
+            "lookback_days": cfg.momentum_lookback_days,
+            "top_n": cfg.momentum_top_n if cfg.momentum_top_n is not None else cfg.max_markets,
+            "candidates_before_screening": len(candidate_final_rows),
+        }
     quality_path.write_text(json.dumps(quality, indent=2), encoding="utf-8")
+
+    momentum_scores_path: pathlib.Path | None = None
+    if momentum_scores is not None:
+        momentum_scores_path = data_processed / f"{cfg.artifact_prefix}_momentum_scores.json"
+        scored_list = []
+        for row in final_market_rows:
+            token = str(row.get("yes_token_id", ""))
+            scored_list.append({
+                "token_id": token,
+                "question": str(row.get("question", "")),
+                "domain": str(row.get("domain", "")),
+                "momentum_score": momentum_scores.get(token, 0.0),
+                "abs_momentum": abs(momentum_scores.get(token, 0.0)),
+            })
+        scored_list.sort(key=lambda r: r["abs_momentum"], reverse=True)
+        momentum_scores_path.write_text(json.dumps(scored_list, indent=2), encoding="utf-8")
 
     if not final_market_rows:
         raise NoMarketsAfterHistoryFilterError(
@@ -664,7 +766,7 @@ def build_dataset(
             "Try lowering min_history_days or increasing max_closed_events."
         )
 
-    return {
+    artifacts: dict[str, pathlib.Path] = {
         "events_raw": raw_events_path,
         "markets_filtered": markets_path,
         "price_history": prices_path,
@@ -672,4 +774,8 @@ def build_dataset(
         "category_liquidity": category_liquidity_path,
         "considered_domains": considered_domains_path,
     }
+    if momentum_scores_path is not None:
+        artifacts["momentum_scores"] = momentum_scores_path
+
+    return artifacts
 

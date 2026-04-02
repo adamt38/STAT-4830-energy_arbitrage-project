@@ -242,6 +242,41 @@ def save_baseline_outputs(
     }
 
 
+def bootstrap_sortino_ci(
+    baseline_returns: np.ndarray,
+    constrained_returns: np.ndarray,
+    n_bootstrap: int = 1000,
+    ci_level: float = 0.95,
+    seed: int = 42,
+) -> dict[str, float]:
+    """Bootstrap confidence interval for the Sortino difference (constrained − baseline).
+
+    Resamples the holdout return indices with replacement, computes Sortino for
+    both strategies in each resample, and reports the mean delta and CI bounds.
+    """
+    rng = np.random.default_rng(seed)
+    n = min(baseline_returns.size, constrained_returns.size)
+    if n == 0:
+        return {"mean_delta": 0.0, "ci_lower": 0.0, "ci_upper": 0.0, "frac_positive": 0.0}
+
+    bl = baseline_returns[:n]
+    co = constrained_returns[:n]
+    deltas = np.empty(n_bootstrap, dtype=float)
+    for i in range(n_bootstrap):
+        idx = rng.integers(0, n, size=n)
+        bl_sample = bl[idx]
+        co_sample = co[idx]
+        deltas[i] = _sortino_ratio(co_sample) - _sortino_ratio(bl_sample)
+
+    alpha = (1.0 - ci_level) / 2.0
+    return {
+        "mean_delta": float(np.mean(deltas)),
+        "ci_lower": float(np.percentile(deltas, 100.0 * alpha)),
+        "ci_upper": float(np.percentile(deltas, 100.0 * (1.0 - alpha))),
+        "frac_positive": float(np.mean(deltas > 0)),
+    }
+
+
 def pretty_pct(x: float) -> str:
     """Format metric as percent string."""
     return f"{x * 100.0:.2f}%"
