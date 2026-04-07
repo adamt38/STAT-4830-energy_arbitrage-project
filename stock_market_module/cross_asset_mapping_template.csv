@@ -1,0 +1,9 @@
+pm_topic,pm_token_id,stock_symbol,beta,notes
+oil,,xle,1.20,oil-linked PM topics with energy equity proxy
+recession,,xly,1.05,consumer discretionary risk proxy
+rates,,tlt,0.35,long-duration rates proxy
+middle east,,lmt,0.90,defense beta proxy
+tariff,,ewz,1.10,country-sensitive ETF proxy
+nvidia,,nvda,1.60,single-name high-beta tech proxy
+ukraine,,ezu,1.00,europe risk proxy
+bitcoin,,ibit,1.80,crypto-equity proxy
