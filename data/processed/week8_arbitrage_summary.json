@@ -1,0 +1,23 @@
+{
+  "artifact_prefix": "week8",
+  "aligned_pairs_considered": 4,
+  "candidates_found": 4,
+  "min_net_edge": 0.01,
+  "slippage_buffer": 0.01,
+  "fee_bps_poly": 0.0,
+  "fee_bps_kalshi": 0.0,
+  "best_candidate": {
+    "canonical_event_key": "evt_676739_KXPRIMEENGCONSUMPTION-30-NUCLEAR",
+    "poly_market_id": "676739",
+    "kalshi_market_id": "KXPRIMEENGCONSUMPTION-30-NUCLEAR",
+    "poly_yes_price": 0.665,
+    "kalshi_yes_price": 0.045,
+    "raw_spread": 0.62,
+    "estimated_total_cost": 0.01,
+    "net_edge": 0.61,
+    "cheap_exchange": "kalshi",
+    "rich_exchange": "polymarket",
+    "strategy_note": "buy cheap YES and hedge rich side via opposite exposure (sell YES or buy NO where executable)",
+    "alignment_score": 0.25
+  }
+}

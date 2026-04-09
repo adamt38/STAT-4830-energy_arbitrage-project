@@ -1,18 +1,26 @@
-"""First-pass constrained OGD/SGD experiments for domain-aware allocation."""
+"""First-pass constrained OGD/SGD experiments for domain-aware allocation.
+
+Macro variants (``ExperimentConfig.macro_integration``): ``rescale`` scales risk
+penalties with exogenous z-scores; ``explicit`` adds an optional concentration
+macro term; ``both`` combines them. See ``ExperimentConfig`` and
+``run_optuna_search`` docstrings for Optuna study options and fair holdout comparison.
+"""
 
 from __future__ import annotations
 
 import csv
 import itertools
 import json
+import math
 import pathlib
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 import numpy as np
+import pandas as pd
 import torch
 
 from src.baseline import _build_price_matrix, _compute_returns, _max_drawdown, _read_csv
@@ -20,7 +28,26 @@ from src.baseline import _build_price_matrix, _compute_returns, _max_drawdown, _
 
 @dataclass(frozen=True)
 class ExperimentConfig:
-    """Hyperparameters for rudimentary constrained optimizer runs."""
+    """Hyperparameters for rudimentary constrained optimizer runs.
+
+    macro_integration controls how exogenous z-scores affect the online objective:
+
+    - ``rescale`` (default): ``m_risk`` scales downside / variance / covariance penalties;
+      ``uniform_mix`` gets time-varying bumps from stale feed and equity session (legacy).
+    - ``explicit``: base penalties only (no ``m_risk`` scaling, no macro ``uniform_mix`` bumps).
+      Optional additive macro term ``J_macro = lambda_macro_explicit * tanh(z_eff) * P_conc``
+      on the mean-downside objective only (``P_conc`` is the same squared clamp concentration
+      penalty already in the loop). Omitted when exogenous series are unavailable.
+    - ``both``: rescale path plus the same ``J_macro`` term when enabled.
+
+    For fair holdout comparison across modes, keep the same data split and exogenous CSV;
+    only the objective path changes. Sortino objective (``objective == "sortino"``) never
+    adds ``J_macro`` so ratio semantics stay unchanged.
+
+    Optuna: either run three studies with ``macro_integration`` fixed per run (cleaner for
+    papers) or one study with a categorical ``macro_mode`` and conditional suggestions for
+    ``regime_k`` / ``lambda_macro_explicit`` (single comparison table, larger search space).
+    """
 
     learning_rates: tuple[float, ...] = (0.02, 0.05, 0.1)
     penalties_lambda: tuple[float, ...] = (1.0, 2.0, 5.0, 10.0)
@@ -39,11 +66,18 @@ class ExperimentConfig:
     variance_penalties: tuple[float, ...] = ()
     downside_penalties: tuple[float, ...] = ()
     optimizer_type: str = "sgd"
+    weight_parameterization: str = "softmax"
     evaluation_modes: tuple[str, ...] = ("online",)
     primary_evaluation_mode: str = "online"
     enable_two_stage_search: bool = True
     stage2_top_k: int = 8
     max_parallel_workers: int = 1
+    #: Parallel Optuna trials (``study.optimize(..., n_jobs=...)``). Use ``1`` for sequential
+    #: runs (default). Use ``-1`` to let Optuna pick ``os.cpu_count()``. On large machines,
+    #: set e.g. ``16`` or ``32`` instead of matching every hardware thread to avoid oversubscription
+    #: when PyTorch/OpenMP also spawn threads; prefer ``OMP_NUM_THREADS=1`` and
+    #: ``TORCH_NUM_THREADS=1`` (or ``MKL_NUM_THREADS=1``) when ``optuna_n_jobs`` is high.
+    optuna_n_jobs: int = 1
     early_prune_enabled: bool = True
     early_prune_exposure_factor: float = 1.5
     max_domain_exposure_threshold: float = 1.0
@@ -51,6 +85,9 @@ class ExperimentConfig:
     walkforward_train_steps: int = 240
     walkforward_test_steps: int = 48
     seed: int = 7
+    regime_k: float = 0.25
+    macro_integration: Literal["rescale", "explicit", "both"] = "rescale"
+    lambda_macro_explicit: float = 0.0
 
 
 class OnlinePassPayload(TypedDict):
@@ -139,6 +176,58 @@ def _load_returns_and_domains(
     return returns_matrix, kept_tokens, kept_domains, token_to_domain, token_to_meta
 
 
+def split_index_for_returns(n_returns: int, cfg: ExperimentConfig) -> int:
+    """First holdout step index; same rule as run_optuna_search / run_experiment_grid."""
+    if n_returns <= 0:
+        return 0
+    split_idx = max(int((1.0 - cfg.holdout_fraction) * n_returns), cfg.walkforward_train_steps)
+    return min(split_idx, n_returns - 1)
+
+
+def _default_exogenous_regime(n_steps: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    z0 = np.zeros(n_steps, dtype=float)
+    return (
+        z0,
+        z0.copy(),
+        z0.copy(),
+        np.ones(n_steps, dtype=float),
+        z0.copy(),
+    )
+
+
+def _load_exogenous_regime(
+    project_root: pathlib.Path,
+    artifact_prefix: str,
+    n_steps: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    path = project_root / "data" / "processed" / f"{artifact_prefix}_exogenous_features.csv"
+    if not path.exists() or n_steps <= 0:
+        return _default_exogenous_regime(max(n_steps, 0))
+    try:
+        df = pd.read_csv(path)
+    except OSError:
+        return _default_exogenous_regime(n_steps)
+    if len(df) != n_steps:
+        return _default_exogenous_regime(n_steps)
+    for col in ("risk_on_z", "exog_is_stale", "is_equity_open"):
+        if col not in df.columns:
+            return _default_exogenous_regime(n_steps)
+    rz = pd.to_numeric(df["risk_on_z"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+    ez = (
+        pd.to_numeric(df["energy_z"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+        if "energy_z" in df.columns
+        else np.zeros(n_steps, dtype=float)
+    )
+    ratesz = (
+        pd.to_numeric(df["rates_z"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+        if "rates_z" in df.columns
+        else np.zeros(n_steps, dtype=float)
+    )
+    st = pd.to_numeric(df["exog_is_stale"], errors="coerce").fillna(1.0).to_numpy(dtype=float)
+    op = pd.to_numeric(df["is_equity_open"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+    return rz, ez, ratesz, st, op
+
+
 def _domain_penalty(
     weights: torch.Tensor,
     domains: list[str],
@@ -173,6 +262,67 @@ def _covariance_penalty(
     return weights @ cov @ weights
 
 
+def _project_to_simplex(weights: torch.Tensor) -> torch.Tensor:
+    """Project a vector onto the probability simplex."""
+    if weights.numel() == 0:
+        return weights
+    sorted_vals, _ = torch.sort(weights, descending=True)
+    cumsum = torch.cumsum(sorted_vals, dim=0)
+    idx = torch.arange(1, weights.numel() + 1, device=weights.device, dtype=weights.dtype)
+    cond = sorted_vals - (cumsum - 1.0) / idx > 0
+    if not torch.any(cond):
+        # Fallback for numerical edge cases.
+        return torch.full_like(weights, 1.0 / float(weights.numel()))
+    rho = int(torch.nonzero(cond, as_tuple=False)[-1].item())
+    theta = (cumsum[rho] - 1.0) / float(rho + 1)
+    return torch.clamp(weights - theta, min=0.0)
+
+
+def _parameterized_weights(
+    params: torch.Tensor,
+    available_mask: torch.Tensor,
+    uniform_mix: float,
+    weight_parameterization: str,
+) -> torch.Tensor:
+    """Map unconstrained parameters to valid per-step portfolio weights."""
+    if weight_parameterization == "projected_simplex":
+        masked = torch.clamp(params, min=0.0) * available_mask
+        masked_sum = torch.sum(masked)
+        if float(masked_sum.detach().cpu().item()) <= 0.0:
+            masked = available_mask
+            masked_sum = torch.sum(masked)
+        masked = masked / torch.clamp(masked_sum, min=1e-8)
+    else:
+        weights_raw = torch.softmax(params, dim=0)
+        masked = weights_raw * available_mask
+        masked_sum = torch.sum(masked)
+        if float(masked_sum.detach().cpu().item()) <= 0.0:
+            masked = available_mask
+            masked_sum = torch.sum(masked)
+        masked = masked / torch.clamp(masked_sum, min=1e-8)
+    uniform_weights = available_mask / torch.clamp(torch.sum(available_mask), min=1e-8)
+    return (1.0 - uniform_mix) * masked + uniform_mix * uniform_weights
+
+
+def _project_parameter_vector_inplace(
+    params: torch.Tensor,
+    available_mask: torch.Tensor,
+    weight_parameterization: str,
+) -> None:
+    """Project parameters after gradient step when using projected-simplex mode."""
+    if weight_parameterization != "projected_simplex":
+        return
+    with torch.no_grad():
+        active_idx = torch.nonzero(available_mask > 0.0, as_tuple=False).flatten()
+        if active_idx.numel() == 0:
+            params.zero_()
+            return
+        active_vals = params[active_idx]
+        projected_active = _project_to_simplex(active_vals)
+        params.zero_()
+        params[active_idx] = projected_active
+
+
 def _run_online_pass(
     returns_matrix: np.ndarray,
     domains: list[str],
@@ -195,7 +345,22 @@ def _run_online_pass(
     variance_penalty: float = 1.0,
     downside_penalty: float = 2.0,
     optimizer_type: str = "sgd",
+    weight_parameterization: str = "softmax",
+    regime_k: float = 0.0,
+    risk_on_z: np.ndarray | None = None,
+    energy_z: np.ndarray | None = None,
+    rates_z: np.ndarray | None = None,
+    exog_is_stale: np.ndarray | None = None,
+    is_equity_open: np.ndarray | None = None,
+    time_offset: int = 0,
+    macro_integration: str = "rescale",
+    lambda_macro_explicit: float = 0.0,
 ) -> OnlinePassPayload:
+    if macro_integration not in {"rescale", "explicit", "both"}:
+        raise RuntimeError(
+            f"Invalid macro_integration {macro_integration!r}. "
+            "Expected 'rescale', 'explicit', or 'both'."
+        )
     torch.manual_seed(seed)
     if returns_matrix.shape[0] <= rolling_window:
         return OnlinePassPayload(
@@ -206,11 +371,23 @@ def _run_online_pass(
         )
 
     n_assets = returns_matrix.shape[1]
-    logits = torch.zeros(n_assets, dtype=torch.float32, requires_grad=True)
+    if weight_parameterization not in {"softmax", "projected_simplex"}:
+        raise RuntimeError(
+            "Unsupported weight_parameterization. Valid values: ['softmax', 'projected_simplex']."
+        )
+    # Softmax(0) is uniform and differentiable w.r.t. logits. For projected_simplex,
+    # all-zero params clamp to zero, masked_sum becomes 0, and _parameterized_weights
+    # falls back to a constant mask — no graph to params, so backward() fails.
+    if weight_parameterization == "projected_simplex":
+        params = torch.full(
+            (n_assets,), 1.0 / float(max(n_assets, 1)), dtype=torch.float32, requires_grad=True
+        )
+    else:
+        params = torch.zeros(n_assets, dtype=torch.float32, requires_grad=True)
     optimizer = (
-        torch.optim.Adam([logits], lr=lr)
+        torch.optim.Adam([params], lr=lr)
         if optimizer_type == "adam"
-        else torch.optim.SGD([logits], lr=lr)
+        else torch.optim.SGD([params], lr=lr)
     )
 
     realized_returns: list[float] = []
@@ -218,6 +395,14 @@ def _run_online_pass(
     eval_asset_returns: list[np.ndarray] = []
 
     eval_start = evaluation_start_t if evaluation_start_t is not None else rolling_window
+    use_regime = (
+        risk_on_z is not None
+        and energy_z is not None
+        and rates_z is not None
+        and exog_is_stale is not None
+        and is_equity_open is not None
+        and risk_on_z.shape[0] >= time_offset + returns_matrix.shape[0]
+    )
     for t in range(rolling_window, returns_matrix.shape[0]):
         step_returns_np = np.array(returns_matrix[t], dtype=float)
         available_mask_np = np.isfinite(step_returns_np)
@@ -228,20 +413,62 @@ def _run_online_pass(
         window_np = np.nan_to_num(window_np, nan=0.0)
         window = torch.tensor(window_np, dtype=torch.float32)
 
+        g = time_offset + t
+        z_eff: float | None = None
+        if use_regime:
+            assert (
+                risk_on_z is not None
+                and energy_z is not None
+                and rates_z is not None
+                and exog_is_stale is not None
+                and is_equity_open is not None
+            )
+            rz = float(risk_on_z[g])
+            ez = float(energy_z[g])
+            rtz = float(rates_z[g])
+            st = float(exog_is_stale[g])
+            eq = float(is_equity_open[g])
+            shrink = 1.0
+            if st >= 0.5:
+                shrink *= 0.25
+            if eq < 0.5:
+                shrink *= 0.50
+            z_bar = (rz + ez + rtz) / 3.0
+            z_eff = shrink * z_bar
+            if macro_integration == "explicit":
+                downside_penalty_t = downside_penalty
+                covariance_penalty_lambda_t = covariance_penalty_lambda
+                variance_penalty_t = variance_penalty
+                uniform_mix_t = uniform_mix
+            else:
+                m_risk = max(0.70, min(1.50, math.exp(-regime_k * z_eff)))
+                downside_penalty_t = downside_penalty * m_risk
+                covariance_penalty_lambda_t = covariance_penalty_lambda * m_risk
+                variance_penalty_t = variance_penalty * m_risk
+                uniform_mix_t = max(
+                    0.0,
+                    min(
+                        0.40,
+                        uniform_mix + 0.05 * (1.0 - eq) + 0.05 * st,
+                    ),
+                )
+        else:
+            downside_penalty_t = downside_penalty
+            covariance_penalty_lambda_t = covariance_penalty_lambda
+            variance_penalty_t = variance_penalty
+            uniform_mix_t = uniform_mix
+
         should_update = update_after_eval_start or (t < eval_start)
         if should_update:
             for _ in range(steps_per_window):
                 optimizer.zero_grad()
-                weights_raw = torch.softmax(logits, dim=0)
-                masked_raw = weights_raw * available_mask
-                masked_raw_sum = torch.sum(masked_raw)
-                if float(masked_raw_sum.detach().cpu().item()) <= 0.0:
-                    masked_raw = available_mask
-                    masked_raw_sum = torch.sum(masked_raw)
-                masked_raw = masked_raw / torch.clamp(masked_raw_sum, min=1e-8)
-                uniform_weights = available_mask / torch.clamp(torch.sum(available_mask), min=1e-8)
                 # Guaranteed diversification floor to prevent single-domain collapse.
-                weights = (1.0 - uniform_mix) * masked_raw + uniform_mix * uniform_weights
+                weights = _parameterized_weights(
+                    params=params,
+                    available_mask=available_mask,
+                    uniform_mix=uniform_mix_t,
+                    weight_parameterization=weight_parameterization,
+                )
                 portfolio = window @ weights
                 # Penalize excessive concentration and reward spread.
                 concentration_penalty = torch.sum(torch.clamp(weights - max_weight, min=0.0).pow(2))
@@ -254,8 +481,8 @@ def _run_online_pass(
                 if objective == "mean_downside":
                     return_term = _mean_downside_objective(
                         portfolio,
-                        variance_penalty=variance_penalty,
-                        downside_penalty=downside_penalty,
+                        variance_penalty=variance_penalty_t,
+                        downside_penalty=downside_penalty_t,
                     )
                 else:
                     return_term = _sortino_torch(portfolio)
@@ -268,23 +495,31 @@ def _run_online_pass(
                         domain_limit=domain_limit,
                     )
                     - concentration_penalty_lambda * concentration_penalty
-                    - covariance_penalty_lambda * covariance_penalty
+                    - covariance_penalty_lambda_t * covariance_penalty
                     + entropy_lambda * entropy_bonus
                 )
+                if (
+                    objective == "mean_downside"
+                    and macro_integration in {"explicit", "both"}
+                    and lambda_macro_explicit != 0.0
+                    and z_eff is not None
+                ):
+                    macro_scale = math.tanh(z_eff)
+                    obj = obj - lambda_macro_explicit * macro_scale * concentration_penalty
                 loss = -obj
                 loss.backward()
                 optimizer.step()
+                _project_parameter_vector_inplace(
+                    params=params,
+                    available_mask=available_mask,
+                    weight_parameterization=weight_parameterization,
+                )
 
-        weights_raw_eval = torch.softmax(logits, dim=0)
-        masked_eval = weights_raw_eval * available_mask
-        masked_eval_sum = torch.sum(masked_eval)
-        if float(masked_eval_sum.detach().cpu().item()) <= 0.0:
-            masked_eval = available_mask
-            masked_eval_sum = torch.sum(masked_eval)
-        masked_eval = masked_eval / torch.clamp(masked_eval_sum, min=1e-8)
-        uniform_weights_eval = available_mask / torch.clamp(torch.sum(available_mask), min=1e-8)
-        current_weights = (
-            (1.0 - uniform_mix) * masked_eval + uniform_mix * uniform_weights_eval
+        current_weights = _parameterized_weights(
+            params=params,
+            available_mask=available_mask,
+            uniform_mix=uniform_mix_t,
+            weight_parameterization=weight_parameterization,
         ).detach().cpu().numpy()
         if t >= eval_start:
             weight_snapshots.append(current_weights)
@@ -641,6 +876,14 @@ def _run_walkforward_validation(
     entropy_lambda: float,
     uniform_mix: float,
     evaluation_mode: str,
+    risk_on_z: np.ndarray | None = None,
+    energy_z: np.ndarray | None = None,
+    rates_z: np.ndarray | None = None,
+    exog_is_stale: np.ndarray | None = None,
+    is_equity_open: np.ndarray | None = None,
+    regime_k: float = 0.0,
+    macro_integration: str = "rescale",
+    lambda_macro_explicit: float = 0.0,
 ) -> OnlinePassPayload:
     """Walk-forward tune: fit on past block, evaluate on next unseen block."""
     train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
@@ -672,6 +915,16 @@ def _run_walkforward_validation(
             variance_penalty=cfg.variance_penalty,
             downside_penalty=cfg.downside_penalty,
             optimizer_type=cfg.optimizer_type,
+            weight_parameterization=cfg.weight_parameterization,
+            regime_k=regime_k,
+            risk_on_z=risk_on_z,
+            energy_z=energy_z,
+            rates_z=rates_z,
+            exog_is_stale=exog_is_stale,
+            is_equity_open=is_equity_open,
+            time_offset=start,
+            macro_integration=macro_integration,
+            lambda_macro_explicit=lambda_macro_explicit,
         )
         if (
             cfg.early_prune_enabled
@@ -717,6 +970,16 @@ def _run_walkforward_validation(
             variance_penalty=cfg.variance_penalty,
             downside_penalty=cfg.downside_penalty,
             optimizer_type=cfg.optimizer_type,
+            weight_parameterization=cfg.weight_parameterization,
+            regime_k=regime_k,
+            risk_on_z=risk_on_z,
+            energy_z=energy_z,
+            rates_z=rates_z,
+            exog_is_stale=exog_is_stale,
+            is_equity_open=is_equity_open,
+            time_offset=0,
+            macro_integration=macro_integration,
+            lambda_macro_explicit=lambda_macro_explicit,
         )
 
     avg_weights = (
@@ -738,6 +1001,11 @@ def _evaluate_candidate(
     tuning_returns: np.ndarray,
     domains: list[str],
     cfg: ExperimentConfig,
+    risk_on_z: np.ndarray | None = None,
+    energy_z: np.ndarray | None = None,
+    rates_z: np.ndarray | None = None,
+    exog_is_stale: np.ndarray | None = None,
+    is_equity_open: np.ndarray | None = None,
 ) -> tuple[dict[str, Any], SelectedExperimentPayload] | None:
     payload = _run_walkforward_validation(
         tuning_returns=tuning_returns,
@@ -754,6 +1022,14 @@ def _evaluate_candidate(
         entropy_lambda=candidate.entropy_lambda,
         uniform_mix=candidate.uniform_mix,
         evaluation_mode=candidate.evaluation_mode,
+        risk_on_z=risk_on_z,
+        energy_z=energy_z,
+        rates_z=rates_z,
+        exog_is_stale=exog_is_stale,
+        is_equity_open=is_equity_open,
+        regime_k=cfg.regime_k,
+        macro_integration=cfg.macro_integration,
+        lambda_macro_explicit=cfg.lambda_macro_explicit,
     )
     portfolio_returns = payload["portfolio_returns"]
     if not isinstance(portfolio_returns, np.ndarray) or portfolio_returns.size == 0:
@@ -776,6 +1052,7 @@ def _evaluate_candidate(
         "max_weight": candidate.max_weight,
         "uniform_mix": candidate.uniform_mix,
         "evaluation_mode": candidate.evaluation_mode,
+        "weight_parameterization": cfg.weight_parameterization,
         "sortino_ratio": sortino,
         "max_drawdown": float(max_dd),
         "mean_return": mean_return,
@@ -784,6 +1061,9 @@ def _evaluate_candidate(
         "covariance_penalty_lambda": candidate.covariance_penalty_lambda,
         "covariance_shrinkage": candidate.covariance_shrinkage,
         "entropy_lambda": candidate.entropy_lambda,
+        "regime_k": cfg.regime_k,
+        "macro_integration": cfg.macro_integration,
+        "lambda_macro_explicit": cfg.lambda_macro_explicit,
         "max_domain_exposure": float(max(domain_exposure.values())) if domain_exposure else 0.0,
         "max_domain_exposure_threshold": cfg.max_domain_exposure_threshold,
         "domain_exposure_json": json.dumps(domain_exposure),
@@ -822,6 +1102,9 @@ def run_experiment_grid(
     split_idx = max(int((1.0 - cfg.holdout_fraction) * returns_matrix.shape[0]), cfg.walkforward_train_steps)
     split_idx = min(split_idx, returns_matrix.shape[0] - 1)
     tuning_returns = returns_matrix[:split_idx]
+    rz, ez, ratesz, st, op = _load_exogenous_regime(
+        project_root, artifact_prefix, returns_matrix.shape[0]
+    )
 
     out_dir = project_root / "data" / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -886,6 +1169,11 @@ def run_experiment_grid(
                     tuning_returns=tuning_returns,
                     domains=domains,
                     cfg=cfg,
+                    risk_on_z=rz,
+                    energy_z=ez,
+                    rates_z=ratesz,
+                    exog_is_stale=st,
+                    is_equity_open=op,
                 )
                 outputs.append((candidate, result))
                 _log_progress(candidate)
@@ -899,6 +1187,11 @@ def run_experiment_grid(
                     tuning_returns=tuning_returns,
                     domains=domains,
                     cfg=cfg,
+                    risk_on_z=rz,
+                    energy_z=ez,
+                    rates_z=ratesz,
+                    exog_is_stale=st,
+                    is_equity_open=op,
                 ): candidate
                 for candidate in candidates
             }
@@ -1116,6 +1409,16 @@ def run_experiment_grid(
             variance_penalty=cfg.variance_penalty,
             downside_penalty=cfg.downside_penalty,
             optimizer_type=cfg.optimizer_type,
+            weight_parameterization=cfg.weight_parameterization,
+            regime_k=cfg.regime_k,
+            risk_on_z=rz,
+            energy_z=ez,
+            rates_z=ratesz,
+            exog_is_stale=st,
+            is_equity_open=op,
+            time_offset=0,
+            macro_integration=cfg.macro_integration,
+            lambda_macro_explicit=cfg.lambda_macro_explicit,
         )
         holdout_returns_realized = holdout_payload["portfolio_returns"]
         (
@@ -1233,12 +1536,30 @@ def run_optuna_search(
     artifact_prefix: str = "week8",
     n_trials: int = 100,
     timeout_sec: int | None = None,
+    *,
+    joint_macro_mode_search: bool = False,
+    output_artifact_suffix: str = "",
 ) -> dict[str, pathlib.Path]:
     """Run Bayesian hyperparameter optimization via Optuna TPE sampler.
 
     Drop-in replacement for ``run_experiment_grid`` that uses Optuna's
     Tree-structured Parzen Estimator with MedianPruner for early stopping
     of unpromising trials during walk-forward validation folds.
+
+    Macro integration: by default ``cfg.macro_integration`` is fixed and Optuna
+    conditionally tunes ``regime_k`` (rescale/both) and ``lambda_macro_explicit``
+    (explicit/both). Set ``joint_macro_mode_search=True`` for one study with a
+    categorical ``macro_mode`` and the same conditional hyperparameters (larger
+    joint search space, single CSV for cross-mode comparison).
+
+    Use ``output_artifact_suffix`` (e.g. ``_macro_explicit``) when running multiple
+    Optuna jobs with the same ``artifact_prefix`` so constrained CSV/JSON outputs
+    do not overwrite each other.
+
+    Parallel trials: set ``cfg.optuna_n_jobs`` > 1 (or ``-1`` for auto). Optuna runs
+    objectives concurrently via threads; speedup depends on how much time is spent
+    in NumPy/PyTorch (GIL-released) versus pure Python. Cap ``n_jobs`` and set
+    ``OMP_NUM_THREADS=1`` / ``TORCH_NUM_THREADS=1`` on big boxes to avoid oversubscription.
     """
     import optuna
 
@@ -1259,9 +1580,13 @@ def run_optuna_search(
     )
     split_idx = min(split_idx, returns_matrix.shape[0] - 1)
     tuning_returns = returns_matrix[:split_idx]
+    rz, ez, ratesz, st, op = _load_exogenous_regime(
+        project_root, artifact_prefix, returns_matrix.shape[0]
+    )
 
     out_dir = project_root / "data" / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
+    constrained_stem = f"{artifact_prefix}{output_artifact_suffix}"
 
     def _suggest(
         trial: optuna.Trial,
@@ -1305,6 +1630,28 @@ def run_optuna_search(
             if cfg.downside_penalties
             else cfg.downside_penalty
         )
+        if joint_macro_mode_search:
+            macro_int = str(
+                trial.suggest_categorical("macro_mode", ["rescale", "explicit", "both"])
+            )
+            if macro_int in ("rescale", "both"):
+                regime_k_val = trial.suggest_float("regime_k", 0.0, 0.8)
+            else:
+                regime_k_val = float(cfg.regime_k)
+            if macro_int in ("explicit", "both"):
+                lambda_macro_val = trial.suggest_float("lambda_macro_explicit", 0.0, 5.0)
+            else:
+                lambda_macro_val = 0.0
+        else:
+            macro_int = str(cfg.macro_integration)
+            if macro_int in ("rescale", "both"):
+                regime_k_val = trial.suggest_float("regime_k", 0.0, 0.8)
+            else:
+                regime_k_val = float(cfg.regime_k)
+            if macro_int in ("explicit", "both"):
+                lambda_macro_val = trial.suggest_float("lambda_macro_explicit", 0.0, 5.0)
+            else:
+                lambda_macro_val = float(cfg.lambda_macro_explicit)
 
         train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
         test_steps = max(cfg.walkforward_test_steps, 1)
@@ -1336,6 +1683,16 @@ def run_optuna_search(
                 variance_penalty=var_pen,
                 downside_penalty=down_pen,
                 optimizer_type=cfg.optimizer_type,
+                weight_parameterization=cfg.weight_parameterization,
+                regime_k=regime_k_val,
+                risk_on_z=rz,
+                energy_z=ez,
+                rates_z=ratesz,
+                exog_is_stale=st,
+                is_equity_open=op,
+                time_offset=start,
+                macro_integration=macro_int,
+                lambda_macro_explicit=lambda_macro_val,
             )
 
             if (
@@ -1430,16 +1787,30 @@ def run_optuna_search(
             flush=True,
         )
 
+    n_jobs = int(cfg.optuna_n_jobs)
+    if n_jobs == 0:
+        raise ValueError("ExperimentConfig.optuna_n_jobs must be non-zero (use 1 for sequential, -1 for auto).")
+
     print(f"\n{'='*60}", flush=True)
-    print(f"OPTUNA BAYESIAN SEARCH: {n_trials} trials (TPE + MedianPruner)", flush=True)
+    print(
+        f"OPTUNA BAYESIAN SEARCH: {n_trials} trials (TPE + MedianPruner), n_jobs={n_jobs}",
+        flush=True,
+    )
     print(f"{'='*60}", flush=True)
+
+    trial_log_lock = threading.Lock()
+
+    def _log_trial_locked(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        with trial_log_lock:
+            _log_trial(study, trial)
 
     study.optimize(
         objective,
         n_trials=n_trials,
         timeout=timeout_sec,
-        callbacks=[_log_trial],
+        callbacks=[_log_trial_locked],
         show_progress_bar=False,
+        n_jobs=n_jobs,
     )
 
     search_elapsed = time.perf_counter() - search_start
@@ -1485,13 +1856,24 @@ def run_optuna_search(
                 "entropy_lambda": trial.params.get("entropy_lambda", cfg.entropy_lambdas[0]),
                 "variance_penalty": trial.params.get("variance_penalty", cfg.variance_penalty),
                 "downside_penalty": trial.params.get("downside_penalty", cfg.downside_penalty),
+                "regime_k": trial.params.get("regime_k", cfg.regime_k),
+                "macro_integration": (
+                    trial.params.get("macro_mode", cfg.macro_integration)
+                    if joint_macro_mode_search
+                    else cfg.macro_integration
+                ),
+                "lambda_macro_explicit": (
+                    float(trial.params["lambda_macro_explicit"])
+                    if "lambda_macro_explicit" in trial.params
+                    else (0.0 if joint_macro_mode_search else float(cfg.lambda_macro_explicit))
+                ),
                 "max_domain_exposure": trial.user_attrs.get("max_domain_exposure", 0.0),
                 "max_domain_exposure_threshold": cfg.max_domain_exposure_threshold,
                 "domain_exposure_json": trial.user_attrs.get("domain_exposure_json", "{}"),
             }
         )
 
-    summary_path = out_dir / f"{artifact_prefix}_constrained_experiment_grid.csv"
+    summary_path = out_dir / f"{constrained_stem}_constrained_experiment_grid.csv"
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
         if summary_rows:
             writer = csv.DictWriter(handle, fieldnames=list(summary_rows[0].keys()))
@@ -1516,6 +1898,23 @@ def run_optuna_search(
         )
 
     bp = best_trial.params
+
+    if joint_macro_mode_search:
+        holdout_macro = str(bp.get("macro_mode", cfg.macro_integration))
+        holdout_lambda_macro = (
+            float(bp["lambda_macro_explicit"]) if "lambda_macro_explicit" in bp else 0.0
+        )
+        holdout_regime_k = float(bp["regime_k"]) if "regime_k" in bp else float(cfg.regime_k)
+    else:
+        holdout_macro = str(cfg.macro_integration)
+        holdout_lambda_macro = (
+            float(bp["lambda_macro_explicit"])
+            if "lambda_macro_explicit" in bp
+            else float(cfg.lambda_macro_explicit)
+        )
+        holdout_regime_k = (
+            float(bp["regime_k"]) if "regime_k" in bp else float(cfg.regime_k)
+        )
 
     holdout_payload = _run_online_pass(
         returns_matrix=returns_matrix,
@@ -1545,6 +1944,16 @@ def run_optuna_search(
         variance_penalty=float(bp.get("variance_penalty", cfg.variance_penalty)),
         downside_penalty=float(bp.get("downside_penalty", cfg.downside_penalty)),
         optimizer_type=cfg.optimizer_type,
+        weight_parameterization=cfg.weight_parameterization,
+        regime_k=holdout_regime_k,
+        risk_on_z=rz,
+        energy_z=ez,
+        rates_z=ratesz,
+        exog_is_stale=st,
+        is_equity_open=op,
+        time_offset=0,
+        macro_integration=holdout_macro,
+        lambda_macro_explicit=holdout_lambda_macro,
     )
 
     holdout_returns = holdout_payload["portfolio_returns"]
@@ -1578,6 +1987,7 @@ def run_optuna_search(
         "max_weight": float(bp.get("max_weight", cfg.max_weights[0])),
         "uniform_mix": float(bp.get("uniform_mix", cfg.uniform_mixes[0])),
         "evaluation_mode": mode,
+        "weight_parameterization": cfg.weight_parameterization,
         "concentration_penalty_lambda": float(
             bp.get("concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0])
         ),
@@ -1590,6 +2000,9 @@ def run_optuna_search(
         "entropy_lambda": float(bp.get("entropy_lambda", cfg.entropy_lambdas[0])),
         "variance_penalty": float(bp.get("variance_penalty", cfg.variance_penalty)),
         "downside_penalty": float(bp.get("downside_penalty", cfg.downside_penalty)),
+        "regime_k": holdout_regime_k,
+        "macro_integration": holdout_macro,
+        "lambda_macro_explicit": holdout_lambda_macro,
         "selection_source": "optuna_bayesian",
         "holdout_sortino_ratio": holdout_sortino,
         "holdout_max_drawdown": holdout_max_dd,
@@ -1600,11 +2013,14 @@ def run_optuna_search(
         else 0.0,
     }
 
-    best_metrics_path = out_dir / f"{artifact_prefix}_constrained_best_metrics.json"
+    best_metrics_path = out_dir / f"{constrained_stem}_constrained_best_metrics.json"
     best_metrics_path.write_text(
         json.dumps(
             {
-                "strategy": f"constrained_optuna_{cfg.objective}",
+                "strategy": (
+                    f"constrained_optuna_{cfg.objective}_{holdout_macro}"
+                    f"{'_joint_macro' if joint_macro_mode_search else ''}"
+                ),
                 "best_params": selected_params,
                 "domain_exposure": holdout_domain_exposure,
                 "feasibility_filter": {
@@ -1620,10 +2036,13 @@ def run_optuna_search(
                 },
                 "optuna_summary": {
                     "n_trials": n_trials,
+                    "n_jobs": n_jobs,
                     "completed_trials": len(completed_trials),
                     "pruned_trials": len(pruned_trials),
                     "best_trial_number": best_trial.number,
                     "search_time_sec": search_elapsed,
+                    "joint_macro_mode_search": joint_macro_mode_search,
+                    "output_artifact_suffix": output_artifact_suffix,
                 },
             },
             indent=2,
@@ -1631,7 +2050,7 @@ def run_optuna_search(
         encoding="utf-8",
     )
 
-    best_series_path = out_dir / f"{artifact_prefix}_constrained_best_timeseries.csv"
+    best_series_path = out_dir / f"{constrained_stem}_constrained_best_timeseries.csv"
     with best_series_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -1663,7 +2082,7 @@ def run_optuna_search(
 
     attribution_artifacts = _build_attribution_artifacts(
         out_dir=out_dir,
-        artifact_prefix=artifact_prefix,
+        artifact_prefix=constrained_stem,
         mode_suffix="",
         holdout_payload=holdout_payload,
         kept_tokens=kept_tokens,

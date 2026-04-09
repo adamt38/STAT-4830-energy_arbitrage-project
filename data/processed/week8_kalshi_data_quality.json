@@ -1,0 +1,31 @@
+{
+  "exchange": "kalshi",
+  "kalshi_ingest_mode": "targeted",
+  "kalshi_api_base_primary": "https://api.elections.kalshi.com/trade-api/v2",
+  "kalshi_api_base_legacy": "https://trading-api.kalshi.com/trade-api/v2",
+  "api_base_used": "https://api.elections.kalshi.com/trade-api/v2",
+  "http_status": null,
+  "pages_fetched": 1,
+  "cursor_final": null,
+  "markets_fetched_raw": 200,
+  "markets_kept_canonical": 200,
+  "price_rows_written": 200,
+  "request_error": null,
+  "bases_tried": null,
+  "kalshi_event_fetch": {
+    "unique_event_tickers": 39,
+    "events_fetched_ok": 0,
+    "events_failed": 0,
+    "events_from_nested_cache": 39
+  },
+  "fetch_meta": {
+    "ingest_mode": "targeted_poly",
+    "target_min_event_similarity": 0.12,
+    "max_event_pages": 25,
+    "pages_scanned": 1,
+    "events_seen": 46,
+    "events_passed_filter": 39,
+    "api_base_used": "https://api.elections.kalshi.com/trade-api/v2",
+    "request_error": null
+  }
+}

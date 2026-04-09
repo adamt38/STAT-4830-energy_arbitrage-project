@@ -40,12 +40,26 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
    ```
    This generates cached data artifacts in `data/processed/week8_*` and figure outputs in `figures/week8_iteration_*`.
 
-4. **(Optional) Run the template demo script:**
+4. **Run the unified mode-toggle pipeline (new):**
+   ```bash
+   # Existing single-platform optimization workflow
+   python script/multiplatform_pipeline.py --mode polymarket_only
+
+   # Cross-platform workflow (Polymarket + Kalshi + alignment + arbitrage signals)
+   python script/multiplatform_pipeline.py --mode cross_platform
+   ```
+   This writes mode-specific artifacts with prefixes such as `week8_poly_*` or `week8_cross_*`.
+   For faster iteration on arbitrage only (reusing existing Polymarket processed files):
+   ```bash
+   python script/multiplatform_pipeline.py --mode cross_platform --skip-optimization
+   ```
+
+5. **(Optional) Run the template demo script:**
    ```bash
    python script/gd_1d_torch.py
    ```
 
-5. **Run tests:**
+6. **Run tests:**
    ```bash
    pytest tests/
    ```
@@ -69,12 +83,26 @@ The project is runnable on macOS, Linux, and Windows using [uv](https://docs.ast
    ```
    This generates cached data artifacts in `data\\processed\\week8_*` and figure outputs in `figures\\week8_iteration_*`.
 
-4. **(Optional) Run the template demo script:**
+4. **Run the unified mode-toggle pipeline (new):**
+   ```powershell
+   # Existing single-platform optimization workflow
+   python .\script\multiplatform_pipeline.py --mode polymarket_only
+
+   # Cross-platform workflow (Polymarket + Kalshi + alignment + arbitrage signals)
+   python .\script\multiplatform_pipeline.py --mode cross_platform
+   ```
+   This writes mode-specific artifacts with prefixes such as `week8_poly_*` or `week8_cross_*`.
+   For faster iteration on arbitrage only (reusing existing Polymarket processed files):
+   ```powershell
+   python .\script\multiplatform_pipeline.py --mode cross_platform --skip-optimization
+   ```
+
+5. **(Optional) Run the template demo script:**
    ```powershell
    python script/gd_1d_torch.py
    ```
 
-5. **Run tests:**
+6. **Run tests:**
    ```powershell
    pytest tests/
    ```

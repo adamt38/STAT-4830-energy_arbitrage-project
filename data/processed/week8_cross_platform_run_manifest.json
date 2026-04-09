@@ -1,0 +1,24 @@
+{
+  "generated_at_utc": "2026-03-24T22:09:22.021616+00:00",
+  "artifact_prefix": "week8",
+  "mode": "cross_platform",
+  "stage_durations_sec": {
+    "polymarket_canonicalization": 1.0341139580013987,
+    "kalshi_ingestion": 2.3372825000005832,
+    "event_alignment": 0.42084362500099814,
+    "arbitrage_signal_generation": 0.2951949999987846,
+    "total": 4.087484208997921
+  },
+  "artifacts": {
+    "poly_canonical_markets": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_poly_canonical_markets.csv",
+    "poly_canonical_prices": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_poly_canonical_prices.csv",
+    "kalshi_raw_markets": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/raw/week8_kalshi_markets_raw.json",
+    "kalshi_canonical_markets": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_kalshi_canonical_markets.csv",
+    "kalshi_canonical_prices": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_kalshi_canonical_prices.csv",
+    "kalshi_data_quality": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_kalshi_data_quality.json",
+    "aligned_pairs": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_aligned_market_pairs.csv",
+    "alignment_summary": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_alignment_summary.json",
+    "arbitrage_candidates": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_arbitrage_candidates.csv",
+    "arbitrage_summary": "/Users/adamthomson/Library/Mobile Documents/com~apple~CloudDocs/Documents/UPenn Spring 2026/STAT4830/STAT-4830-energy_arbitrage-project/data/processed/week8_arbitrage_summary.json"
+  }
+}

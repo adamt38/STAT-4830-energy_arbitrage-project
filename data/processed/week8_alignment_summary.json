@@ -1,0 +1,17 @@
+{
+  "artifact_prefix": "week8",
+  "poly_rows": 40,
+  "kalshi_rows": 200,
+  "matched_pairs": 4,
+  "strict_same_event": false,
+  "poly_markets_skipped_no_event_map": 0,
+  "poly_markets_skipped_below_threshold_in_mapped_event": 17,
+  "min_similarity": 0.25,
+  "min_event_cluster_similarity": 0.12,
+  "max_end_days_gap": null,
+  "poly_event_groups": 40,
+  "kalshi_event_groups": 39,
+  "mapped_event_pairs": 19,
+  "scoring": "Event clusters: max(jaccard(event titles), jaccard(text+slugs vs text+tickers), jaccard(structured slug tokens vs ticker/series)). Markets: same plus structured pair score; optional domain bonus; date gate on end_time_utc when both parseable. strict_same_event off: unmapped Poly events search all Kalshi; global fallback allowed.",
+  "aligned_pairs_csv": "aligned_market_pairs.csv includes alignment_strict_same_event, mapped_kalshi_exchange_event_id (Kalshi event_ticker used for the bucket), then poly_/kalshi_ end_time_utc, domains, slugs, series_ticker, liquidity, exchange_symbol."
+}

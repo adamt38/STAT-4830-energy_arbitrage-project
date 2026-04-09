@@ -542,11 +542,18 @@ def build_dataset(
     token_to_history_days: dict[str, float] = {}
     dropped_by_short_history_days = 0
     dropped_by_short_history_points = 0
+    dropped_by_history_request_error = 0
     for row in filtered_market_rows:
         token_id = row["yes_token_id"]
         if not token_id:
             continue
-        token_history = fetch_price_history(token_id, cfg)
+        try:
+            token_history = fetch_price_history(token_id, cfg)
+        except RuntimeError:
+            # Transient API/network errors should not abort the whole dataset build.
+            dropped_by_history_request_error += 1
+            time.sleep(cfg.sleep_between_requests_sec)
+            continue
         history_days = _history_span_days(token_history)
         if len(token_history) < cfg.min_history_points:
             dropped_by_short_history_points += 1
@@ -576,6 +583,16 @@ def build_dataset(
         final_market_rows = candidate_final_rows[: cfg.max_markets]
     final_tokens = {str(row.get("yes_token_id", "")) for row in final_market_rows}
     histories = [row for row in histories if str(row.get("token_id", "")) in final_tokens]
+
+    if not final_market_rows:
+        raise NoMarketsAfterHistoryFilterError(
+            "No markets survived history filters. "
+            f"min_history_days={cfg.min_history_days}, "
+            f"dropped_by_short_history_days={dropped_by_short_history_days}, "
+            f"dropped_by_short_history_points={dropped_by_short_history_points}, "
+            f"dropped_by_history_request_error={dropped_by_history_request_error}. "
+            "Try lowering min_history_days or increasing max_closed_events."
+        )
 
     markets_path = data_processed / f"{cfg.artifact_prefix}_markets_filtered.csv"
     prices_path = data_processed / f"{cfg.artifact_prefix}_price_history.csv"
@@ -653,16 +670,8 @@ def build_dataset(
     quality["min_history_days_filter"] = cfg.min_history_days
     quality["dropped_by_short_history_days"] = dropped_by_short_history_days
     quality["dropped_by_short_history_points"] = dropped_by_short_history_points
+    quality["dropped_by_history_request_error"] = dropped_by_history_request_error
     quality_path.write_text(json.dumps(quality, indent=2), encoding="utf-8")
-
-    if not final_market_rows:
-        raise NoMarketsAfterHistoryFilterError(
-            "No markets survived history filters. "
-            f"min_history_days={cfg.min_history_days}, "
-            f"dropped_by_short_history_days={dropped_by_short_history_days}, "
-            f"dropped_by_short_history_points={dropped_by_short_history_points}. "
-            "Try lowering min_history_days or increasing max_closed_events."
-        )
 
     return {
         "events_raw": raw_events_path,

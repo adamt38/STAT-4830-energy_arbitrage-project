@@ -1,0 +1,8 @@
+{
+  "artifact_prefix": "week8_cross",
+  "poly_rows": 40,
+  "kalshi_rows": 200,
+  "matched_pairs": 4,
+  "min_similarity": 0.25,
+  "scoring": "max(jaccard(event_title_poly, event_title_kalshi), jaccard(question_poly, question_kalshi), jaccard(concat(poly_event, poly_question), concat(kalshi_event, kalshi_question))) + 0.05 if same domain"
+}

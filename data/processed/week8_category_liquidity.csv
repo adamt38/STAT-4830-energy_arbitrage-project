@@ -1,7 +1,7 @@
 category,total_liquidity,market_count,selected_for_week8,excluded_by_rule,passes_min_liquidity
 world-elections,97100128.34498012,1199,0,0,1
 2026-fifa-world-cup,47019044.44798001,60,1,0,1
-economic-policy,24355595.91313001,60,1,0,1
+economic-policy,24355595.91313001,60,0,0,1
 foreign-policy,16426426.705790002,70,0,0,1
 nba-champion,16000917.052269997,30,0,0,1
 soccer,14257248.997069992,289,0,0,1
@@ -76,7 +76,7 @@ commodities,77328.27600000001,3,1,0,1
 thailand-cambodia,76841.93726,34,0,0,1
 michigan-midterm,70806.7047,53,0,0,1
 new-mexico-midterm,69293.70280999999,34,0,0,1
-ghislaine-maxwell,67007.9891,1,0,0,1
+ghislaine-maxwell,67007.9891,1,1,0,1
 best-of-2025,66847.00157000001,74,1,0,1
 brazil,65405.46718,7,1,0,1
 felix,64111.171469999994,8,1,0,1
