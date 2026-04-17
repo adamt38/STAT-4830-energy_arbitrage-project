@@ -78,6 +78,11 @@ class ExperimentConfig:
     #: when PyTorch/OpenMP also spawn threads; prefer ``OMP_NUM_THREADS=1`` and
     #: ``TORCH_NUM_THREADS=1`` (or ``MKL_NUM_THREADS=1``) when ``optuna_n_jobs`` is high.
     optuna_n_jobs: int = 1
+    #: When True, Optuna tunes ``lambda_etf_tracking``; inner loss adds a term that pulls the
+    #: rolling-window Polymarket portfolio returns toward an equal-weight ETF blend (see
+    #: ``_load_etf_tracking_matrix`` / ``*_ret_1`` columns in exogenous CSV).
+    use_etf_tracking: bool = False
+    etf_tracking_lambdas: tuple[float, ...] = (0.0, 0.05, 0.1, 0.25, 0.5, 1.0)
     early_prune_enabled: bool = True
     early_prune_exposure_factor: float = 1.5
     max_domain_exposure_threshold: float = 1.0
@@ -228,6 +233,40 @@ def _load_exogenous_regime(
     return rz, ez, ratesz, st, op
 
 
+# Columns must match ``exogenous_features.TICKERS`` order (spy, qqq, xle, tlt, btc-usd prefixes).
+_ETF_RET_1_COLUMNS: tuple[str, ...] = (
+    "spy_ret_1",
+    "qqq_ret_1",
+    "xle_ret_1",
+    "tlt_ret_1",
+    "btc_usd_ret_1",
+)
+
+
+def _load_etf_tracking_matrix(
+    project_root: pathlib.Path,
+    artifact_prefix: str,
+    n_steps: int,
+) -> np.ndarray | None:
+    """Load per-step ETF log returns (ret_1) aligned to Polymarket return rows, shape (n_steps, n_etfs)."""
+    path = project_root / "data" / "processed" / f"{artifact_prefix}_exogenous_features.csv"
+    if not path.exists() or n_steps <= 0:
+        return None
+    try:
+        df = pd.read_csv(path)
+    except OSError:
+        return None
+    if len(df) != n_steps:
+        return None
+    missing = [c for c in _ETF_RET_1_COLUMNS if c not in df.columns]
+    if missing:
+        return None
+    mat = np.zeros((n_steps, len(_ETF_RET_1_COLUMNS)), dtype=np.float64)
+    for j, col in enumerate(_ETF_RET_1_COLUMNS):
+        mat[:, j] = pd.to_numeric(df[col], errors="coerce").fillna(0.0).to_numpy(dtype=np.float64)
+    return mat
+
+
 def _domain_penalty(
     weights: torch.Tensor,
     domains: list[str],
@@ -355,6 +394,8 @@ def _run_online_pass(
     time_offset: int = 0,
     macro_integration: str = "rescale",
     lambda_macro_explicit: float = 0.0,
+    etf_step_returns: np.ndarray | None = None,
+    lambda_etf_tracking: float = 0.0,
 ) -> OnlinePassPayload:
     if macro_integration not in {"rescale", "explicit", "both"}:
         raise RuntimeError(
@@ -506,6 +547,20 @@ def _run_online_pass(
                 ):
                     macro_scale = math.tanh(z_eff)
                     obj = obj - lambda_macro_explicit * macro_scale * concentration_penalty
+                if (
+                    lambda_etf_tracking > 0.0
+                    and etf_step_returns is not None
+                    and etf_step_returns.ndim == 2
+                ):
+                    g0 = time_offset + t - rolling_window
+                    g1 = time_offset + t
+                    if 0 <= g0 and g1 <= etf_step_returns.shape[0]:
+                        etf_np = etf_step_returns[g0:g1]
+                        if etf_np.shape[0] == window.shape[0] and etf_np.shape[1] > 0:
+                            etf_win_t = torch.tensor(etf_np, dtype=torch.float32, device=window.device)
+                            bench = torch.mean(etf_win_t, dim=1)
+                            align = torch.mean((portfolio - bench) ** 2)
+                            obj = obj - lambda_etf_tracking * align
                 loss = -obj
                 loss.backward()
                 optimizer.step()
@@ -884,6 +939,8 @@ def _run_walkforward_validation(
     regime_k: float = 0.0,
     macro_integration: str = "rescale",
     lambda_macro_explicit: float = 0.0,
+    etf_step_returns: np.ndarray | None = None,
+    lambda_etf_tracking: float = 0.0,
 ) -> OnlinePassPayload:
     """Walk-forward tune: fit on past block, evaluate on next unseen block."""
     train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
@@ -925,6 +982,8 @@ def _run_walkforward_validation(
             time_offset=start,
             macro_integration=macro_integration,
             lambda_macro_explicit=lambda_macro_explicit,
+            etf_step_returns=etf_step_returns,
+            lambda_etf_tracking=lambda_etf_tracking,
         )
         if (
             cfg.early_prune_enabled
@@ -980,6 +1039,8 @@ def _run_walkforward_validation(
             time_offset=0,
             macro_integration=macro_integration,
             lambda_macro_explicit=lambda_macro_explicit,
+            etf_step_returns=etf_step_returns,
+            lambda_etf_tracking=lambda_etf_tracking,
         )
 
     avg_weights = (
@@ -1006,6 +1067,8 @@ def _evaluate_candidate(
     rates_z: np.ndarray | None = None,
     exog_is_stale: np.ndarray | None = None,
     is_equity_open: np.ndarray | None = None,
+    etf_step_returns: np.ndarray | None = None,
+    lambda_etf_tracking: float = 0.0,
 ) -> tuple[dict[str, Any], SelectedExperimentPayload] | None:
     payload = _run_walkforward_validation(
         tuning_returns=tuning_returns,
@@ -1030,6 +1093,8 @@ def _evaluate_candidate(
         regime_k=cfg.regime_k,
         macro_integration=cfg.macro_integration,
         lambda_macro_explicit=cfg.lambda_macro_explicit,
+        etf_step_returns=etf_step_returns,
+        lambda_etf_tracking=lambda_etf_tracking,
     )
     portfolio_returns = payload["portfolio_returns"]
     if not isinstance(portfolio_returns, np.ndarray) or portfolio_returns.size == 0:
@@ -1105,6 +1170,15 @@ def run_experiment_grid(
     rz, ez, ratesz, st, op = _load_exogenous_regime(
         project_root, artifact_prefix, returns_matrix.shape[0]
     )
+    etf_matrix_full_grid: np.ndarray | None = None
+    lambda_etf_grid_holdout = 0.0
+    if cfg.use_etf_tracking:
+        etf_matrix_full_grid = _load_etf_tracking_matrix(
+            project_root, artifact_prefix, returns_matrix.shape[0]
+        )
+        if etf_matrix_full_grid is not None and cfg.etf_tracking_lambdas:
+            mid = len(cfg.etf_tracking_lambdas) // 2
+            lambda_etf_grid_holdout = float(cfg.etf_tracking_lambdas[mid])
 
     out_dir = project_root / "data" / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1174,6 +1248,8 @@ def run_experiment_grid(
                     rates_z=ratesz,
                     exog_is_stale=st,
                     is_equity_open=op,
+                    etf_step_returns=etf_matrix_full_grid,
+                    lambda_etf_tracking=lambda_etf_grid_holdout,
                 )
                 outputs.append((candidate, result))
                 _log_progress(candidate)
@@ -1192,6 +1268,8 @@ def run_experiment_grid(
                     rates_z=ratesz,
                     exog_is_stale=st,
                     is_equity_open=op,
+                    etf_step_returns=etf_matrix_full_grid,
+                    lambda_etf_tracking=lambda_etf_grid_holdout,
                 ): candidate
                 for candidate in candidates
             }
@@ -1419,6 +1497,8 @@ def run_experiment_grid(
             time_offset=0,
             macro_integration=cfg.macro_integration,
             lambda_macro_explicit=cfg.lambda_macro_explicit,
+            etf_step_returns=etf_matrix_full_grid,
+            lambda_etf_tracking=lambda_etf_grid_holdout,
         )
         holdout_returns_realized = holdout_payload["portfolio_returns"]
         (
@@ -1583,6 +1663,16 @@ def run_optuna_search(
     rz, ez, ratesz, st, op = _load_exogenous_regime(
         project_root, artifact_prefix, returns_matrix.shape[0]
     )
+    etf_tracking_matrix = _load_etf_tracking_matrix(
+        project_root, artifact_prefix, returns_matrix.shape[0]
+    )
+    use_etf_effective = bool(cfg.use_etf_tracking and etf_tracking_matrix is not None)
+    if cfg.use_etf_tracking and etf_tracking_matrix is None:
+        print(
+            "WARNING: use_etf_tracking=True but ETF *_ret_1 columns missing or exogenous CSV "
+            f"row count != return steps ({returns_matrix.shape[0]}); continuing without ETF term.",
+            flush=True,
+        )
 
     out_dir = project_root / "data" / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1653,6 +1743,13 @@ def run_optuna_search(
             else:
                 lambda_macro_val = float(cfg.lambda_macro_explicit)
 
+        if use_etf_effective:
+            lambda_etf_val = float(
+                trial.suggest_categorical("lambda_etf_tracking", list(cfg.etf_tracking_lambdas))
+            )
+        else:
+            lambda_etf_val = 0.0
+
         train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
         test_steps = max(cfg.walkforward_test_steps, 1)
         all_fold_returns: list[float] = []
@@ -1693,6 +1790,8 @@ def run_optuna_search(
                 time_offset=start,
                 macro_integration=macro_int,
                 lambda_macro_explicit=lambda_macro_val,
+                etf_step_returns=etf_tracking_matrix,
+                lambda_etf_tracking=lambda_etf_val,
             )
 
             if (
@@ -1867,6 +1966,7 @@ def run_optuna_search(
                     if "lambda_macro_explicit" in trial.params
                     else (0.0 if joint_macro_mode_search else float(cfg.lambda_macro_explicit))
                 ),
+                "lambda_etf_tracking": float(trial.params.get("lambda_etf_tracking", 0.0)),
                 "max_domain_exposure": trial.user_attrs.get("max_domain_exposure", 0.0),
                 "max_domain_exposure_threshold": cfg.max_domain_exposure_threshold,
                 "domain_exposure_json": trial.user_attrs.get("domain_exposure_json", "{}"),
@@ -1916,6 +2016,8 @@ def run_optuna_search(
             float(bp["regime_k"]) if "regime_k" in bp else float(cfg.regime_k)
         )
 
+    holdout_lambda_etf = float(bp.get("lambda_etf_tracking", 0.0)) if use_etf_effective else 0.0
+
     holdout_payload = _run_online_pass(
         returns_matrix=returns_matrix,
         domains=domains,
@@ -1954,6 +2056,8 @@ def run_optuna_search(
         time_offset=0,
         macro_integration=holdout_macro,
         lambda_macro_explicit=holdout_lambda_macro,
+        etf_step_returns=etf_tracking_matrix,
+        lambda_etf_tracking=holdout_lambda_etf,
     )
 
     holdout_returns = holdout_payload["portfolio_returns"]
@@ -2003,6 +2107,7 @@ def run_optuna_search(
         "regime_k": holdout_regime_k,
         "macro_integration": holdout_macro,
         "lambda_macro_explicit": holdout_lambda_macro,
+        "lambda_etf_tracking": holdout_lambda_etf,
         "selection_source": "optuna_bayesian",
         "holdout_sortino_ratio": holdout_sortino,
         "holdout_max_drawdown": holdout_max_dd,

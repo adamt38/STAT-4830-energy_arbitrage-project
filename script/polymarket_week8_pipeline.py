@@ -650,6 +650,12 @@ def main() -> None:
         help="Single Optuna study with categorical macro_mode and conditional regime_k / lambda_macro_explicit.",
     )
     parser.add_argument(
+        "--etf-tracking",
+        action="store_true",
+        help="Penalize deviation of rolling-window portfolio returns from equal-weight SPY/QQQ/XLE/TLT/BTC log returns "
+        "(from exogenous_features CSV). Optuna searches lambda_etf_tracking.",
+    )
+    parser.add_argument(
         "--optuna-trials",
         type=int,
         default=None,
@@ -748,6 +754,8 @@ def main() -> None:
         raise SystemExit("Use either --joint-macro-mode-search or --macro-modes, not both.")
     if not macro_modes_list and not args.joint_macro_mode_search:
         experiment_config = replace(experiment_config, macro_integration=args.macro_integration)
+    if args.etf_tracking:
+        experiment_config = replace(experiment_config, use_etf_tracking=True)
     config_hash = _config_hash(base_build_config, experiment_config)
 
     def _stage_banner(name: str) -> None:
@@ -931,6 +939,7 @@ def main() -> None:
                 else args.macro_integration
             ),
             "joint_macro_mode_search": args.joint_macro_mode_search,
+            "etf_tracking": args.etf_tracking,
             "optuna_constrained_artifact_suffix": last_optuna_suffix,
             "week9_constrained_artifact_stem": week9_cstem,
         },

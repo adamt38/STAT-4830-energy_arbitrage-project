@@ -165,6 +165,7 @@ def _run_polymarket_optimization(
     *,
     macro_integration: str = "rescale",
     joint_macro_mode_search: bool = False,
+    etf_tracking: bool = False,
     optuna_artifact_suffix: str | None = None,
     optuna_n_jobs: int = 1,
 ) -> dict[str, pathlib.Path]:
@@ -228,6 +229,8 @@ def _run_polymarket_optimization(
         seed=7,
         optuna_n_jobs=optuna_n_jobs,
     )
+    if etf_tracking:
+        experiment_cfg = replace(experiment_cfg, use_etf_tracking=True)
 
     try:
         data_artifacts = build_dataset(project_root=REPO_ROOT, config=build_cfg)
@@ -337,6 +340,11 @@ def main() -> None:
         help="Single Optuna study with categorical macro_mode.",
     )
     parser.add_argument(
+        "--etf-tracking",
+        action="store_true",
+        help="Enable ETF blend tracking penalty in constrained Optuna (see polymarket_week8_pipeline --etf-tracking).",
+    )
+    parser.add_argument(
         "--optuna-artifact-suffix",
         default=None,
         help="Optional suffix for constrained Optuna output filenames (default by macro mode).",
@@ -425,6 +433,7 @@ def main() -> None:
             optuna_trials=args.optuna_trials,
             macro_integration=args.macro_integration,
             joint_macro_mode_search=args.joint_macro_mode_search,
+            etf_tracking=args.etf_tracking,
             optuna_artifact_suffix=args.optuna_artifact_suffix,
             optuna_n_jobs=args.optuna_n_jobs,
         )
