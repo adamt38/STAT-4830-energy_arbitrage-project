@@ -45,8 +45,8 @@ class ExperimentConfig:
     adds ``J_macro`` so ratio semantics stay unchanged.
 
     Optuna: either run three studies with ``macro_integration`` fixed per run (cleaner for
-    papers) or one study with a categorical ``macro_mode`` and conditional suggestions for
-    ``regime_k`` / ``lambda_macro_explicit`` (single comparison table, larger search space).
+    papers) or one joint study with categorical ``macro_mode`` plus always-on draws for
+    ``regime_k`` / ``lambda_macro_explicit`` masked by mode (QMCSampler needs a static space).
     """
 
     learning_rates: tuple[float, ...] = (0.02, 0.05, 0.1)
@@ -1620,11 +1620,12 @@ def run_optuna_search(
     joint_macro_mode_search: bool = False,
     output_artifact_suffix: str = "",
 ) -> dict[str, pathlib.Path]:
-    """Run Bayesian hyperparameter optimization via Optuna TPE sampler.
+    """Run quasi-random hyperparameter search via Optuna QMCSampler (Sobol + scramble).
 
-    Drop-in replacement for ``run_experiment_grid`` that uses Optuna's
-    Tree-structured Parzen Estimator with MedianPruner for early stopping
-    of unpromising trials during walk-forward validation folds.
+    Drop-in replacement for ``run_experiment_grid`` that uses Optuna's quasi-Monte Carlo
+    sampler (low-discrepancy Sobol sequence) with MedianPruner for early stopping of
+    unpromising trials during walk-forward validation folds. This avoids TPE/Bayesian
+    overhead in very high-dimensional conditional spaces.
 
     Macro integration: by default ``cfg.macro_integration`` is fixed and Optuna
     conditionally tunes ``regime_k`` (rescale/both) and ``lambda_macro_explicit``
@@ -1724,14 +1725,14 @@ def run_optuna_search(
             macro_int = str(
                 trial.suggest_categorical("macro_mode", ["rescale", "explicit", "both"])
             )
-            if macro_int in ("rescale", "both"):
-                regime_k_val = trial.suggest_float("regime_k", 0.0, 0.8)
-            else:
-                regime_k_val = float(cfg.regime_k)
-            if macro_int in ("explicit", "both"):
-                lambda_macro_val = trial.suggest_float("lambda_macro_explicit", 0.0, 5.0)
-            else:
-                lambda_macro_val = 0.0
+            # QMCSampler needs a static search space: always draw macro knobs, then mask
+            # for the objective (and holdout/CSV use the same effective values).
+            regime_k_draw = trial.suggest_float("regime_k", 0.0, 0.8)
+            lambda_macro_draw = trial.suggest_float("lambda_macro_explicit", 0.0, 5.0)
+            regime_k_val = regime_k_draw if macro_int in ("rescale", "both") else float(cfg.regime_k)
+            lambda_macro_val = (
+                lambda_macro_draw if macro_int in ("explicit", "both") else 0.0
+            )
         else:
             macro_int = str(cfg.macro_integration)
             if macro_int in ("rescale", "both"):
@@ -1858,7 +1859,7 @@ def run_optuna_search(
     n_warmup_steps = min(25, max(5, _n_folds // 10))  # warmup ~10% of folds, at least 5, cap 25
     study = optuna.create_study(
         direction="maximize",
-        sampler=optuna.samplers.TPESampler(seed=cfg.seed),
+        sampler=optuna.samplers.QMCSampler(seed=cfg.seed, qmc_type="sobol"),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=n_warmup_steps),
     )
 
@@ -1892,7 +1893,8 @@ def run_optuna_search(
 
     print(f"\n{'='*60}", flush=True)
     print(
-        f"OPTUNA BAYESIAN SEARCH: {n_trials} trials (TPE + MedianPruner), n_jobs={n_jobs}",
+        f"OPTUNA QUASI-RANDOM SEARCH: {n_trials} trials (QMCSampler Sobol + MedianPruner), "
+        f"n_jobs={n_jobs}",
         flush=True,
     )
     print(f"{'='*60}", flush=True)
@@ -1930,43 +1932,56 @@ def run_optuna_search(
 
     summary_rows: list[dict[str, Any]] = []
     for trial in completed_trials:
+        p = trial.params
+        if joint_macro_mode_search:
+            macro_mode = str(p.get("macro_mode", cfg.macro_integration))
+            eff_regime_k = (
+                float(p["regime_k"]) if macro_mode in ("rescale", "both") else float(cfg.regime_k)
+            )
+            eff_lambda_macro = (
+                float(p["lambda_macro_explicit"])
+                if macro_mode in ("explicit", "both")
+                else 0.0
+            )
+            macro_integration_out = macro_mode
+        else:
+            eff_regime_k = float(p["regime_k"]) if "regime_k" in p else float(cfg.regime_k)
+            eff_lambda_macro = (
+                float(p["lambda_macro_explicit"])
+                if "lambda_macro_explicit" in p
+                else float(cfg.lambda_macro_explicit)
+            )
+            macro_integration_out = str(cfg.macro_integration)
+
         summary_rows.append(
             {
-                "learning_rate": trial.params.get("lr", cfg.learning_rates[0]),
-                "lambda_penalty": trial.params.get("penalty_lambda", cfg.penalties_lambda[0]),
-                "rolling_window": trial.params.get("rolling_window", cfg.rolling_windows[0]),
-                "domain_limit": trial.params.get("domain_limit", cfg.domain_limits[0]),
-                "max_weight": trial.params.get("max_weight", cfg.max_weights[0]),
-                "uniform_mix": trial.params.get("uniform_mix", cfg.uniform_mixes[0]),
+                "learning_rate": p.get("lr", cfg.learning_rates[0]),
+                "lambda_penalty": p.get("penalty_lambda", cfg.penalties_lambda[0]),
+                "rolling_window": p.get("rolling_window", cfg.rolling_windows[0]),
+                "domain_limit": p.get("domain_limit", cfg.domain_limits[0]),
+                "max_weight": p.get("max_weight", cfg.max_weights[0]),
+                "uniform_mix": p.get("uniform_mix", cfg.uniform_mixes[0]),
                 "evaluation_mode": mode,
                 "sortino_ratio": trial.value,
                 "max_drawdown": trial.user_attrs.get("max_drawdown", 0.0),
                 "mean_return": trial.user_attrs.get("mean_return", 0.0),
                 "volatility": trial.user_attrs.get("volatility", 0.0),
-                "concentration_penalty_lambda": trial.params.get(
+                "concentration_penalty_lambda": p.get(
                     "concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0]
                 ),
-                "covariance_penalty_lambda": trial.params.get(
+                "covariance_penalty_lambda": p.get(
                     "covariance_penalty_lambda", cfg.covariance_penalty_lambdas[0]
                 ),
-                "covariance_shrinkage": trial.params.get(
+                "covariance_shrinkage": p.get(
                     "covariance_shrinkage", cfg.covariance_shrinkages[0]
                 ),
-                "entropy_lambda": trial.params.get("entropy_lambda", cfg.entropy_lambdas[0]),
-                "variance_penalty": trial.params.get("variance_penalty", cfg.variance_penalty),
-                "downside_penalty": trial.params.get("downside_penalty", cfg.downside_penalty),
-                "regime_k": trial.params.get("regime_k", cfg.regime_k),
-                "macro_integration": (
-                    trial.params.get("macro_mode", cfg.macro_integration)
-                    if joint_macro_mode_search
-                    else cfg.macro_integration
-                ),
-                "lambda_macro_explicit": (
-                    float(trial.params["lambda_macro_explicit"])
-                    if "lambda_macro_explicit" in trial.params
-                    else (0.0 if joint_macro_mode_search else float(cfg.lambda_macro_explicit))
-                ),
-                "lambda_etf_tracking": float(trial.params.get("lambda_etf_tracking", 0.0)),
+                "entropy_lambda": p.get("entropy_lambda", cfg.entropy_lambdas[0]),
+                "variance_penalty": p.get("variance_penalty", cfg.variance_penalty),
+                "downside_penalty": p.get("downside_penalty", cfg.downside_penalty),
+                "regime_k": eff_regime_k,
+                "macro_integration": macro_integration_out,
+                "lambda_macro_explicit": eff_lambda_macro,
+                "lambda_etf_tracking": float(p.get("lambda_etf_tracking", 0.0)),
                 "max_domain_exposure": trial.user_attrs.get("max_domain_exposure", 0.0),
                 "max_domain_exposure_threshold": cfg.max_domain_exposure_threshold,
                 "domain_exposure_json": trial.user_attrs.get("domain_exposure_json", "{}"),
@@ -2001,10 +2016,16 @@ def run_optuna_search(
 
     if joint_macro_mode_search:
         holdout_macro = str(bp.get("macro_mode", cfg.macro_integration))
-        holdout_lambda_macro = (
-            float(bp["lambda_macro_explicit"]) if "lambda_macro_explicit" in bp else 0.0
+        holdout_regime_k = (
+            float(bp["regime_k"])
+            if holdout_macro in ("rescale", "both") and "regime_k" in bp
+            else float(cfg.regime_k)
         )
-        holdout_regime_k = float(bp["regime_k"]) if "regime_k" in bp else float(cfg.regime_k)
+        holdout_lambda_macro = (
+            float(bp["lambda_macro_explicit"])
+            if holdout_macro in ("explicit", "both") and "lambda_macro_explicit" in bp
+            else 0.0
+        )
     else:
         holdout_macro = str(cfg.macro_integration)
         holdout_lambda_macro = (
@@ -2108,7 +2129,7 @@ def run_optuna_search(
         "macro_integration": holdout_macro,
         "lambda_macro_explicit": holdout_lambda_macro,
         "lambda_etf_tracking": holdout_lambda_etf,
-        "selection_source": "optuna_bayesian",
+        "selection_source": "optuna_qmc",
         "holdout_sortino_ratio": holdout_sortino,
         "holdout_max_drawdown": holdout_max_dd,
         "holdout_mean_return": holdout_mean,
@@ -2146,6 +2167,7 @@ def run_optuna_search(
                     "pruned_trials": len(pruned_trials),
                     "best_trial_number": best_trial.number,
                     "search_time_sec": search_elapsed,
+                    "sampler": "QMCSampler(sobol)",
                     "joint_macro_mode_search": joint_macro_mode_search,
                     "output_artifact_suffix": output_artifact_suffix,
                 },

@@ -829,7 +829,7 @@ def main() -> None:
         print(f"- {key}: {value}")
 
     n_trials_opt = args.optuna_trials if args.optuna_trials is not None else OPTUNA_N_TRIALS
-    _stage_banner(f"Optuna Bayesian Search ({n_trials_opt} trials)")
+    _stage_banner(f"Optuna quasi-random search ({n_trials_opt} trials, QMCSampler)")
     stage_started = time.perf_counter()
     manifest_constrained_flat: dict[str, str] = {}
     last_optuna_suffix = ""
