@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import time
 from dataclasses import replace
@@ -106,6 +107,82 @@ def _write_run_manifest(
         payload.update(extra)
     manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return manifest_path
+
+
+def _git_commit_and_push(
+    project_root: pathlib.Path,
+    *,
+    remote: str,
+    branch: str,
+    message: str,
+) -> None:
+    """Stage processed outputs, commit if needed, pull --rebase, push HEAD to remote branch."""
+    if not (project_root / ".git").is_dir():
+        print("Skipping git publish: no .git directory (not a git checkout).", flush=True)
+        return
+
+    def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    paths_to_add: list[str] = []
+    for rel in ("data/processed", "figures", "docs"):
+        p = project_root / rel
+        if p.exists():
+            paths_to_add.append(rel)
+    if not paths_to_add:
+        print("Skipping git publish: data/processed, figures, and docs are all missing.", flush=True)
+        return
+
+    add_r = _run(["add", *paths_to_add])
+    if add_r.returncode != 0:
+        raise RuntimeError(
+            f"git add failed ({add_r.returncode}):\n{add_r.stderr or add_r.stdout}"
+        )
+
+    diff_r = _run(["diff", "--cached", "--quiet"])
+    if diff_r.returncode == 0:
+        print("Git publish: nothing new to commit; skipping pull/push.", flush=True)
+        return
+
+    commit_r = _run(["commit", "-m", message])
+    if commit_r.returncode != 0:
+        raise RuntimeError(
+            f"git commit failed ({commit_r.returncode}):\n{commit_r.stderr or commit_r.stdout}"
+        )
+
+    pull_r = _run(["pull", "--rebase", remote, branch])
+    if pull_r.returncode != 0:
+        err = (pull_r.stderr or "") + (pull_r.stdout or "")
+        if "couldn't find remote ref" in err or "could not find remote ref" in err:
+            print(
+                f"Git publish: pull --rebase skipped (remote branch {remote}/{branch!r} missing); "
+                "attempting push only.",
+                flush=True,
+            )
+        else:
+            raise RuntimeError(
+                f"git pull --rebase {remote} {branch} failed ({pull_r.returncode}):\n{err}"
+            )
+
+    push_r = _run(["push", remote, f"HEAD:{branch}"])
+    if push_r.returncode != 0:
+        raise RuntimeError(
+            f"git push {remote} HEAD:{branch} failed ({push_r.returncode}):\n"
+            f"{push_r.stderr or push_r.stdout}"
+        )
+
+    head_r = _run(["rev-parse", "--abbrev-ref", "HEAD"])
+    head_name = (head_r.stdout or "").strip() or "?"
+    print(
+        f"Git publish: committed and pushed branch {head_name!r} to {remote}/{branch}.",
+        flush=True,
+    )
 
 
 def _make_week9_diagnostics_report(
@@ -668,6 +745,29 @@ def main() -> None:
         help="Parallel Optuna trials (passed to study.optimize n_jobs). Use 1 for sequential (default). "
         "Use -1 for auto (cpu_count). On many-core pods, try 16–32 with OMP_NUM_THREADS=1 TORCH_NUM_THREADS=1.",
     )
+    parser.add_argument(
+        "--git-commit-and-push",
+        action="store_true",
+        help="After a successful run: git add data/processed figures docs, commit, "
+        "git pull --rebase <remote> <branch>, git push <remote> HEAD:<branch>. "
+        "Requires git credentials (SSH key or token) and a normal checkout on the machine.",
+    )
+    parser.add_argument(
+        "--git-remote",
+        default="origin",
+        help="Remote for --git-commit-and-push (default: origin).",
+    )
+    parser.add_argument(
+        "--git-push-branch",
+        default="cloud-runs",
+        help="Branch for pull --rebase and push HEAD:<branch> (default: cloud-runs).",
+    )
+    parser.add_argument(
+        "--git-commit-message",
+        default=None,
+        metavar="MSG",
+        help="Commit message for --git-commit-and-push. Default: timestamped auto message.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -942,6 +1042,7 @@ def main() -> None:
             "etf_tracking": args.etf_tracking,
             "optuna_constrained_artifact_suffix": last_optuna_suffix,
             "week9_constrained_artifact_stem": week9_cstem,
+            "git_commit_and_push_requested": bool(args.git_commit_and_push),
         },
     )
     total_sec = time.perf_counter() - run_started
@@ -950,6 +1051,17 @@ def main() -> None:
     print(f"  Total time: {total_sec / 60:.1f}m ({total_sec / 3600:.1f}h)", flush=True)
     print(f"{'#'*60}", flush=True)
     print(f"- run_manifest: {manifest_path}")
+
+    if args.git_commit_and_push:
+        tag = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%MZ")
+        commit_msg = args.git_commit_message or f"Week8 pipeline cloud run {tag}"
+        _stage_banner("Git commit and push")
+        _git_commit_and_push(
+            project_root,
+            remote=args.git_remote,
+            branch=args.git_push_branch,
+            message=commit_msg,
+        )
 
 
 if __name__ == "__main__":
