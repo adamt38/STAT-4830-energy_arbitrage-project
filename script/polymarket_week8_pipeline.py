@@ -502,18 +502,24 @@ def _load_cached_dataset_artifacts(
     if not markets_rows or not price_rows:
         raise RuntimeError(
             "Cached dataset artifacts exist but are empty. "
-            "A previous failed fetch likely overwrote week8 processed files."
+            "A previous failed fetch likely overwrote the processed files for this artifact prefix."
         )
     return artifacts
 
 
-def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
+def _make_figures(
+    project_root: pathlib.Path,
+    *,
+    artifact_prefix: str = "week8",
+    constrained_suffix: str = "",
+) -> dict[str, pathlib.Path]:
     processed = project_root / "data" / "processed"
     figures_dir = project_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    baseline_series = _read_series(processed / "week8_baseline_timeseries.csv")
-    constrained_series = _read_series(processed / "week8_constrained_best_timeseries.csv")
+    cstem = f"{artifact_prefix}{constrained_suffix}"
+    baseline_series = _read_series(processed / f"{artifact_prefix}_baseline_timeseries.csv")
+    constrained_series = _read_series(processed / f"{cstem}_constrained_best_timeseries.csv")
     if constrained_series:
         # Align baseline and constrained plots to the same holdout horizon.
         baseline_series = baseline_series[-len(constrained_series) :]
@@ -540,7 +546,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_equity.set_xlabel("Step")
     ax_equity.set_ylabel("Growth of $1")
     ax_equity.legend()
-    equity_path = figures_dir / "week8_iteration_equity_curve_comparison.png"
+    equity_path = figures_dir / f"{artifact_prefix}_iteration_equity_curve_comparison.png"
     fig_equity.savefig(equity_path, dpi=120)
     plt.close(fig_equity)
 
@@ -551,13 +557,13 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_dd.set_xlabel("Step")
     ax_dd.set_ylabel("Drawdown")
     ax_dd.legend()
-    dd_path = figures_dir / "week8_iteration_drawdown_comparison.png"
+    dd_path = figures_dir / f"{artifact_prefix}_iteration_drawdown_comparison.png"
     fig_dd.savefig(dd_path, dpi=120)
     plt.close(fig_dd)
 
-    with (processed / "week8_baseline_metrics.json").open("r", encoding="utf-8") as handle:
+    with (processed / f"{artifact_prefix}_baseline_metrics.json").open("r", encoding="utf-8") as handle:
         baseline_metrics = json.load(handle)
-    with (processed / "week8_constrained_best_metrics.json").open("r", encoding="utf-8") as handle:
+    with (processed / f"{cstem}_constrained_best_metrics.json").open("r", encoding="utf-8") as handle:
         constrained_metrics = json.load(handle)
 
     baseline_exp = baseline_metrics.get("exposure_by_domain", {})
@@ -572,7 +578,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
         }
         for domain in all_domains
     ]
-    exposure_table_path = processed / "week8_category_exposure_table.csv"
+    exposure_table_path = processed / f"{artifact_prefix}_category_exposure_table.csv"
     with exposure_table_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -606,7 +612,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_exp.set_xticks(list(x))
     ax_exp.set_xticklabels(ranked_domains, rotation=35, ha="right")
     ax_exp.legend()
-    exposure_path = figures_dir / "week8_iteration_category_exposure_comparison.png"
+    exposure_path = figures_dir / f"{artifact_prefix}_iteration_category_exposure_comparison.png"
     fig_exp.tight_layout()
     fig_exp.savefig(exposure_path, dpi=120)
     plt.close(fig_exp)
@@ -636,7 +642,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_roll.set_xlabel("Step")
     ax_roll.set_ylabel("Mean Return")
     ax_roll.legend()
-    rolling_path = figures_dir / "week8_iteration_rolling_mean_return_comparison.png"
+    rolling_path = figures_dir / f"{artifact_prefix}_iteration_rolling_mean_return_comparison.png"
     fig_roll.tight_layout()
     fig_roll.savefig(rolling_path, dpi=120)
     plt.close(fig_roll)
@@ -651,7 +657,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_hist.set_xlabel("Step Return")
     ax_hist.set_ylabel("Frequency")
     ax_hist.legend()
-    hist_path = figures_dir / "week8_iteration_return_distribution_comparison.png"
+    hist_path = figures_dir / f"{artifact_prefix}_iteration_return_distribution_comparison.png"
     fig_hist.tight_layout()
     fig_hist.savefig(hist_path, dpi=120)
     plt.close(fig_hist)
@@ -668,7 +674,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_delta.set_xticklabels(exp_labels, rotation=35, ha="right")
     ax_delta.set_title("Top Category Exposure Deltas (Constrained - Baseline)")
     ax_delta.set_ylabel("Delta Weight")
-    exposure_delta_path = figures_dir / "week8_iteration_top_exposure_deltas.png"
+    exposure_delta_path = figures_dir / f"{artifact_prefix}_iteration_top_exposure_deltas.png"
     fig_delta.tight_layout()
     fig_delta.savefig(exposure_delta_path, dpi=120)
     plt.close(fig_delta)
@@ -685,7 +691,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_scatter.set_xlabel("Volatility")
     ax_scatter.set_ylabel("Mean Step Return")
     ax_scatter.legend()
-    risk_return_path = figures_dir / "week8_iteration_risk_return_snapshot.png"
+    risk_return_path = figures_dir / f"{artifact_prefix}_iteration_risk_return_snapshot.png"
     fig_scatter.tight_layout()
     fig_scatter.savefig(risk_return_path, dpi=120)
     plt.close(fig_scatter)
@@ -768,6 +774,13 @@ def main() -> None:
         metavar="MSG",
         help="Commit message for --git-commit-and-push. Default: timestamped auto message.",
     )
+    parser.add_argument(
+        "--artifact-prefix",
+        default="week8",
+        help="Stem for every artifact this run writes (raw cache, processed CSV/JSON, "
+        "figures, manifest, week 9 report). Use unique values per pod when running "
+        "experiments in parallel (e.g. week8_A, week8_B, ...) so branches merge cleanly.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -792,7 +805,7 @@ def main() -> None:
             "pre-market",
             "rewards-20-4pt5-50",
         ),
-        artifact_prefix="week8",
+        artifact_prefix=args.artifact_prefix,
         history_interval="max",
         history_fidelity=60,
         use_cached_events_if_available=True,
@@ -888,8 +901,8 @@ def main() -> None:
 
     _stage_banner("Equal-Weight Baseline")
     stage_started = time.perf_counter()
-    baseline_result = run_equal_weight_baseline(project_root, artifact_prefix="week8")
-    baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix="week8")
+    baseline_result = run_equal_weight_baseline(project_root, artifact_prefix=args.artifact_prefix)
+    baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix=args.artifact_prefix)
     baseline_sec = time.perf_counter() - stage_started
     print(f"Baseline complete in {baseline_sec:.1f}s")
     print(f"- markets: {baseline_result.market_count}")
@@ -901,7 +914,7 @@ def main() -> None:
     _stage_banner("Exogenous Yahoo features")
     stage_started = time.perf_counter()
     exogenous_artifacts: dict[str, pathlib.Path] = {}
-    ap = "week8"
+    ap = args.artifact_prefix
     markets_p = project_root / "data" / "processed" / f"{ap}_markets_filtered.csv"
     history_p = project_root / "data" / "processed" / f"{ap}_price_history.csv"
     baseline_ts_p = project_root / "data" / "processed" / f"{ap}_baseline_timeseries.csv"
@@ -943,7 +956,7 @@ def main() -> None:
             t0 = time.perf_counter()
             arts = run_optuna_search(
                 project_root,
-                artifact_prefix="week8",
+                artifact_prefix=args.artifact_prefix,
                 config=cfg_m,
                 n_trials=n_trials_opt,
                 joint_macro_mode_search=False,
@@ -965,7 +978,7 @@ def main() -> None:
             )
         constrained_artifacts = run_optuna_search(
             project_root,
-            artifact_prefix="week8",
+            artifact_prefix=args.artifact_prefix,
             config=experiment_config,
             n_trials=n_trials_opt,
             joint_macro_mode_search=args.joint_macro_mode_search,
@@ -980,7 +993,7 @@ def main() -> None:
 
     _stage_banner("Covariance Diagnostics")
     stage_started = time.perf_counter()
-    covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix="week8")
+    covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix=args.artifact_prefix)
     covariance_sec = time.perf_counter() - stage_started
     print(f"Covariance diagnostics complete in {covariance_sec:.1f}s")
     for key, value in covariance_artifacts.items():
@@ -988,7 +1001,11 @@ def main() -> None:
 
     _stage_banner("Figure Generation")
     stage_started = time.perf_counter()
-    figure_artifacts = _make_figures(project_root)
+    figure_artifacts = _make_figures(
+        project_root,
+        artifact_prefix=args.artifact_prefix,
+        constrained_suffix=last_optuna_suffix,
+    )
     figures_sec = time.perf_counter() - stage_started
     print(f"Figures complete in {figures_sec:.1f}s")
     for key, value in figure_artifacts.items():
@@ -996,12 +1013,12 @@ def main() -> None:
 
     _stage_banner("Week 9 Diagnostics Report")
     stage_started = time.perf_counter()
-    week9_cstem = f"week8{last_optuna_suffix}" if last_optuna_suffix else "week8"
+    week9_cstem = f"{args.artifact_prefix}{last_optuna_suffix}" if last_optuna_suffix else args.artifact_prefix
     week9_report_path = _make_week9_diagnostics_report(
         project_root=project_root,
-        artifact_prefix="week8",
+        artifact_prefix=args.artifact_prefix,
         min_history_days_used=used_min_history_days,
-        constrained_artifact_stem=week9_cstem if week9_cstem != "week8" else None,
+        constrained_artifact_stem=week9_cstem if week9_cstem != args.artifact_prefix else None,
     )
     report_sec = time.perf_counter() - stage_started
     print(f"Report complete in {report_sec:.1f}s")
@@ -1009,7 +1026,7 @@ def main() -> None:
 
     manifest_path = _write_run_manifest(
         project_root=project_root,
-        artifact_prefix="week8",
+        artifact_prefix=args.artifact_prefix,
         config_hash=config_hash,
         stage_durations_sec={
             "data_build": data_sec,
