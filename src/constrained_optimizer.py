@@ -1851,16 +1851,18 @@ def run_optuna_search(
 
         return sortino
 
-    # Pruner: only prune after many folds so intermediate Sortino has signal.
-    # With n_warmup_steps=2 we were pruning after ~1% of folds (noise) and killed 80%+ of trials.
+    # Pruner: aggressive enough to actually kill bad trials early. With ~10–20 folds per trial,
+    # waiting >5 folds means most of the work is already paid for before pruning can fire.
     _train = max(cfg.walkforward_train_steps, 96 + 1)
     _test = max(cfg.walkforward_test_steps, 1)
     _n_folds = max(1, (tuning_returns.shape[0] - _train) // _test)
-    n_warmup_steps = min(25, max(5, _n_folds // 10))  # warmup ~10% of folds, at least 5, cap 25
+    n_warmup_steps = min(5, max(2, _n_folds // 5))
     study = optuna.create_study(
         direction="maximize",
-        sampler=optuna.samplers.QMCSampler(seed=cfg.seed, qmc_type="sobol"),
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=n_warmup_steps),
+        sampler=optuna.samplers.QMCSampler(
+            seed=cfg.seed, qmc_type="sobol", warn_independent_sampling=False
+        ),
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=n_warmup_steps),
     )
 
     trial_start = time.perf_counter()
