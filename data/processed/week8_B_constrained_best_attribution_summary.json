@@ -1,0 +1,27 @@
+{
+  "steps": 2085,
+  "asset_count": 40,
+  "total_portfolio_return": 0.02249932783475108,
+  "top_market_by_abs_contribution": {
+    "token_id": "75243767583801257521744211524447653598366317209903038558716257700246583477252",
+    "domain": "bundesliga",
+    "question": "Will Dortmund win the 2025\u201326 Bundesliga?",
+    "market_id": "566538",
+    "market_slug": "will-dortmund-win-the-202526-bundesliga",
+    "mean_weight": 0.024592640324246153,
+    "total_contribution": -0.0653193532278348,
+    "mean_step_contribution": -3.132822696778648e-05,
+    "contribution_share_of_total_return": -2.9031690949872084
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "bundesliga",
+    "total_contribution": -0.0653193532278348,
+    "contribution_share_of_total_return": -2.9031690949872084
+  },
+  "top_abs_corr_pair": {
+    "token_a": "94195159380649683762164114216519545499991614727769221572315275622082093227806",
+    "token_b": "94387913280398317052582281843978069916338462525042652614881277797162415545237",
+    "corr": 0.8593980347540423,
+    "abs_corr": 0.8593980347540423
+  }
+}
