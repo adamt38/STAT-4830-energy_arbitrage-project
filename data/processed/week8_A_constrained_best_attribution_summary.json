@@ -1,0 +1,27 @@
+{
+  "steps": 2085,
+  "asset_count": 40,
+  "total_portfolio_return": 0.17016847635711357,
+  "top_market_by_abs_contribution": {
+    "token_id": "25475523485165949975510012377759235530663609002114542535065321675093084569420",
+    "domain": "basketball",
+    "question": "Will Mitch Johnson win the 2025\u20132026 NBA Coach of the Year?",
+    "market_id": "643797",
+    "market_slug": "nba-2025-26-coach-of-the-year-mitch-johnson",
+    "mean_weight": 0.014893828101436064,
+    "total_contribution": 0.1715575014664092,
+    "mean_step_contribution": 8.228177528364949e-05,
+    "contribution_share_of_total_return": 1.0081626464491615
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "basketball",
+    "total_contribution": 0.1715575014664092,
+    "contribution_share_of_total_return": 1.0081626464491615
+  },
+  "top_abs_corr_pair": {
+    "token_a": "35772478648141184011258957985537045975935629101627518451751092071575033100741",
+    "token_b": "70026524713009669538763377800911903794570186848119999786864842995489783143838",
+    "corr": -0.18897297141891298,
+    "abs_corr": 0.18897297141891298
+  }
+}
