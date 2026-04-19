@@ -284,3 +284,121 @@ is:
 This framing is stronger than "we beat the baseline" because it is
 falsifiable, mechanism-grounded, and corroborated across four independent
 runs.
+
+---
+
+## 8. Round 2: implementation and experiment plan
+
+Round 1 (B/C/D/F + the still-running A/E) gave us a clean diagnosis. Round 2
+is a targeted attempt to **beat the baseline** by acting on the four
+strongest signals from Section 4:
+
+- ETF tracking is net-negative whenever it is active (Section 3, pods C/D).
+  → Round 2 turns ETF tracking off everywhere.
+- Selection bias from 100-trial Sobol search inflates CV Sortino ~3–5× over
+  holdout (Section 4.5).
+  → Round 2 averages the top-K trials' holdout returns instead of using a
+  single best trial.
+- The CV objective rewards configurations that maximize absolute Sortino,
+  which equal-weight already does well (Section 4.1, 4.4).
+  → Round 2 changes the search objective to *Sortino(constrained) −
+  Sortino(equal-weight)* on each fold.
+- 14-dimensional search × 100 trials is sparse; many parameters converged
+  identically across pods.
+  → Round 2 narrows the search space (drops outer extremes, fixes
+  entropy_lambda at 0).
+
+Optionally we also blend toward baseline at evaluation time (shrinkage with
+α searched by Optuna) to test whether even a 50/50 mix of constrained and
+equal-weight is preferable to either alone.
+
+### 8.1 Code changes shipped on `cloud-runs`
+
+Two files changed; both backward-compatible (defaults preserve Round 1
+behavior):
+
+`src/constrained_optimizer.py` — `run_optuna_search` gains three keyword
+args:
+
+| Argument | Default | Effect |
+|---|---|---|
+| `top_k_bagging: int` | `1` | Average holdout `portfolio_returns`, `eval_weights`, and `avg_weights` of the top-K feasible trials (sorted by CV objective). K=1 is the legacy single-best behavior. |
+| `baseline_shrinkage: bool` | `False` | Adds `baseline_alpha ∈ [0,1]` as an Optuna hyperparameter; final per-step return is `α·r_constrained + (1−α)·r_equalweight` in both fold scoring and holdout. |
+| `beat_baseline_objective: bool` | `False` | Optuna maximizes `Sortino_constrained_CV − Sortino_equalweight_CV` on the same walk-forward folds (and uses the same delta for `MedianPruner` reports). |
+
+The best-metrics JSON now includes `baseline_holdout_sortino`,
+`holdout_sortino_minus_baseline`, `top_k_bagging`, `baseline_shrinkage`,
+`beat_baseline_objective`, `bagged_trial_numbers`, `bagged_alphas`, and
+`best_trial_baseline_alpha`. Comparing pods is now a one-line diff on these
+fields.
+
+`script/polymarket_week8_pipeline.py` — four new flags, threaded through to
+both call sites of `run_optuna_search` (single-mode and `--macro-modes`
+sweep):
+
+| Flag | Argument | Notes |
+|---|---|---|
+| `--top-k-bagging` | int (default 1) | Recommended K=5 for Round 2. |
+| `--baseline-shrinkage` | flag | Enables Optuna search of `baseline_alpha`. |
+| `--beat-baseline-objective` | flag | Changes the optimization target to baseline-relative Sortino. |
+| `--reduced-search` | flag | Narrows `learning_rates`, `penalties_lambda`, `domain_limits`, `max_weights`, `variance_penalties`, `downside_penalties`, `uniform_mixes`; pins `entropy_lambdas=(0.0,)`. Same trial budget → denser Sobol coverage of the meaningful subspace. |
+
+### 8.2 Experiment matrix (six pods, ~ablation design)
+
+Every Round 2 pod **drops `--etf-tracking`** (Tier 1 #1) and applies
+`--reduced-search` (Tier 1 #2). Pods then vary along three axes:
+
+- **Macro mode**: `rescale`, `explicit`, `both`, joint.
+- **Top-K bagging**: K=1, 5, or 10.
+- **Optimization target / shrinkage**: plain Sortino, beat-baseline, or
+  shrinkage α.
+
+| Pod | Macro | Top-K | Beat-baseline obj | Baseline shrinkage | Hypothesis being tested |
+|---|---|---|---|---|---|
+| **A** | rescale | 5 | no | no | Pure top-K bagging on the simplest macro. Isolates the bagging effect. |
+| **B** | rescale | 1 | no | yes | Pure shrinkage-α on the simplest macro. Isolates the shrinkage effect. |
+| **C** | both | 5 | no | no | Top-K bagging on the macro mode that blends rescale + explicit. |
+| **D** | explicit | 5 | yes | no | Bagging + objective change on the explicit-only macro. |
+| **E** | both | 10 | yes | yes | Kitchen sink: bigger bag, beat-baseline objective, and shrinkage α together. |
+| **F** | joint | 5 | yes | yes | Joint macro search with all three improvements on. Complements E by letting Optuna pick macro mode. |
+
+If the consistent winner is a configuration with both `--top-k-bagging` and
+`--baseline-shrinkage` enabled (E, F), Round 3 should focus there. If A
+alone closes the gap, bagging-only is the best path; if B alone closes it,
+the result was always portfolio-level shrinkage, not constraint design.
+
+### 8.3 What "beat the baseline" looks like in artifacts
+
+For a Round 2 pod X, after the run completes, a positive
+`holdout_sortino_minus_baseline` in
+`data/processed/week9_X<suffix>_constrained_best_metrics.json` means we
+beat the baseline. Suffix is `""` for `--macro-integration rescale`,
+`"_macro_explicit"` for explicit, `"_macro_both"` for both. For F (joint)
+the suffix is empty and `holdout_macro` inside the JSON tells you which
+mode Optuna picked.
+
+Quick fan-in on the local machine after all six finish:
+
+```bash
+for pod in A B C D E F; do
+  for f in data/processed/week9_${pod}*constrained_best_metrics.json; do
+    [ -f "$f" ] || continue
+    python3 -c "
+import json,sys
+d=json.load(open('$f'))['best_params']
+print(f\"$pod  delta={d['holdout_sortino_minus_baseline']:+.4f}  \" 
+      f\"sortino={d['holdout_sortino_ratio']:.4f}  \"
+      f\"baseline={d['baseline_holdout_sortino']:.4f}  \"
+      f\"K={d['top_k_bagging']}  shrinkage={d['baseline_shrinkage']}  \"
+      f\"beat_obj={d['beat_baseline_objective']}\"
+"
+  done
+done
+```
+
+A negative result here is still informative: it tells us that even with the
+four highest-leverage corrections from Round 1, the constrained mean-downside
+formulation cannot beat equal-weight on this universe — at which point the
+project narrative shifts from "fix the model" to "fix the universe" (Tier 3
+items 7 and the cross-platform-arbitrage note).
+

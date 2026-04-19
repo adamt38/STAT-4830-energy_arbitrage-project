@@ -1619,6 +1619,9 @@ def run_optuna_search(
     *,
     joint_macro_mode_search: bool = False,
     output_artifact_suffix: str = "",
+    top_k_bagging: int = 1,
+    baseline_shrinkage: bool = False,
+    beat_baseline_objective: bool = False,
 ) -> dict[str, pathlib.Path]:
     """Run quasi-random hyperparameter search via Optuna QMCSampler (Sobol + scramble).
 
@@ -1661,6 +1664,13 @@ def run_optuna_search(
     )
     split_idx = min(split_idx, returns_matrix.shape[0] - 1)
     tuning_returns = returns_matrix[:split_idx]
+    # Equal-weight (per-step) baseline return time series. Used by
+    # baseline_shrinkage (blend constrained returns toward baseline) and
+    # beat_baseline_objective (subtract baseline Sortino from objective).
+    baseline_returns_full = returns_matrix.mean(axis=1)
+    n_assets = returns_matrix.shape[1]
+    if top_k_bagging < 1:
+        raise ValueError("top_k_bagging must be >= 1.")
     rz, ez, ratesz, st, op = _load_exogenous_regime(
         project_root, artifact_prefix, returns_matrix.shape[0]
     )
@@ -1751,9 +1761,15 @@ def run_optuna_search(
         else:
             lambda_etf_val = 0.0
 
+        if baseline_shrinkage:
+            baseline_alpha = float(trial.suggest_float("baseline_alpha", 0.0, 1.0))
+        else:
+            baseline_alpha = 1.0
+
         train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
         test_steps = max(cfg.walkforward_test_steps, 1)
         all_fold_returns: list[float] = []
+        all_baseline_fold_returns: list[float] = []
         fold_weights_list: list[np.ndarray] = []
         fold_idx = 0
         start = 0
@@ -1811,7 +1827,17 @@ def run_optuna_search(
 
             fold_rets = fold_payload["portfolio_returns"]
             if isinstance(fold_rets, np.ndarray) and fold_rets.size > 0:
-                all_fold_returns.extend(fold_rets.tolist())
+                test_lo = start + train_steps
+                test_hi = test_lo + fold_rets.size
+                base_slice = baseline_returns_full[test_lo:test_hi]
+                if baseline_shrinkage and base_slice.size == fold_rets.size:
+                    blended = (
+                        baseline_alpha * fold_rets + (1.0 - baseline_alpha) * base_slice
+                    )
+                    all_fold_returns.extend(blended.tolist())
+                else:
+                    all_fold_returns.extend(fold_rets.tolist())
+                all_baseline_fold_returns.extend(base_slice.tolist())
                 if fold_payload["avg_weights"].size > 0:
                     fold_weights_list.append(fold_payload["avg_weights"])
 
@@ -1819,7 +1845,14 @@ def run_optuna_search(
                 intermediate_sortino = _compute_metrics(
                     np.array(all_fold_returns, dtype=float)
                 )[0]
-                trial.report(intermediate_sortino, fold_idx)
+                if beat_baseline_objective and all_baseline_fold_returns:
+                    intermediate_baseline = _compute_metrics(
+                        np.array(all_baseline_fold_returns, dtype=float)
+                    )[0]
+                    intermediate_score = intermediate_sortino - intermediate_baseline
+                else:
+                    intermediate_score = intermediate_sortino
+                trial.report(intermediate_score, fold_idx)
                 if trial.should_prune():
                     raise optuna.TrialPruned()
 
@@ -1831,6 +1864,14 @@ def run_optuna_search(
 
         returns_arr = np.array(all_fold_returns, dtype=float)
         sortino, max_dd, mean_return, volatility, _, _ = _compute_metrics(returns_arr)
+        if beat_baseline_objective and all_baseline_fold_returns:
+            base_arr = np.array(all_baseline_fold_returns, dtype=float)
+            baseline_sortino_cv = _compute_metrics(base_arr)[0]
+            objective_score = sortino - baseline_sortino_cv
+            trial.set_user_attr("baseline_sortino_cv", float(baseline_sortino_cv))
+            trial.set_user_attr("sortino_minus_baseline_cv", float(objective_score))
+        else:
+            objective_score = sortino
 
         trial.set_user_attr("max_drawdown", float(max_dd))
         trial.set_user_attr("mean_return", float(mean_return))
@@ -1849,7 +1890,10 @@ def run_optuna_search(
             )
             trial.set_user_attr("domain_exposure_json", json.dumps(domain_exposure))
 
-        return sortino
+        trial.set_user_attr("sortino_constrained_cv", float(sortino))
+        if baseline_shrinkage:
+            trial.set_user_attr("baseline_alpha", float(baseline_alpha))
+        return objective_score
 
     # Pruner: aggressive enough to actually kill bad trials early. With ~10–20 folds per trial,
     # waiting >5 folds means most of the work is already paid for before pruning can fire.
@@ -2014,74 +2058,180 @@ def run_optuna_search(
             key=lambda t: t.value if t.value is not None else float("-inf"),
         )
 
+    def _resolve_trial_holdout_params(
+        trial_params: dict[str, Any],
+    ) -> tuple[str, float, float, float, float]:
+        if joint_macro_mode_search:
+            macro_local = str(trial_params.get("macro_mode", cfg.macro_integration))
+            regime_k_local = (
+                float(trial_params["regime_k"])
+                if macro_local in ("rescale", "both") and "regime_k" in trial_params
+                else float(cfg.regime_k)
+            )
+            lambda_macro_local = (
+                float(trial_params["lambda_macro_explicit"])
+                if macro_local in ("explicit", "both") and "lambda_macro_explicit" in trial_params
+                else 0.0
+            )
+        else:
+            macro_local = str(cfg.macro_integration)
+            lambda_macro_local = (
+                float(trial_params["lambda_macro_explicit"])
+                if "lambda_macro_explicit" in trial_params
+                else float(cfg.lambda_macro_explicit)
+            )
+            regime_k_local = (
+                float(trial_params["regime_k"])
+                if "regime_k" in trial_params
+                else float(cfg.regime_k)
+            )
+        lambda_etf_local = (
+            float(trial_params.get("lambda_etf_tracking", 0.0)) if use_etf_effective else 0.0
+        )
+        alpha_local = (
+            float(trial_params.get("baseline_alpha", 1.0)) if baseline_shrinkage else 1.0
+        )
+        return macro_local, regime_k_local, lambda_macro_local, lambda_etf_local, alpha_local
+
+    def _holdout_pass_for_trial(trial_params: dict[str, Any]) -> OnlinePassPayload:
+        macro_local, regime_k_local, lambda_macro_local, lambda_etf_local, _alpha_local = (
+            _resolve_trial_holdout_params(trial_params)
+        )
+        return _run_online_pass(
+            returns_matrix=returns_matrix,
+            domains=domains,
+            lr=float(trial_params.get("lr", cfg.learning_rates[0])),
+            penalty_lambda=float(trial_params.get("penalty_lambda", cfg.penalties_lambda[0])),
+            rolling_window=int(trial_params.get("rolling_window", cfg.rolling_windows[0])),
+            steps_per_window=cfg.steps_per_window,
+            domain_limit=float(trial_params.get("domain_limit", cfg.domain_limits[0])),
+            max_weight=float(trial_params.get("max_weight", cfg.max_weights[0])),
+            concentration_penalty_lambda=float(
+                trial_params.get(
+                    "concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0]
+                )
+            ),
+            covariance_penalty_lambda=float(
+                trial_params.get(
+                    "covariance_penalty_lambda", cfg.covariance_penalty_lambdas[0]
+                )
+            ),
+            covariance_shrinkage=float(
+                trial_params.get("covariance_shrinkage", cfg.covariance_shrinkages[0])
+            ),
+            entropy_lambda=float(trial_params.get("entropy_lambda", cfg.entropy_lambdas[0])),
+            uniform_mix=float(trial_params.get("uniform_mix", cfg.uniform_mixes[0])),
+            seed=cfg.seed,
+            evaluation_start_t=split_idx,
+            update_after_eval_start=(mode == "online"),
+            capture_diagnostics=True,
+            objective=cfg.objective,
+            variance_penalty=float(trial_params.get("variance_penalty", cfg.variance_penalty)),
+            downside_penalty=float(trial_params.get("downside_penalty", cfg.downside_penalty)),
+            optimizer_type=cfg.optimizer_type,
+            weight_parameterization=cfg.weight_parameterization,
+            regime_k=regime_k_local,
+            risk_on_z=rz,
+            energy_z=ez,
+            rates_z=ratesz,
+            exog_is_stale=st,
+            is_equity_open=op,
+            time_offset=0,
+            macro_integration=macro_local,
+            lambda_macro_explicit=lambda_macro_local,
+            etf_step_returns=etf_tracking_matrix,
+            lambda_etf_tracking=lambda_etf_local,
+        )
+
+    feasible_pool = feasible_trials if feasible_trials else completed_trials
+    feasible_pool = sorted(
+        feasible_pool,
+        key=lambda t: t.value if t.value is not None else float("-inf"),
+        reverse=True,
+    )
+    top_k = max(1, min(int(top_k_bagging), len(feasible_pool)))
+    bag_trials = feasible_pool[:top_k]
+
     bp = best_trial.params
 
-    if joint_macro_mode_search:
-        holdout_macro = str(bp.get("macro_mode", cfg.macro_integration))
-        holdout_regime_k = (
-            float(bp["regime_k"])
-            if holdout_macro in ("rescale", "both") and "regime_k" in bp
-            else float(cfg.regime_k)
-        )
-        holdout_lambda_macro = (
-            float(bp["lambda_macro_explicit"])
-            if holdout_macro in ("explicit", "both") and "lambda_macro_explicit" in bp
-            else 0.0
-        )
-    else:
-        holdout_macro = str(cfg.macro_integration)
-        holdout_lambda_macro = (
-            float(bp["lambda_macro_explicit"])
-            if "lambda_macro_explicit" in bp
-            else float(cfg.lambda_macro_explicit)
-        )
-        holdout_regime_k = (
-            float(bp["regime_k"]) if "regime_k" in bp else float(cfg.regime_k)
-        )
-
-    holdout_lambda_etf = float(bp.get("lambda_etf_tracking", 0.0)) if use_etf_effective else 0.0
-
-    holdout_payload = _run_online_pass(
-        returns_matrix=returns_matrix,
-        domains=domains,
-        lr=float(bp.get("lr", cfg.learning_rates[0])),
-        penalty_lambda=float(bp.get("penalty_lambda", cfg.penalties_lambda[0])),
-        rolling_window=int(bp.get("rolling_window", cfg.rolling_windows[0])),
-        steps_per_window=cfg.steps_per_window,
-        domain_limit=float(bp.get("domain_limit", cfg.domain_limits[0])),
-        max_weight=float(bp.get("max_weight", cfg.max_weights[0])),
-        concentration_penalty_lambda=float(
-            bp.get("concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0])
-        ),
-        covariance_penalty_lambda=float(
-            bp.get("covariance_penalty_lambda", cfg.covariance_penalty_lambdas[0])
-        ),
-        covariance_shrinkage=float(
-            bp.get("covariance_shrinkage", cfg.covariance_shrinkages[0])
-        ),
-        entropy_lambda=float(bp.get("entropy_lambda", cfg.entropy_lambdas[0])),
-        uniform_mix=float(bp.get("uniform_mix", cfg.uniform_mixes[0])),
-        seed=cfg.seed,
-        evaluation_start_t=split_idx,
-        update_after_eval_start=(mode == "online"),
-        capture_diagnostics=True,
-        objective=cfg.objective,
-        variance_penalty=float(bp.get("variance_penalty", cfg.variance_penalty)),
-        downside_penalty=float(bp.get("downside_penalty", cfg.downside_penalty)),
-        optimizer_type=cfg.optimizer_type,
-        weight_parameterization=cfg.weight_parameterization,
-        regime_k=holdout_regime_k,
-        risk_on_z=rz,
-        energy_z=ez,
-        rates_z=ratesz,
-        exog_is_stale=st,
-        is_equity_open=op,
-        time_offset=0,
-        macro_integration=holdout_macro,
-        lambda_macro_explicit=holdout_lambda_macro,
-        etf_step_returns=etf_tracking_matrix,
-        lambda_etf_tracking=holdout_lambda_etf,
+    holdout_macro, holdout_regime_k, holdout_lambda_macro, holdout_lambda_etf, _ = (
+        _resolve_trial_holdout_params(bp)
     )
+
+    bagged_payloads: list[OnlinePassPayload] = []
+    bag_alphas: list[float] = []
+    bag_trial_numbers: list[int] = []
+    baseline_holdout_returns = baseline_returns_full[split_idx:]
+    for t in bag_trials:
+        payload_t = _holdout_pass_for_trial(t.params)
+        if baseline_shrinkage and payload_t["portfolio_returns"].size > 0:
+            alpha_t = float(t.params.get("baseline_alpha", 1.0))
+            ret_t = payload_t["portfolio_returns"]
+            base_slice_t = baseline_holdout_returns[: ret_t.size]
+            blended_t = alpha_t * ret_t + (1.0 - alpha_t) * base_slice_t
+            payload_t = OnlinePassPayload(
+                portfolio_returns=blended_t,
+                avg_weights=(
+                    alpha_t * payload_t["avg_weights"]
+                    + (1.0 - alpha_t) * (np.ones_like(payload_t["avg_weights"]) / max(n_assets, 1))
+                )
+                if payload_t["avg_weights"].size > 0
+                else payload_t["avg_weights"],
+                eval_weights=(
+                    alpha_t * payload_t["eval_weights"]
+                    + (1.0 - alpha_t) * (np.ones_like(payload_t["eval_weights"]) / max(n_assets, 1))
+                )
+                if payload_t["eval_weights"].size > 0
+                else payload_t["eval_weights"],
+                eval_asset_returns=payload_t["eval_asset_returns"],
+            )
+            bag_alphas.append(alpha_t)
+        else:
+            bag_alphas.append(1.0)
+        bagged_payloads.append(payload_t)
+        bag_trial_numbers.append(int(t.number))
+
+    if len(bagged_payloads) == 1:
+        holdout_payload = bagged_payloads[0]
+    else:
+        # All payloads share holdout length and asset universe; defensive trim to min length.
+        min_len = min(int(p["portfolio_returns"].size) for p in bagged_payloads)
+        stacked_rets = np.stack(
+            [p["portfolio_returns"][:min_len] for p in bagged_payloads], axis=0
+        )
+        bagged_returns = stacked_rets.mean(axis=0)
+        nonempty_avg = [p["avg_weights"] for p in bagged_payloads if p["avg_weights"].size > 0]
+        bagged_avg = (
+            np.mean(np.stack(nonempty_avg, axis=0), axis=0)
+            if nonempty_avg
+            else np.zeros(0, dtype=float)
+        )
+        nonempty_evw = [p["eval_weights"] for p in bagged_payloads if p["eval_weights"].size > 0]
+        if nonempty_evw:
+            min_steps = min(arr.shape[0] for arr in nonempty_evw)
+            bagged_eval_w = np.mean(
+                np.stack([arr[:min_steps] for arr in nonempty_evw], axis=0), axis=0
+            )
+        else:
+            bagged_eval_w = np.zeros((0, 0), dtype=float)
+        nonempty_evr = [
+            p["eval_asset_returns"] for p in bagged_payloads if p["eval_asset_returns"].size > 0
+        ]
+        if nonempty_evr:
+            min_steps_r = min(arr.shape[0] for arr in nonempty_evr)
+            bagged_eval_r = nonempty_evr[0][:min_steps_r]
+        else:
+            bagged_eval_r = np.zeros((0, 0), dtype=float)
+        if bagged_eval_w.size > 0 and bagged_eval_r.size > 0:
+            steps_match = min(bagged_eval_w.shape[0], bagged_eval_r.shape[0])
+            bagged_eval_w = bagged_eval_w[:steps_match]
+            bagged_eval_r = bagged_eval_r[:steps_match]
+        holdout_payload = OnlinePassPayload(
+            portfolio_returns=bagged_returns,
+            avg_weights=bagged_avg,
+            eval_weights=bagged_eval_w,
+            eval_asset_returns=bagged_eval_r,
+        )
 
     holdout_returns = holdout_payload["portfolio_returns"]
     (
@@ -2092,6 +2242,7 @@ def run_optuna_search(
         holdout_cumulative,
         holdout_drawdown,
     ) = _compute_metrics(holdout_returns)
+    baseline_holdout_sortino = float(_compute_metrics(baseline_holdout_returns)[0])
 
     avg_holdout_weights = holdout_payload["avg_weights"]
     if avg_holdout_weights.size == 0:
@@ -2139,6 +2290,16 @@ def run_optuna_search(
         "max_domain_exposure": float(max(holdout_domain_exposure.values()))
         if holdout_domain_exposure
         else 0.0,
+        "baseline_holdout_sortino": baseline_holdout_sortino,
+        "holdout_sortino_minus_baseline": float(holdout_sortino - baseline_holdout_sortino),
+        "top_k_bagging": top_k,
+        "baseline_shrinkage": bool(baseline_shrinkage),
+        "beat_baseline_objective": bool(beat_baseline_objective),
+        "bagged_trial_numbers": bag_trial_numbers,
+        "bagged_alphas": bag_alphas,
+        "best_trial_baseline_alpha": float(bp.get("baseline_alpha", 1.0))
+        if baseline_shrinkage
+        else 1.0,
     }
 
     best_metrics_path = out_dir / f"{constrained_stem}_constrained_best_metrics.json"
@@ -2172,6 +2333,14 @@ def run_optuna_search(
                     "sampler": "QMCSampler(sobol)",
                     "joint_macro_mode_search": joint_macro_mode_search,
                     "output_artifact_suffix": output_artifact_suffix,
+                    "top_k_bagging": top_k,
+                    "baseline_shrinkage": bool(baseline_shrinkage),
+                    "beat_baseline_objective": bool(beat_baseline_objective),
+                    "bagged_trial_numbers": bag_trial_numbers,
+                    "bagged_alphas": bag_alphas,
+                    "objective_value_best": float(best_trial.value)
+                    if best_trial.value is not None
+                    else None,
                 },
             },
             indent=2,

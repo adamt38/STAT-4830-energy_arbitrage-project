@@ -788,6 +788,36 @@ def main() -> None:
         "figures, manifest, week 9 report). Use unique values per pod when running "
         "experiments in parallel (e.g. week8_A, week8_B, ...) so branches merge cleanly.",
     )
+    parser.add_argument(
+        "--top-k-bagging",
+        type=int,
+        default=1,
+        help="Average the holdout portfolio returns of the top-K Optuna trials (by walk-forward "
+        "objective) instead of using a single best trial. K=1 (default) preserves legacy behavior. "
+        "Reduces selection bias from many-trial Sobol search; recommended K=5–10.",
+    )
+    parser.add_argument(
+        "--baseline-shrinkage",
+        action="store_true",
+        help="Add baseline_alpha ∈ [0, 1] as an Optuna hyperparameter. Final per-step return is "
+        "alpha * r_constrained + (1 - alpha) * r_equalweight; Optuna picks alpha. Acts as "
+        "shrinkage-to-uniform at the portfolio level.",
+    )
+    parser.add_argument(
+        "--beat-baseline-objective",
+        action="store_true",
+        help="Change the Optuna objective from Sortino(constrained) to "
+        "Sortino(constrained) - Sortino(equal-weight) on the same walk-forward folds. "
+        "Pushes the search toward configurations that *beat* equal-weight rather than just "
+        "maximizing absolute Sortino.",
+    )
+    parser.add_argument(
+        "--reduced-search",
+        action="store_true",
+        help="Narrow the Optuna search space to ranges around the values that converged across "
+        "Round 1 pods (drops outer extremes for lr, domain_limit, max_weight, variance/downside "
+        "penalties; fixes entropy_lambda at 0). Same trial count → denser Sobol coverage.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -876,6 +906,18 @@ def main() -> None:
         experiment_config = replace(experiment_config, macro_integration=args.macro_integration)
     if args.etf_tracking:
         experiment_config = replace(experiment_config, use_etf_tracking=True)
+    if args.reduced_search:
+        experiment_config = replace(
+            experiment_config,
+            learning_rates=(0.005, 0.01, 0.02, 0.05),
+            penalties_lambda=(0.25, 0.5, 1.0),
+            domain_limits=(0.08, 0.12),
+            max_weights=(0.04, 0.06, 0.10),
+            entropy_lambdas=(0.0,),
+            variance_penalties=(1.0, 2.0),
+            downside_penalties=(2.0, 3.0),
+            uniform_mixes=(0.0, 0.05, 0.1),
+        )
     config_hash = _config_hash(base_build_config, experiment_config)
 
     def _stage_banner(name: str) -> None:
@@ -1010,6 +1052,9 @@ def main() -> None:
                     n_trials=n_trials_opt,
                     joint_macro_mode_search=False,
                     output_artifact_suffix=suf,
+                    top_k_bagging=int(args.top_k_bagging),
+                    baseline_shrinkage=bool(args.baseline_shrinkage),
+                    beat_baseline_objective=bool(args.beat_baseline_objective),
                 )
                 constrained_sec_total += time.perf_counter() - t0
                 for k, v in arts.items():
@@ -1032,6 +1077,9 @@ def main() -> None:
                 n_trials=n_trials_opt,
                 joint_macro_mode_search=args.joint_macro_mode_search,
                 output_artifact_suffix=suf_single,
+                top_k_bagging=int(args.top_k_bagging),
+                baseline_shrinkage=bool(args.baseline_shrinkage),
+                beat_baseline_objective=bool(args.beat_baseline_objective),
             )
             constrained_sec = time.perf_counter() - stage_started
             manifest_constrained_flat = {k: str(v) for k, v in constrained_artifacts.items()}
