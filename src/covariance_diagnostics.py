@@ -48,8 +48,15 @@ def _build_category_returns(
 def run_covariance_diagnostics(
     project_root: pathlib.Path,
     artifact_prefix: str = "week8",
+    constrained_suffix: str = "",
 ) -> dict[str, pathlib.Path]:
-    """Compute covariance diagnostics and persist summary artifacts."""
+    """Compute covariance diagnostics and persist summary artifacts.
+
+    ``constrained_suffix`` should mirror the suffix used by the constrained Optuna
+    stage (e.g. ``""`` for rescale, ``"_macro_explicit"`` for explicit). Without
+    this, runs whose primary mode is not ``rescale`` would look for a
+    ``{prefix}_constrained_best_metrics.json`` file that was never written.
+    """
     categories, category_returns = _build_category_returns(project_root, artifact_prefix=artifact_prefix)
     out_dir = project_root / "data" / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -103,9 +110,10 @@ def run_covariance_diagnostics(
     baseline_metrics = json.loads(
         (out_dir / f"{artifact_prefix}_baseline_metrics.json").read_text(encoding="utf-8")
     )
-    constrained_metrics = json.loads(
-        (out_dir / f"{artifact_prefix}_constrained_best_metrics.json").read_text(encoding="utf-8")
+    constrained_metrics_path = (
+        out_dir / f"{artifact_prefix}{constrained_suffix}_constrained_best_metrics.json"
     )
+    constrained_metrics = json.loads(constrained_metrics_path.read_text(encoding="utf-8"))
     baseline_exp = baseline_metrics.get("exposure_by_domain", {})
     constrained_exp = constrained_metrics.get("domain_exposure", {})
     baseline_w = np.array([float(baseline_exp.get(cat, 0.0)) for cat in categories], dtype=float)

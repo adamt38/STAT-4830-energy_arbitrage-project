@@ -752,6 +752,13 @@ def main() -> None:
         "Use -1 for auto (cpu_count). On many-core pods, try 16–32 with OMP_NUM_THREADS=1 TORCH_NUM_THREADS=1.",
     )
     parser.add_argument(
+        "--skip-optuna",
+        action="store_true",
+        help="Skip the Optuna search stage entirely and resume the pipeline from covariance "
+        "diagnostics onward, reusing previously-written *_constrained_best_*.json/csv artifacts. "
+        "Use this when an earlier run finished Optuna but crashed in a downstream stage.",
+    )
+    parser.add_argument(
         "--git-commit-and-push",
         action="store_true",
         help="After a successful run: git add data/processed figures docs, commit, "
@@ -942,58 +949,104 @@ def main() -> None:
         print(f"- {key}: {value}")
 
     n_trials_opt = args.optuna_trials if args.optuna_trials is not None else OPTUNA_N_TRIALS
-    _stage_banner(f"Optuna quasi-random search ({n_trials_opt} trials, QMCSampler)")
-    stage_started = time.perf_counter()
     manifest_constrained_flat: dict[str, str] = {}
     last_optuna_suffix = ""
     constrained_artifacts: dict[str, pathlib.Path] = {}
+    constrained_sec = 0.0
 
-    if macro_modes_list:
-        constrained_sec_total = 0.0
-        for m in macro_modes_list:
-            suf = "" if m == "rescale" else f"_macro_{m}"
-            cfg_m = replace(experiment_config, macro_integration=m)
-            t0 = time.perf_counter()
-            arts = run_optuna_search(
-                project_root,
-                artifact_prefix=args.artifact_prefix,
-                config=cfg_m,
-                n_trials=n_trials_opt,
-                joint_macro_mode_search=False,
-                output_artifact_suffix=suf,
-            )
-            constrained_sec_total += time.perf_counter() - t0
-            for k, v in arts.items():
-                manifest_constrained_flat[f"{m}__{k}"] = str(v)
-            constrained_artifacts = arts
-            last_optuna_suffix = suf
-        constrained_sec = constrained_sec_total
-    else:
-        suf_single = args.optuna_artifact_suffix
-        if suf_single is None:
-            suf_single = (
+    def _resume_suffix_from_args() -> str:
+        if macro_modes_list:
+            last_mode = macro_modes_list[-1]
+            return "" if last_mode == "rescale" else f"_macro_{last_mode}"
+        suf = args.optuna_artifact_suffix
+        if suf is None:
+            suf = (
                 ""
                 if (args.joint_macro_mode_search or args.macro_integration == "rescale")
                 else f"_macro_{args.macro_integration}"
             )
-        constrained_artifacts = run_optuna_search(
-            project_root,
-            artifact_prefix=args.artifact_prefix,
-            config=experiment_config,
-            n_trials=n_trials_opt,
-            joint_macro_mode_search=args.joint_macro_mode_search,
-            output_artifact_suffix=suf_single,
-        )
-        constrained_sec = time.perf_counter() - stage_started
+        return suf
+
+    def _reconstruct_artifacts_from_disk(suffix: str) -> dict[str, pathlib.Path]:
+        processed_dir = project_root / "data" / "processed"
+        stem = f"{args.artifact_prefix}{suffix}"
+        candidates = {
+            "constrained_grid": processed_dir / f"{args.artifact_prefix}_constrained_experiment_grid.csv",
+            "constrained_best_metrics": processed_dir / f"{stem}_constrained_best_metrics.json",
+            "constrained_best_timeseries": processed_dir / f"{stem}_constrained_best_timeseries.csv",
+        }
+        return {k: v for k, v in candidates.items() if v.exists()}
+
+    if args.skip_optuna:
+        _stage_banner("Optuna quasi-random search (SKIPPED — resuming from disk)")
+        last_optuna_suffix = _resume_suffix_from_args()
+        constrained_artifacts = _reconstruct_artifacts_from_disk(last_optuna_suffix)
         manifest_constrained_flat = {k: str(v) for k, v in constrained_artifacts.items()}
-        last_optuna_suffix = suf_single
-    print(f"\nOptuna search complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
+        required = (
+            project_root
+            / "data"
+            / "processed"
+            / f"{args.artifact_prefix}{last_optuna_suffix}_constrained_best_metrics.json"
+        )
+        if not required.exists():
+            raise SystemExit(
+                f"--skip-optuna requested but {required} is missing. "
+                "Cannot resume; rerun without --skip-optuna or check --macro-integration / --macro-modes."
+            )
+        print(f"Reusing constrained artifacts with suffix {last_optuna_suffix!r}:")
+    else:
+        _stage_banner(f"Optuna quasi-random search ({n_trials_opt} trials, QMCSampler)")
+        stage_started = time.perf_counter()
+        if macro_modes_list:
+            constrained_sec_total = 0.0
+            for m in macro_modes_list:
+                suf = "" if m == "rescale" else f"_macro_{m}"
+                cfg_m = replace(experiment_config, macro_integration=m)
+                t0 = time.perf_counter()
+                arts = run_optuna_search(
+                    project_root,
+                    artifact_prefix=args.artifact_prefix,
+                    config=cfg_m,
+                    n_trials=n_trials_opt,
+                    joint_macro_mode_search=False,
+                    output_artifact_suffix=suf,
+                )
+                constrained_sec_total += time.perf_counter() - t0
+                for k, v in arts.items():
+                    manifest_constrained_flat[f"{m}__{k}"] = str(v)
+                constrained_artifacts = arts
+                last_optuna_suffix = suf
+            constrained_sec = constrained_sec_total
+        else:
+            suf_single = args.optuna_artifact_suffix
+            if suf_single is None:
+                suf_single = (
+                    ""
+                    if (args.joint_macro_mode_search or args.macro_integration == "rescale")
+                    else f"_macro_{args.macro_integration}"
+                )
+            constrained_artifacts = run_optuna_search(
+                project_root,
+                artifact_prefix=args.artifact_prefix,
+                config=experiment_config,
+                n_trials=n_trials_opt,
+                joint_macro_mode_search=args.joint_macro_mode_search,
+                output_artifact_suffix=suf_single,
+            )
+            constrained_sec = time.perf_counter() - stage_started
+            manifest_constrained_flat = {k: str(v) for k, v in constrained_artifacts.items()}
+            last_optuna_suffix = suf_single
+        print(f"\nOptuna search complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
     for key, value in constrained_artifacts.items():
         print(f"- {key}: {value}")
 
     _stage_banner("Covariance Diagnostics")
     stage_started = time.perf_counter()
-    covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix=args.artifact_prefix)
+    covariance_artifacts = run_covariance_diagnostics(
+        project_root,
+        artifact_prefix=args.artifact_prefix,
+        constrained_suffix=last_optuna_suffix,
+    )
     covariance_sec = time.perf_counter() - stage_started
     print(f"Covariance diagnostics complete in {covariance_sec:.1f}s")
     for key, value in covariance_artifacts.items():
