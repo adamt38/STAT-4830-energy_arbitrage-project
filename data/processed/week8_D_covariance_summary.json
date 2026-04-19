@@ -1,0 +1,11 @@
+{
+  "category_count": 40,
+  "avg_abs_correlation": 0.002865863490936496,
+  "max_abs_correlation": 0.26535494338076737,
+  "pairs_abs_corr_ge_0p8": 0,
+  "pairs_abs_corr_ge_0p6": 0,
+  "top_eigenvalue_share": 0.8418169883845208,
+  "baseline_portfolio_variance": 6.574749006666481e-05,
+  "constrained_portfolio_variance": 6.690220813981293e-05,
+  "variance_ratio_constrained_vs_baseline": 1.017562922508179
+}
