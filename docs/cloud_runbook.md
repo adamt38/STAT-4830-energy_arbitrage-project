@@ -619,3 +619,227 @@ RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
 ```
 
 For a pod that already has Round 1 / Round 2 set up, this collapses to: `git fetch && reset --hard origin/cloud-runs`, re-export the env vars inside tmux, paste the §13.2 block.
+
+---
+
+## 14. Round 4 — post-C2/G2 cross-term week8 experiments
+
+Round 4 builds on the two positive Round 2 results (C2: +0.0040 Sortino delta with `macro=both`, and G2: +0.0019 delta with `--momentum-screening`) and tests the experiments Round 2 never ran. Every Round 4 pod uses the **same `polymarket_week8_pipeline.py`** script as Round 2, but with post-Round-2 levers combined in ways that Round 2 did not cover. Round 4 is parallel-safe with in-flight Round 3 (Kelly) pods from §13 because stems are uniquely `week11_<X>_*` and branches are uniquely `cloud-runs-<X>4`.
+
+### 14.0. Round 4 hypothesis and ablation matrix
+
+Round 2's cross-pod synthesis identified five headline findings. Round 4 is the follow-up ablation:
+
+| Round 2 finding | Round 4 response |
+|---|---|
+| `macro=both` > `rescale` > `explicit` (C2: +0.004 vs A2: −0.060) | Every Round 4 pod uses `--macro-integration both`. |
+| Momentum screening buys ~10× the raw return (G2's 0.00126 vs ~0.00015 elsewhere) | Pods I, K, L add `--momentum-screening` on top of macro=both. |
+| `--beat-baseline-objective` hurt on D2/E2/F2 | Dropped from Round 4 entirely. |
+| `--baseline-shrinkage` alone collapsed to α=0 (B2 never used the constrained portfolio) | Dropped as a primary lever. |
+| `top_k_bagging=10` underperformed 5 (E2) and `=1` collapsed (B2) | Fixed at 5 (pods I, K, L) or 3 (pod M's noise-reduction check). |
+
+All five pods drop `--etf-tracking` (Round 1's largest negative finding) and keep `--reduced-search` (denser Sobol coverage of the meaningful subspace). The four pods differ along three axes: momentum window, rolling window, and Optuna budget.
+
+| Pod | Macro | Momentum screening | Rolling window | Top-K | Trials | Hypothesis |
+|---|---|---|---|---|---|---|
+| **I** | both | top-20 / 5d (same as G2) | default (24, 48, 96) | 5 | 100 | **The missing C2 × G2 cross-term.** Predicted to be the strongest Round 4 pod. |
+| **K** | both | top-20 / 5d | pinned to 96 only | 5 | 100 | G2 selected rolling=96. Does that carry over when macro=both is active? |
+| **L** | both | top-25 / 10d | default | 5 | 100 | Universe sensitivity around G2's peak. Wider momentum window, larger universe. |
+| **M** | both | none (full universe) | default | 3 | **200** | Denser Sobol + smaller bag on C2's winning config; tests whether C2's +0.004 was selection noise or real. |
+
+### 14.1. Prerequisites (delta vs §0–§3 and §13.1)
+
+1. **Code:** `cloud-runs` as of commit `1436c71` contains the merged `origin/momentum-lever` changes — so `--momentum-screening`, `--momentum-top-n`, `--momentum-lookback-days`, and the pandas-2.3 dtype fix are all present on `cloud-runs`. No extra branch-juggling.
+2. **Round 2 fan-in:** if you have not yet merged `cloud-runs-A2 … H2` back into `cloud-runs` per §8, Round 4 pods will not see the Round 2 artifacts (`data/processed/week9_*_constrained_best_metrics.json`) locally for comparison. This does not block Round 4 — each Round 4 pod builds its own baseline — but it makes the cross-comparison on your laptop harder later. Recommended order: fan-in Round 2 → launch Round 4.
+3. **Python deps:** identical to Round 2. `scipy` still required by Optuna's QMCSampler (§2d).
+4. **Threading:** same rules as §3a. Use `OMP/MKL/TORCH=4 + --optuna-n-jobs 4` on a 16-vCPU pod. Pod M's 200-trial budget runs ~2× longer than the others but is otherwise unchanged.
+
+### 14.2. Round 4 pod commands
+
+Every block below sets `--artifact-prefix week11_<X>`, `--git-push-branch cloud-runs-<X>4`, and `--macro-integration both`. Launch inside tmux after exporting the threading env vars per §3/§13.1.
+
+#### Experiment I — macro=both + momentum top-20 / 5d (the missing cross-term)
+
+```bash
+python -u script/polymarket_week8_pipeline.py \
+  --artifact-prefix week11_I \
+  --macro-integration both \
+  --reduced-search \
+  --top-k-bagging 5 \
+  --momentum-screening \
+  --momentum-top-n 20 \
+  --momentum-lookback-days 5.0 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-I4 \
+  --git-commit-message "I4: macro=both + mom20/5d + top-K=5 (C2xG2 cross-term) ${RUN_TAG}" \
+  2>&1 | tee "run_I4_${RUN_TAG}.log"
+```
+
+#### Experiment K — macro=both + momentum top-20 / 5d + longer rolling window
+
+```bash
+python -u script/polymarket_week8_pipeline.py \
+  --artifact-prefix week11_K \
+  --macro-integration both \
+  --reduced-search \
+  --top-k-bagging 5 \
+  --momentum-screening \
+  --momentum-top-n 20 \
+  --momentum-lookback-days 5.0 \
+  --rolling-windows 96 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-K4 \
+  --git-commit-message "K4: I + rolling_window=96 only ${RUN_TAG}" \
+  2>&1 | tee "run_K4_${RUN_TAG}.log"
+```
+
+If `--rolling-windows` isn't wired as a CLI override in your working tree, drop that flag — the default `(24, 48, 96)` search still exercises 96. Pod K's delta vs pod I just becomes a pure reproduction run, which is still useful for variance measurement.
+
+#### Experiment L — macro=both + wider momentum universe (top-25 / 10d)
+
+```bash
+python -u script/polymarket_week8_pipeline.py \
+  --artifact-prefix week11_L \
+  --macro-integration both \
+  --reduced-search \
+  --top-k-bagging 5 \
+  --momentum-screening \
+  --momentum-top-n 25 \
+  --momentum-lookback-days 10.0 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-L4 \
+  --git-commit-message "L4: macro=both + mom25/10d (universe sensitivity) ${RUN_TAG}" \
+  2>&1 | tee "run_L4_${RUN_TAG}.log"
+```
+
+#### Experiment M — macro=both full universe + smaller bag + 2× trials (C2 robustness check)
+
+```bash
+python -u script/polymarket_week8_pipeline.py \
+  --artifact-prefix week11_M \
+  --macro-integration both \
+  --reduced-search \
+  --top-k-bagging 3 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 200 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-M4 \
+  --git-commit-message "M4: macro=both + K=3 + 200 trials (C2 noise check) ${RUN_TAG}" \
+  2>&1 | tee "run_M4_${RUN_TAG}.log"
+```
+
+### 14.3. What each Round 4 pod writes
+
+Stems are `week11_<X>_*` and do not overlap with Round 1 (`week8_*`), Round 2 (`week9_*`), Round 3 Kelly (`week10_kelly_*`), or each other.
+
+| Pod | Constrained Optuna stems | Baseline / exog / covariance / figures stem | Manifest | Push branch |
+|---|---|---|---|---|
+| I (both + mom20/5d + K=5) | `week11_I_macro_both_constrained_*` | `week11_I_*` | `week11_I_run_manifest.json` | `cloud-runs-I4` |
+| K (both + mom20/5d + K=5 + rw=96) | `week11_K_macro_both_constrained_*` | `week11_K_*` | `week11_K_run_manifest.json` | `cloud-runs-K4` |
+| L (both + mom25/10d + K=5) | `week11_L_macro_both_constrained_*` | `week11_L_*` | `week11_L_run_manifest.json` | `cloud-runs-L4` |
+| M (both + full universe + K=3 + 200 trials) | `week11_M_macro_both_constrained_*` | `week11_M_*` | `week11_M_run_manifest.json` | `cloud-runs-M4` |
+
+### 14.4. Quick "did we beat Round 2's best?" peek
+
+Run on the pod after the pipeline completes (replace `<X>` with the pod letter). This compares against the Round 2 winner C2's `+0.0040` delta as the bar to clear:
+
+```bash
+python3 -c "
+import json, glob
+R2_BEST_DELTA = 0.0040  # C2 from Round 2
+for f in sorted(glob.glob('data/processed/week11_<X>*_constrained_best_metrics.json')):
+    d = json.load(open(f))['best_params']
+    delta = d['holdout_sortino_minus_baseline']
+    print(f'{f.split(chr(47))[-1]:60s}  delta={delta:+.4f}  '
+          f'vs_C2={delta - R2_BEST_DELTA:+.4f}  '
+          f'sortino={d[\"holdout_sortino_ratio\"]:.4f}  '
+          f'baseline={d[\"baseline_holdout_sortino\"]:.4f}  '
+          f'mean_ret={d[\"holdout_mean_return\"]:+.6f}')
+"
+```
+
+A positive `delta` means the pod beat the equal-weight baseline; a positive `vs_C2` means it also beat Round 2's best.
+
+### 14.5. Fan-back-in to `cloud-runs` (mirrors §8 and §13.5)
+
+```bash
+cd ~/.../STAT-4830-energy_arbitrage-project
+git fetch origin
+git checkout cloud-runs
+git pull --ff-only
+
+git merge --no-ff origin/cloud-runs-I4 -m "merge week11_I artifacts"
+git merge --no-ff origin/cloud-runs-K4 -m "merge week11_K artifacts"
+git merge --no-ff origin/cloud-runs-L4 -m "merge week11_L artifacts"
+git merge --no-ff origin/cloud-runs-M4 -m "merge week11_M artifacts"
+git push origin cloud-runs
+
+# Optional cleanup once merged:
+git push origin --delete cloud-runs-I4 cloud-runs-K4 cloud-runs-L4 cloud-runs-M4
+```
+
+Conflict-free against Round 1 / Round 2 / Round 3 Kelly artifacts already on `cloud-runs` because every stem is uniquely `week11_<X>_*`.
+
+### 14.6. Cheat sheet — single Round 4 pod
+
+```bash
+prime pods ssh <pod-id>
+
+cd ~
+git clone https://github.com/adamt38/STAT-4830-energy_arbitrage-project.git
+cd STAT-4830-energy_arbitrage-project
+git fetch origin && git checkout cloud-runs && git reset --hard origin/cloud-runs
+
+sudo apt update && sudo apt install -y curl build-essential python3-venv tmux
+export PATH="$HOME/.local/bin:$PATH"
+bash script/install.sh
+source .venv/bin/activate
+uv pip install scipy
+git config --global user.email "you@example.edu"
+git config --global user.name  "Your Name"
+
+# GitHub credentials for --git-commit-and-push (see §2e-style PAT setup):
+git config --global credential.helper store
+cat > ~/.git-credentials <<'EOF'
+https://<USERNAME>:<FINE_GRAINED_PAT>@github.com
+EOF
+chmod 600 ~/.git-credentials
+
+tmux new -s week11
+# inside tmux (16-vCPU pod):
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+
+# Pick ONE block from §14.2 (--artifact-prefix and --git-push-branch
+# must be unique per pod). Paste it and let the run finish.
+```
+
+For a pod that already has Round 1 / Round 2 / Round 3 set up, this collapses to: `git fetch && reset --hard origin/cloud-runs`, re-export the env vars inside tmux, paste the §14.2 block.
+
+### 14.7. Priority ordering if you can't launch all four
+
+Expected-value-per-pod ranking, highest first:
+
+1. **Pod I** — the missing C2 × G2 cross-term. Highest probability of beating C2's +0.004. Launch first.
+2. **Pod L** — tests whether G2's momentum sweet spot generalizes with a wider filter. Medium probability of a win; high information value regardless.
+3. **Pod M** — C2-robustness check. Does not introduce a new lever but tightens statistical confidence on the +0.004 Round 2 headline. Useful for the writeup.
+4. **Pod K** — confirmation / variance-measurement pod. Only launch if you have a spare pod.
+
+Minimum viable Round 4 if compute-constrained: **just pod I**. If two pods: **I + L**. If three: **I + L + M**. Four pods exercises the full matrix.
+
+### 14.8. Levers not yet implemented (future rounds)
+
+Round 4 deliberately leaves two levers on the table because they require code changes, not just flag changes:
+
+- **LR-ceiling widening.** C2's winning learning rate of 0.045 sat at the top of the `--reduced-search` LR range. Adding `--lr-min` / `--lr-max` override flags would let a Round 5 pod explore `lr ∈ [0.04, 0.12]` directly. Not in Round 4 because it requires a pipeline patch.
+- **Post-hoc α-blend evaluation.** Separate from `--baseline-shrinkage` (which is a search-space lever and collapsed to α=0 on B2), a post-hoc evaluator would take the already-optimized weights and report metrics at `α ∈ {0.2, 0.4, 0.6, 0.8, 1.0}` without re-running Optuna. Useful for risk-adjusted comparison, but requires a new evaluation script.
+
+Both are good Round 5 candidates if Round 4 doesn't meaningfully move the needle past C2.
