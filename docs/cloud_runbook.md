@@ -449,3 +449,173 @@ If you ever need to reproduce Round 1 verbatim:
 | F | `--artifact-prefix week8_F --joint-macro-mode-search --etf-tracking --git-push-branch cloud-runs-F` |
 
 Add the standard wrappers (`python -u script/polymarket_week8_pipeline.py … --optuna-n-jobs 4 --optuna-trials 100 --git-commit-and-push --git-commit-message "..." 2>&1 | tee run_<X>_${RUN_TAG}.log`) and run inside tmux as in sections 3 and 4.
+
+---
+
+## 13. Round 3 — Week 10 Dynamic-Copula End-to-End Kelly OGD
+
+Round 3 swaps the entire optimization stack: the continuous mean-variance / Sortino objective is replaced by a binary-resolution log-wealth (Kelly) objective, the Pearson covariance is replaced by a dynamic Gaussian copula whose correlation matrix is generated per step by a small MLP over the macro features (SPY / QQQ / BTC log returns), and a vanilla L1 turnover penalty is added to absorb Polymarket slippage. Online weight updates and MLP parameter updates are interleaved in one Adam-OGD pass, which is the source of the non-convexity. See [`docs/week10_kelly_academic_summary.md`](week10_kelly_academic_summary.md) for the math.
+
+This round runs in **its own pipeline script** (`script/polymarket_week10_kelly_pipeline.py`) and **its own artifact namespace** (`week10_kelly_*`). It does not touch `week8_*` (Round 1) or `week9_*` (Round 2) files. It is therefore safe to launch in parallel with — or after — any in-flight Round 2 pods.
+
+### 13.0. What the new pipeline writes
+
+Every artifact stem is `<prefix>_kelly_*`. With the default `--artifact-prefix=week10_kelly` you get:
+
+| Stem | Content |
+|---|---|
+| `*_kelly_experiment_grid.csv` | One row per Optuna trial (params + holdout metrics). |
+| `*_kelly_best_metrics.json` | Best trial's params, holdout metrics, equal-weight comparison, copula diagnostics. |
+| `*_kelly_best_timeseries.csv` | Per-step holdout: portfolio return, log-wealth, turnover, Σ log-wealth, equal-weight log-wealth. |
+| `*_kelly_best_weights.csv` | Per-step holdout weight vector at the best trial. |
+| `*_kelly_copula_diagnostics.json` | MLP head + final-step correlation matrix summary stats. |
+| `*_kelly_run_manifest.json` | Argparse + experiment config + git SHA at run start. |
+| `figures/*_kelly_log_wealth.png` | Cumulative log-wealth, Kelly vs equal-weight. |
+| `figures/*_kelly_turnover.png` | Per-step L1 turnover (and rolling mean). |
+| `figures/*_kelly_drawdown.png` | Drawdown of cumulative log-wealth, Kelly vs equal-weight. |
+| `figures/*_kelly_copula_corr_heatmap.png` | Final-step copula correlation heatmap. |
+| `docs/<prefix>_diagnostics_report.md` | Human-readable summary (log-wealth growth, turnover, copula stats — no Sortino/variance). |
+
+### 13.1. Pre-reqs (delta vs sections 0–3)
+
+1. **Code:** `cloud-runs` already contains `script/polymarket_week10_kelly_pipeline.py`, `src/kelly_copula_optimizer.py`, and the academic summary doc. No edits required.
+2. **Cached week8 inputs:** by default the new script *consumes* `week8_*` markets/prices/exogenous CSVs (via `--input-artifact-prefix=week8`) and copies them to `week10_kelly_*` so it never re-fetches Polymarket / yfinance. On a freshly cloned pod those week8 CSVs are already in `data/processed/` on `cloud-runs`. If you'd rather rebuild from scratch, pass `--rebuild-data` (slow — full Polymarket + yfinance pull).
+3. **Python deps:** identical to week8 — `scipy` is still required by Optuna's QMCSampler (`uv pip install scipy` per §2d). No new requirements; the MLP / copula are pure PyTorch on top of what's already installed.
+4. **Threading:** the Kelly inner step is more PyTorch-heavy per trial than the week8 inner step (Monte-Carlo sampling × MLP forward × Cholesky × log1p), so BLAS parallelism matters more than Optuna trial parallelism. On a 16-vCPU pod use the same `OMP/MKL/TORCH=4` + `--optuna-n-jobs 4` from §3a. On 32 vCPU prefer `OMP=8 + n_jobs=4` (more BLAS, fewer concurrent trials) over the §3a default of `OMP=4 + n_jobs=8`.
+
+### 13.2. Round 3 ablation matrix (one pod each)
+
+Three pods are enough to bracket the contribution of each non-convex piece:
+
+| Pod | Macro / copula | Turnover λ | Other flags | Hypothesis |
+|---|---|---|---|---|
+| **K10A** | dynamic copula (default, MLP over SPY/QQQ/BTC) | search | `--reduced-search` | Full system: Kelly + dynamic copula + L1 turnover, dense Sobol on a small budget. |
+| **K10B** | **disabled** (`--no-exogenous` → R = I) | search | `--reduced-search` | Isolates the copula contribution. Same Kelly + L1, no MLP, no exogenous coupling. |
+| **K10C** | dynamic copula | **pinned to 0** (`--lambda-turnover-override 0`) | `--reduced-search` | Isolates the turnover penalty. Same copula, zero L1 — measures slippage cost explicitly. |
+
+### Experiment K10A — full Kelly + dynamic copula + L1 turnover
+
+```bash
+python -u script/polymarket_week10_kelly_pipeline.py \
+  --artifact-prefix week10_kelly_A \
+  --input-artifact-prefix week8 \
+  --reduced-search \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-K10A \
+  --git-commit-message "K10A: dynamic-copula Kelly OGD (default) ${RUN_TAG}" \
+  2>&1 | tee "run_K10A_${RUN_TAG}.log"
+```
+
+### Experiment K10B — Kelly + L1 turnover, copula disabled
+
+```bash
+python -u script/polymarket_week10_kelly_pipeline.py \
+  --artifact-prefix week10_kelly_B \
+  --input-artifact-prefix week8 \
+  --no-exogenous \
+  --reduced-search \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-K10B \
+  --git-commit-message "K10B: Kelly + L1, copula disabled (R=I) ${RUN_TAG}" \
+  2>&1 | tee "run_K10B_${RUN_TAG}.log"
+```
+
+### Experiment K10C — Kelly + dynamic copula, turnover penalty pinned to 0
+
+```bash
+python -u script/polymarket_week10_kelly_pipeline.py \
+  --artifact-prefix week10_kelly_C \
+  --input-artifact-prefix week8 \
+  --lambda-turnover-override 0 \
+  --reduced-search \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-K10C \
+  --git-commit-message "K10C: dynamic-copula Kelly, lambda_turnover=0 ${RUN_TAG}" \
+  2>&1 | tee "run_K10C_${RUN_TAG}.log"
+```
+
+### 13.3. Parallel-safety vs in-flight Round 2 pods
+
+- All Round 3 stems are `week10_kelly_<X>_*`. Zero overlap with `week8_*` or `week9_*`.
+- Each Round 3 pod must use a **unique `--git-push-branch`** (the script's default is `cloud-runs`, same as week8 — overriding to `cloud-runs-K10<X>` is required to keep the parallel-safe convention from §4).
+- Round 2 pods that are still running pushed off a `cloud-runs` snapshot from before the week10 commit landed. The eventual §8 fan-in merges (`cloud-runs-A2 … F2 → cloud-runs`) preserve the new week10 files via standard git three-way merge — those branches simply don't touch them.
+- If you do invoke the §10 recovery flow on a Round 2 pod (`git fetch && git reset --hard origin/cloud-runs`), that pod's working tree will now also contain the three week10 files. Harmless — the week8 pipeline does not import them.
+
+### 13.4. Quick "did Kelly beat equal-weight?" peek
+
+Run on the pod after the pipeline completes (replace `<X>` with the pod letter):
+
+```bash
+python3 -c "
+import json, glob
+for f in sorted(glob.glob('data/processed/week10_kelly_<X>*_kelly_best_metrics.json')):
+    d = json.load(open(f))
+    bp = d.get('best_params', {})
+    h  = d.get('holdout_metrics', {})
+    e  = d.get('equal_weight_holdout', {})
+    print(f'{f.split(chr(47))[-1]:60s}  '
+          f'kelly_logW={h.get(\"sum_log_wealth\", 0):+.4f}  '
+          f'eq_logW={e.get(\"sum_log_wealth\", 0):+.4f}  '
+          f'delta={h.get(\"sum_log_wealth\",0)-e.get(\"sum_log_wealth\",0):+.4f}  '
+          f'mean_turnover={h.get(\"mean_turnover\",0):.4f}  '
+          f'lambda_t={bp.get(\"turnover_lambda\",0):.4f}')
+"
+```
+
+A positive `delta` means the Kelly + dynamic-copula portfolio earned more cumulative log-wealth than equal-weight on the holdout window.
+
+### 13.5. Fan back in to `cloud-runs` (mirrors §8)
+
+```bash
+cd ~/.../STAT-4830-energy_arbitrage-project
+git fetch origin
+git checkout cloud-runs
+git pull --ff-only
+
+git merge --no-ff origin/cloud-runs-K10A -m "merge week10_kelly_A artifacts"
+git merge --no-ff origin/cloud-runs-K10B -m "merge week10_kelly_B artifacts"
+git merge --no-ff origin/cloud-runs-K10C -m "merge week10_kelly_C artifacts"
+git push origin cloud-runs
+
+# Optional cleanup once the merges are pushed:
+git push origin --delete cloud-runs-K10A cloud-runs-K10B cloud-runs-K10C
+```
+
+Conflict-free against `week8_*` and `week9_*` artifacts already on `cloud-runs` because every stem is uniquely `week10_kelly_<X>*`.
+
+### 13.6. Cheat sheet — single Round 3 pod
+
+```bash
+prime pods ssh <pod-id>
+
+cd ~
+git clone https://github.com/adamt38/STAT-4830-energy_arbitrage-project.git
+cd STAT-4830-energy_arbitrage-project
+git fetch origin && git checkout cloud-runs && git reset --hard origin/cloud-runs
+
+sudo apt update && sudo apt install -y curl build-essential python3-venv tmux
+export PATH="$HOME/.local/bin:$PATH"
+bash script/install.sh
+source .venv/bin/activate
+uv pip install scipy
+git config --global user.email "you@example.edu"
+git config --global user.name  "Your Name"
+
+tmux new -s week10
+# inside tmux (16-vCPU pod):
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+
+# Pick ONE block from section 13.2 (--artifact-prefix and --git-push-branch
+# values must be unique per pod). Paste it and let the run finish.
+```
+
+For a pod that already has Round 1 / Round 2 set up, this collapses to: `git fetch && reset --hard origin/cloud-runs`, re-export the env vars inside tmux, paste the §13.2 block.
