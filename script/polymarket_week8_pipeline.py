@@ -818,6 +818,32 @@ def main() -> None:
         "Round 1 pods (drops outer extremes for lr, domain_limit, max_weight, variance/downside "
         "penalties; fixes entropy_lambda at 0). Same trial count → denser Sobol coverage.",
     )
+    parser.add_argument(
+        "--momentum-screening",
+        action="store_true",
+        help="Pre-screen markets by absolute recent price momentum before the optimizer sees them. "
+        "Ranks candidate markets by |return over the last N days| and keeps only the top-K movers. "
+        "Addresses the 'weak signal / dead-weight markets' problem diagnosed in the Week 9 synthesis: "
+        "reduces parameter count so constraint thresholds become binding and per-market tilts are "
+        "large enough to rise above gradient noise. Combines cleanly with --reduced-search, "
+        "--top-k-bagging, and the macro modes (orthogonal lever).",
+    )
+    parser.add_argument(
+        "--momentum-top-n",
+        type=int,
+        default=20,
+        help="Number of markets to retain after momentum screening (default 20). "
+        "Only used when --momentum-screening is set. Must be <= --max-markets; if not set, "
+        "defaults to 20.",
+    )
+    parser.add_argument(
+        "--momentum-lookback-days",
+        type=float,
+        default=5.0,
+        help="Window (in days) for computing per-market momentum (default 5.0). "
+        "Only used when --momentum-screening is set. Shorter windows (e.g. 3.0) capture "
+        "very recent price action; longer windows (e.g. 7.0) smooth out noise.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -848,6 +874,11 @@ def main() -> None:
         use_cached_events_if_available=True,
         history_priority_enabled=True,
         history_priority_oversample_factor=5,
+        momentum_screening_enabled=bool(args.momentum_screening),
+        momentum_lookback_days=float(args.momentum_lookback_days),
+        momentum_top_n=(
+            int(args.momentum_top_n) if args.momentum_screening else None
+        ),
     )
     # ── Toggle: set QUICK_SANITY_CHECK = False for the full Optuna run ──
     QUICK_SANITY_CHECK = False
@@ -926,6 +957,13 @@ def main() -> None:
         print(f"  PIPELINE STAGE: {name}", flush=True)
         print(f"  (total elapsed: {elapsed_total / 60:.1f}m)", flush=True)
         print(f"{'#'*60}\n", flush=True)
+
+    if args.momentum_screening:
+        print(
+            f"\n[CONFIG] momentum screening ENABLED: "
+            f"top_n={args.momentum_top_n}, lookback_days={args.momentum_lookback_days}",
+            flush=True,
+        )
 
     _stage_banner("Data Build")
     stage_started = time.perf_counter()
@@ -1158,6 +1196,11 @@ def main() -> None:
             ),
             "joint_macro_mode_search": args.joint_macro_mode_search,
             "etf_tracking": args.etf_tracking,
+            "momentum_screening": {
+                "enabled": bool(args.momentum_screening),
+                "top_n": int(args.momentum_top_n) if args.momentum_screening else None,
+                "lookback_days": float(args.momentum_lookback_days) if args.momentum_screening else None,
+            },
             "optuna_constrained_artifact_suffix": last_optuna_suffix,
             "week9_constrained_artifact_stem": week9_cstem,
             "git_commit_and_push_requested": bool(args.git_commit_and_push),
