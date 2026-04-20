@@ -855,9 +855,9 @@ Use these in §15 Round 5 below.
 
 | Pod | Recipe | `--macro-modes` | momentum? | `--lr-values` | `--rolling-windows` | trials | push branch |
 |---|---|---|---|---|---|---|---|
-| O | LR sweep, macro both | `both` | no | `0.04,0.06,0.08,0.10,0.12` | default (24,48,96) | 300 | `cloud-runs-O5` |
-| P | LR sweep + rw=96 (C2 x-term) | `both` | no | `0.04,0.06,0.08,0.10,0.12` | `96` | 300 | `cloud-runs-P5` |
-| Q | full recipe (Pod I + LR sweep) | `both` | `top-20 / 5d` | `0.04,0.06,0.08,0.10,0.12` | `96` | 300 | `cloud-runs-Q5` |
+| O | LR sweep, macro both | `both` | no | `0.04,0.06,0.08,0.10,0.12` | default (24,48,96) | 200 | `cloud-runs-O5` |
+| P | LR sweep + rw=96 (C2 x-term) | `both` | no | `0.04,0.06,0.08,0.10,0.12` | `96` | 200 | `cloud-runs-P5` |
+| Q | full recipe (Pod I + LR sweep) | `both` | `top-20 / 5d` | `0.04,0.06,0.08,0.10,0.12` | `96` | 200 | `cloud-runs-Q5` |
 | R | **post-hoc α-blend only** | n/a | n/a | n/a | n/a | 0 | `cloud-runs-R5` |
 
 Pods O–Q share prior env setup from §14.6 (clone, venv, PAT). Pod R does not need a GPU pod — it only reads existing CSVs from `cloud-runs` and writes small artifacts; the cheapest CPU container is fine.
@@ -879,10 +879,10 @@ python -u script/polymarket_week8_pipeline.py \
   --lr-values 0.04,0.06,0.08,0.10,0.12 \
   --top-k-bagging 5 \
   --optuna-n-jobs 4 \
-  --optuna-trials 300 \
+  --optuna-trials 200 \
   --git-commit-and-push \
   --git-push-branch cloud-runs-O5 \
-  --git-commit-message "O5: macro=both + LR sweep 0.04..0.12 + K=5 + 300 trials ${RUN_TAG}" \
+  --git-commit-message "O5: macro=both + LR sweep 0.04..0.12 + K=5 + 200 trials ${RUN_TAG}" \
   2>&1 | tee "run_O5_${RUN_TAG}.log"
 ```
 
@@ -902,10 +902,10 @@ python -u script/polymarket_week8_pipeline.py \
   --rolling-windows 96 \
   --top-k-bagging 5 \
   --optuna-n-jobs 4 \
-  --optuna-trials 300 \
+  --optuna-trials 200 \
   --git-commit-and-push \
   --git-push-branch cloud-runs-P5 \
-  --git-commit-message "P5: macro=both + LR sweep + rw=96 + K=5 + 300 trials ${RUN_TAG}" \
+  --git-commit-message "P5: macro=both + LR sweep + rw=96 + K=5 + 200 trials ${RUN_TAG}" \
   2>&1 | tee "run_P5_${RUN_TAG}.log"
 ```
 
@@ -928,10 +928,10 @@ python -u script/polymarket_week8_pipeline.py \
   --momentum-lookback-days 5 \
   --top-k-bagging 5 \
   --optuna-n-jobs 4 \
-  --optuna-trials 300 \
+  --optuna-trials 200 \
   --git-commit-and-push \
   --git-push-branch cloud-runs-Q5 \
-  --git-commit-message "Q5: full recipe (both + mom20/5d + rw=96 + LR sweep + K=5 + 300 trials) ${RUN_TAG}" \
+  --git-commit-message "Q5: full recipe (both + mom20/5d + rw=96 + LR sweep + K=5 + 200 trials) ${RUN_TAG}" \
   2>&1 | tee "run_Q5_${RUN_TAG}.log"
 ```
 
