@@ -1,0 +1,40 @@
+{
+  "markets_count": 20,
+  "unique_market_ids": 20,
+  "unique_tokens": 20,
+  "history_points": 10033,
+  "market_missing_history": 0,
+  "duplicate_history_points": 0,
+  "non_monotonic_tokens": 0,
+  "domain_coverage": {
+    "basketball": 689,
+    "economic-policy": 634,
+    "nba-champion": 1162,
+    "republican-primary": 686,
+    "colombia-election": 582,
+    "hockey": 425,
+    "ligue-1": 693,
+    "grooming-gangs": 683,
+    "uefa-europa-league": 533,
+    "best-of-2025": 564,
+    "west-virginia-primary": 363,
+    "claude-5": 341,
+    "south-dakota-midterm": 363,
+    "tennis": 435,
+    "nba": 421,
+    "primaries": 670,
+    "airdrops": 397,
+    "serie-a": 392
+  },
+  "min_history_days_filter": 24.0,
+  "dropped_by_short_history_days": 3,
+  "dropped_by_short_history_points": 4,
+  "dropped_by_history_request_error": 0,
+  "momentum_screening": {
+    "enabled": true,
+    "lookback_days": 5.0,
+    "top_n": 20,
+    "candidates_before_screening": 193,
+    "selected_after_screening": 20
+  }
+}

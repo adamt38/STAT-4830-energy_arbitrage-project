@@ -1,80 +1,99 @@
 # Week 9 Diagnostics Report
 
 ## Run Context
-- artifact prefix: `week8`
+- artifact prefix: `week9_G`
+- constrained artifact stem: `week9_G`
 - min history days used after backoff: `24.0`
-- market count: `40`
-- tuning steps: `44168`
-- holdout steps: `11042`
-- objective: `1.2`-var / `1.2`-downside mean-downside surrogate
+- market count: `20`
+- tuning steps: `5315`
+- holdout steps: `1329`
+- objective: `1.5`-var / `2.6`-downside mean-downside surrogate
 
 ## Holdout Performance Comparison
 
 | Metric | Baseline | Constrained | Delta |
 |--------|----------|-------------|-------|
-| Sortino ratio | 0.0791 | 0.0700 | -0.0091 |
-| Max drawdown | -7.1565% | -7.3414% | -0.1849% |
-| Mean return | 0.00007378 | 0.00005993 | -0.00001385 |
-| Volatility | 0.00336451 | 0.00296682 | -0.00039769 |
+| Sortino ratio | 0.2237 | 0.2576 | +0.0339 |
+| Max drawdown | -22.4972% | -21.2629% | +1.2343% |
+| Mean return | 0.00110812 | 0.00126077 | +0.00015265 |
+| Volatility | 0.02407253 | 0.02449667 | +0.00042414 |
+
+## Holdout — US equity session vs closed (exogenous mask)
+
+Subset metrics use chronological holdout steps where `is_equity_open` is 1 (NYSE regular hours, Mon–Fri 09:30–16:00 ET; exchange holidays are not excluded). Max drawdown on each subset uses cumulative wealth `cumprod(1+r)` over **only** those steps (gapped timeline, not calendar-interpolated).
+
+- Holdout steps with equity open: `14.7%`
+- Holdout steps marked exog-stale: `0.0%`
+
+| Subset | Metric | Baseline | Constrained |
+|--------|--------|----------|-------------|
+| Open | Sortino | 0.4254 | 0.5845 |
+| Open | Mean return | 0.00188330 | 0.00266327 |
+| Open | Volatility | 0.02008508 | 0.02986860 |
+| Open | Max drawdown (subset) | -7.4674% | -7.5653% |
+| Closed | Sortino | 0.1935 | 0.2060 |
+| Closed | Mean return | 0.00097482 | 0.00101960 |
+| Closed | Volatility | 0.02469096 | 0.02344080 |
+| Closed | Max drawdown (subset) | -22.4972% | -21.2629% |
 
 ## Full-Series Baseline Reference
-- baseline sortino (full): `0.0177`
-- baseline max drawdown (full): `-7.1565%`
+- baseline sortino (full): `0.0830`
+- baseline max drawdown (full): `-22.4972%`
 
 ## Attribution — What Drove Returns
 
-**Biggest single market:** Will Databricks’ market cap be $250B or greater at market close on IPO day? (`databricks`) — 41.7% of total return
-**Biggest domain:** `databricks` — 41.7% of total return
+**Biggest single market:** Will Hubert Hurkacz win the 2026 Men's US Open? (`tennis`) — 38.7% of total return
+**Biggest domain:** `tennis` — 38.7% of total return
 
 ### Top 10 Market Contributors
 
 | # | Market | Domain | Contribution | Share | Weight |
 |---|--------|--------|-------------|-------|--------|
-| 1 | Will Databricks’ market cap be $250B or greater at market close on IPO day? | `databricks` | 0.275660 | 41.7% | 0.0228 |
-| 2 | Will the Fed increase interest rates by 25+ bps after the March 2026 meeting? | `economic-policy` | 0.125770 | 19.0% | 0.0247 |
-| 3 | Will Giannis Antetokounmpo win the 2025–2026 NBA MVP? | `awards` | 0.067983 | 10.3% | 0.0249 |
-| 4 | Will Anthropic’s market cap be less than $100B at market close on IPO day? | `anthropic` | 0.061193 | 9.2% | 0.0250 |
-| 5 | Will Chad Bianco win the California Governor Election in 2026? | `california-midterm` | 0.056206 | 8.5% | 0.0250 |
-| 6 | Will Stuttgart win the 2025–26 Bundesliga? | `bundesliga` | 0.043709 | 6.6% | 0.0250 |
-| 7 | MicroStrategy sells any Bitcoin by March 31, 2026? | `2025-predictions` | 0.038356 | 5.8% | 0.0249 |
-| 8 | Will Rand Paul announce a presidential run before 2027? | `celebrities` | 0.026856 | 4.1% | 0.0252 |
-| 9 | Will Claude 5 be released by March 31, 2026? | `claude-5` | -0.020991 | -3.2% | 0.0250 |
-| 10 | Will Meituan have the best AI model at the end of March 2026? | `gemini-3` | -0.017004 | -2.6% | 0.0250 |
+| 1 | Will Hubert Hurkacz win the 2026 Men's US Open? | `tennis` | 0.648849 | 38.7% | 0.0488 |
+| 2 | Starmer out by April 30, 2026? | `grooming-gangs` | 0.577141 | 34.4% | 0.0489 |
+| 3 | Will Wesley Hunt win the 2026 Texas Republican Primary? | `republican-primary` | 0.124235 | 7.4% | 0.0502 |
+| 4 | Will the Phoenix Suns win the 2026 NBA Finals? | `nba-champion` | 0.093485 | 5.6% | 0.0500 |
+| 5 | Will Juan Manuel Galán win the 2026 Colombian presidential election? | `colombia-election` | 0.087921 | 5.2% | 0.0502 |
+| 6 | Will Zachary Shrewsbury be the Democratic nominee for Senate in West Virginia? | `west-virginia-primary` | 0.084901 | 5.1% | 0.0502 |
+| 7 | Will Connie Chan receive the most votes in the CA-11 primary? | `primaries` | 0.070438 | 4.2% | 0.0502 |
+| 8 | MegaETH market cap (FDV) >$2B one day after launch? | `airdrops` | 0.050558 | 3.0% | 0.0502 |
+| 9 | Will Marseille win the 2025–26 French Ligue 1? | `ligue-1` | -0.041636 | -2.5% | 0.0501 |
+| 10 | Will Nott'm Forest win the 2025-26 UEFA Europa League? | `uefa-europa-league` | 0.040084 | 2.4% | 0.0502 |
 
 ### Top 10 Domain Contributors
 
 | # | Domain | Contribution | Share |
 |---|--------|-------------|-------|
-| 1 | `databricks` | 0.275660 | 41.7% |
-| 2 | `economic-policy` | 0.125770 | 19.0% |
-| 3 | `awards` | 0.067983 | 10.3% |
-| 4 | `anthropic` | 0.061193 | 9.2% |
-| 5 | `california-midterm` | 0.056206 | 8.5% |
-| 6 | `bundesliga` | 0.043709 | 6.6% |
-| 7 | `2025-predictions` | 0.038356 | 5.8% |
-| 8 | `celebrities` | 0.026856 | 4.1% |
-| 9 | `claude-5` | -0.020991 | -3.2% |
-| 10 | `gemini-3` | -0.017004 | -2.6% |
+| 1 | `tennis` | 0.648849 | 38.7% |
+| 2 | `grooming-gangs` | 0.614195 | 36.7% |
+| 3 | `republican-primary` | 0.124235 | 7.4% |
+| 4 | `colombia-election` | 0.087921 | 5.2% |
+| 5 | `west-virginia-primary` | 0.084901 | 5.1% |
+| 6 | `nba-champion` | 0.083795 | 5.0% |
+| 7 | `primaries` | 0.070438 | 4.2% |
+| 8 | `airdrops` | 0.050558 | 3.0% |
+| 9 | `ligue-1` | -0.041636 | -2.5% |
+| 10 | `uefa-europa-league` | 0.040084 | 2.4% |
 
 ### Top 5 Correlated Contributor Pairs
 
 | Market A | Market B | Correlation |
 |----------|----------|-------------|
-| Will Stuttgart win the 2025–26 Bundesliga? | Will Gold have the best performance in 2026? | 0.0693 |
-| Will Rand Paul announce a presidential run before 2027? | Felix Protocol FDV above $2B one day after launch? | 0.0687 |
-| Epstein client list released by June 30? | Will AfD win the most seats in the 2026 Berlin state elections? | 0.0398 |
-| MicroStrategy sells any Bitcoin by March 31, 2026? | Will Gold have the best performance in 2026? | -0.0144 |
-| Will Chad Bianco win the California Governor Election in 2026? | MicroStrategy sells any Bitcoin by March 31, 2026? | -0.0137 |
+| Will the Phoenix Suns win the NBA Western Conference Finals? | Will the Los Angeles Kings win the Western Conference? | 0.1397 |
+| Will Zachary Shrewsbury be the Democratic nominee for Senate in West Virginia? | Will the Democrats win the South Dakota Senate race in 2026? | 0.1335 |
+| MegaETH market cap (FDV) >$2B one day after launch? | Will the Phoenix Suns win the NBA Western Conference Finals? | 0.1233 |
+| MegaETH market cap (FDV) >$2B one day after launch? | Will the Los Angeles Kings win the Western Conference? | 0.0513 |
+| Will the Democrats win the South Dakota Senate race in 2026? | Will Claude 5 be released by April 30, 2026? | 0.0138 |
 
 ## Correlation and Risk Structure
-- category count: `40`
-- avg abs category correlation: `0.0008`
-- max abs category correlation: `0.0350`
-- top eigenvalue share: `0.3937`
-- variance ratio constrained vs baseline: `0.9345`
+- category count: `18`
+- avg abs category correlation: `0.0016`
+- max abs category correlation: `0.0645`
+- top eigenvalue share: `0.7314`
+- variance ratio constrained vs baseline: `0.8605`
 
 ## Interpretation Checklist
-- [ ] Constrained holdout Sortino beats baseline (-0.0091)
-- [ ] Constrained holdout drawdown better than baseline (-0.1849%)
-- [x] Top contributor pairs not excessively correlated (max abs corr: 0.0350)
-- [x] No single domain dominates returns (top domain share: 41.7%)
+- [x] Constrained holdout Sortino beats baseline (+0.0339)
+- [x] Constrained holdout drawdown better than baseline (+1.2343%)
+- [x] Top contributor pairs not excessively correlated (max abs corr: 0.0645)
+- [x] No single domain dominates returns (top domain share: 38.7%)
