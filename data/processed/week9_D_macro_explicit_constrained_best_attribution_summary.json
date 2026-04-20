@@ -1,0 +1,27 @@
+{
+  "steps": 2157,
+  "asset_count": 40,
+  "total_portfolio_return": 0.15283361197104578,
+  "top_market_by_abs_contribution": {
+    "token_id": "94195159380649683762164114216519545499991614727769221572315275622082093227806",
+    "domain": "felix",
+    "question": "Felix Protocol FDV above $300M one day after launch?",
+    "market_id": "716905",
+    "market_slug": "felix-protocol-fdv-above-300m-one-day-after-launch-953-129",
+    "mean_weight": 0.01657412843965466,
+    "total_contribution": 0.11409549317794812,
+    "mean_step_contribution": 5.2895453490008404e-05,
+    "contribution_share_of_total_return": 0.7465340359787049
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "felix",
+    "total_contribution": 0.11409549317794812,
+    "contribution_share_of_total_return": 0.7465340359787049
+  },
+  "top_abs_corr_pair": {
+    "token_a": "94195159380649683762164114216519545499991614727769221572315275622082093227806",
+    "token_b": "3783874556587832518151104525711027133710881159533628607061884012946071097261",
+    "corr": 0.7795531408113607,
+    "abs_corr": 0.7795531408113607
+  }
+}
