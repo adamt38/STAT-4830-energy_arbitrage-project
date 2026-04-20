@@ -827,6 +827,17 @@ def main() -> None:
         "to narrow the categorical search to that subset.",
     )
     parser.add_argument(
+        "--lr-values",
+        default=None,
+        metavar="LR1,LR2,...",
+        help="Override the learning_rates search set. Mirrors --rolling-windows: accepts a "
+        "single value (e.g. '0.08') to pin the LR, or a comma-separated list "
+        "(e.g. '0.04,0.06,0.08,0.10,0.12') to narrow the categorical search to that subset. "
+        "Applied AFTER --reduced-search, so '--reduced-search --lr-values 0.04,0.06,0.08,0.10,0.12' "
+        "widens beyond the reduced upper bound of 0.05. Round 5 uses this to explore LRs past "
+        "C2's winning 0.045, which saturated the Round 2 reduced-search ceiling.",
+    )
+    parser.add_argument(
         "--momentum-screening",
         action="store_true",
         help="Pre-screen markets by absolute recent price momentum before the optimizer sees them. "
@@ -976,6 +987,31 @@ def main() -> None:
         experiment_config = replace(experiment_config, rolling_windows=rw_override)
         print(
             f"[CONFIG] rolling_windows overridden via CLI: {rw_override}",
+            flush=True,
+        )
+    if args.lr_values is not None:
+        try:
+            lr_override = tuple(
+                float(x.strip()) for x in str(args.lr_values).split(",") if x.strip()
+            )
+        except ValueError as exc:
+            raise SystemExit(
+                f"--lr-values must be a comma-separated list of floats, got "
+                f"{args.lr_values!r}: {exc}"
+            )
+        if not lr_override:
+            raise SystemExit("--lr-values requires at least one float value.")
+        if any(lr <= 0.0 for lr in lr_override):
+            raise SystemExit(
+                f"--lr-values entries must be strictly positive, got {lr_override}."
+            )
+        if any(lr >= 1.0 for lr in lr_override):
+            raise SystemExit(
+                f"--lr-values entries must be < 1.0 (OGD learning rates), got {lr_override}."
+            )
+        experiment_config = replace(experiment_config, learning_rates=lr_override)
+        print(
+            f"[CONFIG] learning_rates overridden via CLI: {lr_override}",
             flush=True,
         )
     config_hash = _config_hash(base_build_config, experiment_config)
