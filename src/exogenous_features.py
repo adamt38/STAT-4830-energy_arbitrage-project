@@ -137,6 +137,12 @@ def align_to_polymarket_step_ts(
         for c in feat_cols:
             merged[c] = np.nan
     else:
+        left["poly_dt_effective"] = pd.to_datetime(left["poly_dt_effective"], utc=True).astype(
+            "datetime64[ns, UTC]"
+        )
+        right["exog_ts"] = pd.to_datetime(right["exog_ts"], utc=True).astype(
+            "datetime64[ns, UTC]"
+        )
         merged = pd.merge_asof(
             left,
             right,
