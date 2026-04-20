@@ -819,6 +819,14 @@ def main() -> None:
         "penalties; fixes entropy_lambda at 0). Same trial count → denser Sobol coverage.",
     )
     parser.add_argument(
+        "--rolling-windows",
+        default=None,
+        metavar="W1,W2,...",
+        help="Override the rolling_windows search set (default: 24,48,96). Accepts a single "
+        "value (e.g. '96') to pin rolling_window, or a comma-separated list (e.g. '48,96') "
+        "to narrow the categorical search to that subset.",
+    )
+    parser.add_argument(
         "--momentum-screening",
         action="store_true",
         help="Pre-screen markets by absolute recent price momentum before the optimizer sees them. "
@@ -948,6 +956,27 @@ def main() -> None:
             variance_penalties=(1.0, 2.0),
             downside_penalties=(2.0, 3.0),
             uniform_mixes=(0.0, 0.05, 0.1),
+        )
+    if args.rolling_windows is not None:
+        try:
+            rw_override = tuple(
+                int(x.strip()) for x in str(args.rolling_windows).split(",") if x.strip()
+            )
+        except ValueError as exc:
+            raise SystemExit(
+                f"--rolling-windows must be a comma-separated list of ints, got "
+                f"{args.rolling_windows!r}: {exc}"
+            )
+        if not rw_override:
+            raise SystemExit("--rolling-windows requires at least one integer value.")
+        if any(w <= 0 for w in rw_override):
+            raise SystemExit(
+                f"--rolling-windows values must be positive ints, got {rw_override}."
+            )
+        experiment_config = replace(experiment_config, rolling_windows=rw_override)
+        print(
+            f"[CONFIG] rolling_windows overridden via CLI: {rw_override}",
+            flush=True,
         )
     config_hash = _config_hash(base_build_config, experiment_config)
 
