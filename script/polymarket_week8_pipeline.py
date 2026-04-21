@@ -156,7 +156,11 @@ def _git_commit_and_push(
             f"git commit failed ({commit_r.returncode}):\n{commit_r.stderr or commit_r.stdout}"
         )
 
-    pull_r = _run(["pull", "--rebase", remote, branch])
+    # --autostash stashes any unrelated modifications to tracked files (e.g.,
+    # from concurrent work in the same working tree) before rebasing and
+    # restores them after. Without this, a pull --rebase will refuse to run
+    # if there are any unstaged changes outside the three paths we staged.
+    pull_r = _run(["pull", "--rebase", "--autostash", remote, branch])
     if pull_r.returncode != 0:
         err = (pull_r.stderr or "") + (pull_r.stdout or "")
         if "couldn't find remote ref" in err or "could not find remote ref" in err:
