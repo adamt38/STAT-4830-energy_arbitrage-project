@@ -406,17 +406,17 @@ All terms are active; what's been missing is the ability to sweep them from the 
    - `script/posthoc_overlay_tilt.py` applies the equity-domain tilt at a sweep of strengths on a domain-equal baseline, using actual PM per-asset returns from `_price_history.csv`. Used by Pod S2. Requires `yfinance` + network.
    - `script/posthoc_overlay_spread.py` identifies negatively correlated domain pairs from `_category_correlation.csv`, computes the zero-investment spread, sweeps `(max_pairs, spread_lambda)`. Used by Pod S3. Pure-CPU, no network. Smoke-tested on `week8` artifacts: interior argmax at `(max_pairs=5, λ=0.1)` improves on pure baseline by +0.0014 Sortino (real-but-small signal).
 
-### Round 6 experiment design (5 CPU pods) — revised after corrected post-mortem
+### Round 6 experiment design (3 pods + 2 laptop-local overlays)
 
 See [docs/cloud_runbook.md §16](cloud_runbook.md) for full recipes and CLI commands. Summary:
 
-- **S4 — Pod I4 recipe × 5 seeds `{3, 7, 101, 202, 303}`** (noise-floor diagnostic, promoted to priority 1). Measures σ(Δ) around our individual-seed winner. Without this, no other pod's result is interpretable. Swapped from the G recipe (a Round-5 loser) to the I4 recipe (our only win we're trying to validate).
-- **S1 — full risk-aware objective sweep** (highest upside, priority 2). Sweeps eight levers simultaneously with sizing bracketed between I4's defaults (≈0.10) and the teammate's optimum (0.04) rather than strictly tighter than both, and keeps I4's winning `rw=24` in the rolling-window search. Targets the teammate's Δ = +0.1018 benchmark.
-- **S5 — sizing-frontier grid on Pod I4** (priority 3). 3×3×3 grid on `max_weight × domain_limit × concentration_penalty_lambda`, Optuna-sampled. Traces the Sortino/DD frontier between I4's defaults and the teammate's tight corner; replaces the earlier single-pin design.
-- **S2 — post-hoc equity-domain tilt sweep** (priority 4, runs on S1/S5 outputs). Tests whether the SPY-informed tilt adds value on top of a domain-equal portfolio.
-- **S3 — post-hoc PM-category spread sweep** (priority 5, runs on S1/S5 outputs). Tests whether zero-investment pairs trading on the top negatively correlated PM categories adds risk-adjusted value.
+- **S4 (pod) — Pod I4 recipe × 5 seeds `{3, 7, 101, 202, 303}`** (noise-floor diagnostic, promoted to priority 1). Measures σ(Δ) around our individual-seed winner. Without this, no other pod's result is interpretable. Swapped from the G recipe (a Round-5 loser) to the I4 recipe (our only win we're trying to validate).
+- **S1 (pod) — full risk-aware objective sweep** (highest upside, priority 2). Sweeps eight levers simultaneously with sizing bracketed between I4's defaults (≈0.10) and the teammate's optimum (0.04) rather than strictly tighter than both, and keeps I4's winning `rw=24` in the rolling-window search. Targets the teammate's Δ = +0.1018 benchmark.
+- **S5 (pod) — sizing-frontier grid on Pod I4** (priority 3). 3×3×3 grid on `max_weight × domain_limit × concentration_penalty_lambda`, Optuna-sampled. Traces the Sortino/DD frontier between I4's defaults and the teammate's tight corner; replaces the earlier single-pin design.
+- **S2 (laptop) — post-hoc equity-domain tilt sweep** (run on laptop after S1/S5 fan-in, ~2 min). Tests whether the SPY-informed tilt adds value on top of a domain-equal portfolio. Pure-numpy script — no pod needed.
+- **S3 (laptop) — post-hoc PM-category spread sweep** (run on laptop after S1/S5 fan-in, <1 min). Tests whether zero-investment pairs trading on the top negatively correlated PM categories adds risk-adjusted value.
 
-Priority order: **S4 > S1 > S5 > S2 > S3**. S2 and S3 are minutes-long CPU post-hoc evaluators and can piggyback on whichever pod frees up first.
+Priority order: **S4 > S1 > S5**, with S2/S3 fired the moment either S1 or S5 fans in. Pod budget is 3 (not 5) — the overlays are laptop-local because they're pure-numpy scripts and provisioning a pod just to run them is wasted credit.
 
 ### Why the design was revised
 
