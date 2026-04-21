@@ -1,0 +1,9 @@
+{
+  "metric": {
+    "name": "PFCS",
+    "formula": "|atanh(clip(r))| * sqrt(max(0, n - 3))",
+    "description": "Fisher z magnitude scaled by effective sample size for correlation."
+  },
+  "n_pairs_emitted": 0,
+  "artifact_prefix": "week8"
+}

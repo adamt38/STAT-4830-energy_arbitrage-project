@@ -1,0 +1,20 @@
+{
+  "window_sizes": [
+    6000,
+    18000
+  ],
+  "best": {
+    "uniform_mix": 0.1,
+    "entropy_lambda": 0.02,
+    "concentration_penalty_lambda": 50.0,
+    "max_weight": 0.18,
+    "hedge_allocation": 0.0,
+    "avg_excess_capital_gain_vs_baseline": -0.06538836620131072,
+    "avg_drawdown_delta_vs_baseline": 0.012356438677136261,
+    "robust_score": -0.06538836620131072,
+    "robust_ok": false,
+    "feasible_all_windows": true
+  },
+  "n_rows": 18,
+  "note": "robust_ok = positive excess gain in both windows and avg drawdown not worse by >1pp"
+}
