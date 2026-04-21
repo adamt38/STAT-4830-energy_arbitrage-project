@@ -162,6 +162,7 @@ def _write_markdown(
     rows: Sequence[dict[str, float]],
     artifact_prefix: str,
     constrained_stem: str,
+    constrained_suffix: str,
     baseline_rows: int,
     constrained_rows: int,
     aligned_rows: int,
@@ -174,7 +175,8 @@ def _write_markdown(
         f"(full rows: {baseline_rows})"
     )
     lines.append(
-        f"- **constrained series** `{constrained_stem}_constrained_best_timeseries.csv` "
+        f"- **optimized series** "
+        f"`{constrained_stem}_{constrained_suffix}_timeseries.csv` "
         f"(holdout rows: {constrained_rows})"
     )
     lines.append(f"- **aligned holdout rows** used: {aligned_rows}")
@@ -301,9 +303,17 @@ def main() -> None:
     parser.add_argument(
         "--constrained-stem",
         required=True,
-        help="Stem used for the constrained best-weights artifacts "
-        "(e.g. 'week11_I_macro_both'). The script reads "
-        "data/processed/{constrained_stem}_constrained_best_timeseries.csv.",
+        help="Stem used for the optimized portfolio's best-weights artifacts "
+        "(e.g. 'week11_I_macro_both' for constrained, 'week10_kelly_B' for Kelly). "
+        "The script reads "
+        "data/processed/{constrained_stem}_{constrained_suffix}_timeseries.csv.",
+    )
+    parser.add_argument(
+        "--constrained-suffix",
+        default="constrained_best",
+        help="Suffix between {constrained_stem} and _timeseries.csv. Defaults to "
+        "'constrained_best' for week8/week9/week11 pods. Use 'kelly_best' for "
+        "week10 Kelly pods. Output file names use {output_stem} unchanged.",
     )
     parser.add_argument(
         "--alphas",
@@ -334,7 +344,10 @@ def main() -> None:
     processed.mkdir(parents=True, exist_ok=True)
 
     baseline_path = processed / f"{args.artifact_prefix}_baseline_timeseries.csv"
-    constrained_path = processed / f"{args.constrained_stem}_constrained_best_timeseries.csv"
+    constrained_path = (
+        processed
+        / f"{args.constrained_stem}_{args.constrained_suffix}_timeseries.csv"
+    )
 
     baseline_rets_full = _read_returns(baseline_path)
     constrained_rets = _read_returns(constrained_path)
@@ -367,6 +380,7 @@ def main() -> None:
         rows,
         artifact_prefix=args.artifact_prefix,
         constrained_stem=args.constrained_stem,
+        constrained_suffix=args.constrained_suffix,
         baseline_rows=int(baseline_rets_full.size),
         constrained_rows=int(constrained_rets.size),
         aligned_rows=aligned_rows,
@@ -377,16 +391,23 @@ def main() -> None:
         title=f"Post-hoc alpha-blend: {args.constrained_stem}",
     )
 
+    def _rel(p: Path) -> str:
+        try:
+            return str(p.relative_to(REPO_ROOT))
+        except ValueError:
+            return str(p)
+
     print(
         json.dumps(
             {
                 "artifact_prefix": args.artifact_prefix,
                 "constrained_stem": args.constrained_stem,
+                "constrained_suffix": args.constrained_suffix,
                 "aligned_rows": aligned_rows,
                 "n_alphas": len(alphas),
-                "csv": str(csv_path.relative_to(REPO_ROOT)),
-                "markdown": str(md_path.relative_to(REPO_ROOT)),
-                "plot": str(png_path.relative_to(REPO_ROOT)),
+                "csv": _rel(csv_path),
+                "markdown": _rel(md_path),
+                "plot": _rel(png_path),
                 "best_sortino_alpha": max(rows, key=lambda r: r["sortino"])["alpha"],
                 "best_sortino_value": max(rows, key=lambda r: r["sortino"])["sortino"],
                 "alpha_1_sortino": next(r["sortino"] for r in rows if r["alpha"] == 1.0)
