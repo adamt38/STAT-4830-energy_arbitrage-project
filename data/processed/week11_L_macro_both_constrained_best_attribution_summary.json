@@ -1,0 +1,27 @@
+{
+  "steps": 1681,
+  "asset_count": 25,
+  "total_portfolio_return": 0.32006193393827315,
+  "top_market_by_abs_contribution": {
+    "token_id": "65075454639388714811293775905500639483433054272204316386263594369997153544149",
+    "domain": "grooming-gangs",
+    "question": "Starmer out by April 30, 2026?",
+    "market_id": "1500922",
+    "market_slug": "starmer-out-by-april-30-2026",
+    "mean_weight": 0.03535082711536796,
+    "total_contribution": 0.3893084299265187,
+    "mean_step_contribution": 0.00023159335510203373,
+    "contribution_share_of_total_return": 1.2163534261515785
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "grooming-gangs",
+    "total_contribution": 0.3893084299265187,
+    "contribution_share_of_total_return": 1.2163534261515785
+  },
+  "top_abs_corr_pair": {
+    "token_a": "19063193541024384703688685779087142926481547676681055667364352656903314720497",
+    "token_b": "9556122149160720922715284597610520228366807023831966638741974320131898296289",
+    "corr": -0.21158390663324217,
+    "abs_corr": 0.21158390663324217
+  }
+}

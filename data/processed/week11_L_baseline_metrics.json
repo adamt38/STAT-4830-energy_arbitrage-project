@@ -1,0 +1,33 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.08474340695956203,
+  "max_drawdown": -0.22378908838935263,
+  "market_count": 25,
+  "exposure_by_domain": {
+    "2026-nfl-draft": 0.043478260869565216,
+    "roland-garros": 0.043478260869565216,
+    "congress": 0.043478260869565216,
+    "economic-policy": 0.043478260869565216,
+    "basketball": 0.043478260869565216,
+    "la-liga": 0.043478260869565216,
+    "new-mexico-primary": 0.043478260869565216,
+    "taylor-swift": 0.043478260869565216,
+    "ligue-1": 0.043478260869565216,
+    "ufc": 0.043478260869565216,
+    "natural-disasters": 0.043478260869565216,
+    "airdrops": 0.043478260869565216,
+    "best-of-2025": 0.043478260869565216,
+    "grooming-gangs": 0.043478260869565216,
+    "south-dakota-primary": 0.043478260869565216,
+    "primaries": 0.043478260869565216,
+    "uefa-europa-league": 0.043478260869565216,
+    "nba-champion": 0.043478260869565216,
+    "west-virginia-primary": 0.043478260869565216,
+    "league-of-legends": 0.043478260869565216,
+    "serie-a": 0.043478260869565216,
+    "south-carolina-primary": 0.043478260869565216,
+    "usdptai": 0.043478260869565216
+  },
+  "mean_return": 0.00041866571263179497,
+  "volatility": 0.017069413061931795
+}

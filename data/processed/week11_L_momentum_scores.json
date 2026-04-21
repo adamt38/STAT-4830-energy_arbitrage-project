@@ -1,0 +1,181 @@
+{
+  "lookback_days": 10.0,
+  "top_n": 25,
+  "selected_markets": [
+    {
+      "token_id": "65075454639388714811293775905500639483433054272204316386263594369997153544149",
+      "market_slug": "starmer-out-by-april-30-2026",
+      "question": "Starmer out by April 30, 2026?",
+      "domain": "grooming-gangs",
+      "momentum": 2.566666666666667
+    },
+    {
+      "token_id": "85804162766623143925505734230172858069182216823432975004068744981960196178654",
+      "market_slug": "will-zachary-shrewsbury-be-the-democratic-nominee-for-senate-in-west-virginia",
+      "question": "Will Zachary Shrewsbury be the Democratic nominee for Senate in West Virginia?",
+      "domain": "west-virginia-primary",
+      "momentum": 2.0
+    },
+    {
+      "token_id": "89958419168244050451443228284990944744088214601708643333969277675829695680590",
+      "market_slug": "will-ninjas-in-pyjamas-win-the-lpl-2026-season",
+      "question": "Will Ninjas in Pyjamas win the LPL 2026 season?",
+      "domain": "league-of-legends",
+      "momentum": 1.7333333333333336
+    },
+    {
+      "token_id": "81085168149210534701056807267483472863288984314426354863145129521956049193057",
+      "market_slug": "will-nottm-forest-win-the-2025-26-uefa-europa-league",
+      "question": "Will Nott'm Forest win the 2025-26 UEFA Europa League?",
+      "domain": "uefa-europa-league",
+      "momentum": 0.9850746268656716
+    },
+    {
+      "token_id": "19063193541024384703688685779087142926481547676681055667364352656903314720497",
+      "market_slug": "nba-2025-26-coach-of-the-year-jb-bickerstaff",
+      "question": "Will JB Bickerstaff win the 2025\u20132026 NBA Coach of the Year?",
+      "domain": "basketball",
+      "momentum": -0.9314516129032259
+    },
+    {
+      "token_id": "7345183309756257693783741573478340128830660331823026035095352170224920670792",
+      "market_slug": "will-connie-chan-receive-the-most-votes-in-the-ca-11-primary",
+      "question": "Will Connie Chan receive the most votes in the CA-11 primary?",
+      "domain": "primaries",
+      "momentum": 0.911111111111111
+    },
+    {
+      "token_id": "63415064977569429650854303533694905713854849186055984415925532647266316927744",
+      "market_slug": "will-theodore-rank-1-among-boy-names-on-the-ssas-official-list-for-2025",
+      "question": "Will Theodore rank #1 among boy names on the SSA\u2019s official list for 2025?",
+      "domain": "best-of-2025",
+      "momentum": -0.8125
+    },
+    {
+      "token_id": "2317130722330994677503722994963086323403276367952762140016618274858179343506",
+      "market_slug": "will-villarreal-win-the-202526-la-liga",
+      "question": "Will Villarreal win the 2025\u201326 La Liga?",
+      "domain": "la-liga",
+      "momentum": -0.8
+    },
+    {
+      "token_id": "52742072726655342667303322232600981394438522628089364540756474997538505603610",
+      "market_slug": "will-there-be-fewer-than-5-earthquakes-of-magnitude-7pt0-or-higher-worldwide-in-2026",
+      "question": "Will there be fewer than 5 earthquakes of magnitude 7.0 or higher worldwide in 2026?",
+      "domain": "natural-disasters",
+      "momentum": -0.8
+    },
+    {
+      "token_id": "57301498276970257025109591078431189727442302532145853906375186182281603517458",
+      "market_slug": "megaeth-market-cap-fdv-2b-one-day-after-launch-738-867-649-272-765-733",
+      "question": "MegaETH market cap (FDV) >$2B one day after launch?",
+      "domain": "airdrops",
+      "momentum": 0.7826086956521737
+    },
+    {
+      "token_id": "51613719567621754724891717390585755097347351696566637940067208667324364080624",
+      "market_slug": "will-petr-yan-fight-pedro-munhoz-next",
+      "question": "Will Petr Yan fight Pedro Munhoz next?",
+      "domain": "ufc",
+      "momentum": -0.7222222222222221
+    },
+    {
+      "token_id": "31317702573839002987249831884538721320741670016050389364356636973937868446333",
+      "market_slug": "will-duke-rodriguez-win-the-2026-new-mexico-governor-republican-primary-election",
+      "question": "Will Duke Rodriguez win the 2026 New Mexico Governor Republican primary election?",
+      "domain": "new-mexico-primary",
+      "momentum": -0.72
+    },
+    {
+      "token_id": "99804639596039576605430305696643768871601282444072106847249567969182778209050",
+      "market_slug": "usdai-fdv-above-300m-one-day-after-launch-673-643-134-327-974-316",
+      "question": "USD.AI FDV above $300M one day after launch?",
+      "domain": "usdptai",
+      "momentum": 0.6790299572039945
+    },
+    {
+      "token_id": "99749016268102215655027460847575255229185808451121448681239772223604694086957",
+      "market_slug": "will-mark-smith-be-the-republican-nominee-for-sc-01",
+      "question": "Will Mark Smith be the Republican Nominee for SC-01?",
+      "domain": "south-carolina-primary",
+      "momentum": 0.673076923076923
+    },
+    {
+      "token_id": "6676305416092353520750099363203230548628101142538374719045668193435729818451",
+      "market_slug": "will-larry-rhoden-win-the-2026-south-dakota-governor-republican-primary-election",
+      "question": "Will Larry Rhoden win the 2026 South Dakota Governor Republican primary election?",
+      "domain": "south-dakota-primary",
+      "momentum": -0.6666666666666667
+    },
+    {
+      "token_id": "18690049947242812495755151360212639738977254879109748949267393375856311641700",
+      "market_slug": "will-the-fed-decrease-interest-rates-by-50-bps-after-the-april-2026-meeting",
+      "question": "Will the Fed decrease interest rates by 50+ bps after the April 2026 meeting?",
+      "domain": "economic-policy",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "49662274238485451283220527378586398370959042852997899886824914466317758572224",
+      "market_slug": "will-marseille-win-the-202526-french-ligue-1",
+      "question": "Will Marseille win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "91681655108670616412919019847395705594860242172439222709398777917282123641489",
+      "market_slug": "will-juventus-win-the-202526-serie-a-league",
+      "question": "Will Juventus win the 2025\u201326 Serie A league?",
+      "domain": "serie-a",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "9556122149160720922715284597610520228366807023831966638741974320131898296289",
+      "market_slug": "will-the-fed-increase-interest-rates-by-25-bps-after-the-april-2026-meeting",
+      "question": "Will the Fed increase interest rates by 25+ bps after the April 2026 meeting?",
+      "domain": "economic-policy",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "82402823484466457361170410951601106261368113664328436062375970009969959380598",
+      "market_slug": "will-the-portland-trail-blazers-win-the-2026-nba-finals",
+      "question": "Will the Portland Trail Blazers win the 2026 NBA Finals?",
+      "domain": "nba-champion",
+      "momentum": 0.6666666666666666
+    },
+    {
+      "token_id": "104812555872482040859204311862207595317318459151981099582262357665296846969541",
+      "market_slug": "will-jack-draper-win-the-2026-mens-french-open",
+      "question": "Will Jack Draper win the 2026 Men's French Open?",
+      "domain": "roland-garros",
+      "momentum": -0.6315789473684211
+    },
+    {
+      "token_id": "109303663734739671465714636465895865472163062510173069449390862173969575719974",
+      "market_slug": "will-the-number-of-republican-senate-members-who-retire-in-2026-be-less-than-5",
+      "question": "Will the number of Republican Senate members who retire in 2026 be less than 5?",
+      "domain": "congress",
+      "momentum": -0.6310160427807486
+    },
+    {
+      "token_id": "103367863677987537227281870345670478293273189433945337168589532296599991222509",
+      "market_slug": "will-dante-moore-be-the-second-pick-in-the-2026-nfl-draft",
+      "question": "Will Dante Moore be the second pick in the 2026 NFL draft?",
+      "domain": "2026-nfl-draft",
+      "momentum": -0.625
+    },
+    {
+      "token_id": "103950812176015306889097643332505690876545410954871160290129574415932884036868",
+      "market_slug": "will-taylor-fritz-win-the-2026-mens-french-open",
+      "question": "Will Taylor Fritz win the 2026 Men's French Open?",
+      "domain": "roland-garros",
+      "momentum": -0.6153846153846154
+    },
+    {
+      "token_id": "332462812953361158016354695716232633373752944798478737086328444144960550554",
+      "market_slug": "taylor-swift-pregnant-before-marriage",
+      "question": "Taylor Swift pregnant before marriage?",
+      "domain": "taylor-swift",
+      "momentum": 0.5999999999999999
+    }
+  ]
+}
