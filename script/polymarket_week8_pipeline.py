@@ -844,6 +844,13 @@ def main() -> None:
         "Only used when --momentum-screening is set. Shorter windows (e.g. 3.0) capture "
         "very recent price action; longer windows (e.g. 7.0) smooth out noise.",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=7,
+        help="Random seed passed to ExperimentConfig.seed (default 7). Use a different value "
+        "for replication runs to verify that a positive holdout delta is not seed-specific.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -922,7 +929,7 @@ def main() -> None:
         holdout_fraction=0.2,
         walkforward_train_steps=walkforward_train_steps,
         walkforward_test_steps=walkforward_test_steps,
-        seed=7,
+        seed=int(args.seed),
         optuna_n_jobs=args.optuna_n_jobs,
     )
     macro_modes_list = (
