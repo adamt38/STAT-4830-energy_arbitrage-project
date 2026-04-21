@@ -1,0 +1,109 @@
+{
+  "strategy": "constrained_optuna_mean_downside_both",
+  "best_params": {
+    "learning_rate": 0.06250150874589773,
+    "lambda_penalty": 0.9296875,
+    "rolling_window": 96,
+    "domain_limit": 0.09125,
+    "max_weight": 0.045625,
+    "uniform_mix": 0.040625,
+    "evaluation_mode": "online",
+    "weight_parameterization": "projected_simplex",
+    "concentration_penalty_lambda": 13.522496441040662,
+    "covariance_penalty_lambda": 7.551416732516023,
+    "covariance_shrinkage": 0.037500000000000006,
+    "entropy_lambda": 0.0,
+    "variance_penalty": 1.78125,
+    "downside_penalty": 2.21875,
+    "regime_k": 0.7250000000000001,
+    "macro_integration": "both",
+    "lambda_macro_explicit": 1.09375,
+    "lambda_etf_tracking": 0.0,
+    "selection_source": "optuna_qmc",
+    "holdout_sortino_ratio": 0.08084227592328985,
+    "holdout_max_drawdown": -0.3234447015270967,
+    "holdout_mean_return": 0.00029932797084230515,
+    "holdout_volatility": 0.009227234218895082,
+    "max_domain_exposure": 0.09708830341696739,
+    "baseline_holdout_sortino": 0.08385767511110419,
+    "holdout_sortino_minus_baseline": -0.0030153991878143355,
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      31,
+      89,
+      99,
+      190,
+      199
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "best_trial_baseline_alpha": 1.0
+  },
+  "domain_exposure": {
+    "roland-garros": 0.050461411476135254,
+    "nba-champion": 0.05025317147374153,
+    "serie-a": 0.050592172890901566,
+    "ligue-1": 0.09694048762321472,
+    "la-liga": 0.05032990500330925,
+    "nba": 0.050414301455020905,
+    "new-mexico-primary": 0.05025682598352432,
+    "taylor-swift": 0.05032838508486748,
+    "colombia-election": 0.09708830341696739,
+    "best-of-2025": 0.04999309033155441,
+    "prediction-markets": 0.050469160079956055,
+    "ufc": 0.050180383026599884,
+    "airdrops": 0.05062023550271988,
+    "fifa-world-cup": 0.050372689962387085,
+    "south-dakota-primary": 0.0502769835293293,
+    "trump": 0.05042847990989685,
+    "primaries": 0.05046195536851883,
+    "uefa-europa-league": 0.05053209513425827
+  },
+  "feasibility_filter": {
+    "applied_threshold": 0.12,
+    "feasible_solution_found": true
+  },
+  "data_split": {
+    "tuning_steps": 6264,
+    "holdout_steps_total": 1566,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48
+  },
+  "optuna_summary": {
+    "n_trials": 200,
+    "n_jobs": 4,
+    "completed_trials": 196,
+    "pruned_trials": 4,
+    "best_trial_number": 31,
+    "search_time_sec": 36626.653191602,
+    "sampler": "QMCSampler(sobol)",
+    "joint_macro_mode_search": false,
+    "output_artifact_suffix": "_macro_both",
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      31,
+      89,
+      99,
+      190,
+      199
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "objective_value_best": 0.08905112800741558
+  }
+}
