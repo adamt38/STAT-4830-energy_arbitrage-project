@@ -1,0 +1,27 @@
+{
+  "steps": 1520,
+  "asset_count": 20,
+  "total_portfolio_return": 0.15053855553096937,
+  "top_market_by_abs_contribution": {
+    "token_id": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+    "domain": "serie-a",
+    "question": "Will AC Milan win the 2025\u201326 Serie A league?",
+    "market_id": "566514",
+    "market_slug": "will-ac-milan-win-the-202526-serie-a-league",
+    "mean_weight": 0.050089016057501844,
+    "total_contribution": 0.08975096897419656,
+    "mean_step_contribution": 5.9046690114603e-05,
+    "contribution_share_of_total_return": 0.5961992172545634
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "colombia-election",
+    "total_contribution": 0.15436987215032177,
+    "contribution_share_of_total_return": 1.0254507332413205
+  },
+  "top_abs_corr_pair": {
+    "token_a": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+    "token_b": "73768610008619570600930429495180540710817177537162503586781057110775077618432",
+    "corr": -0.04120441878289474,
+    "abs_corr": 0.04120441878289474
+  }
+}
