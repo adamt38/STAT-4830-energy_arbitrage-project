@@ -1,0 +1,28 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.05788687897924284,
+  "max_drawdown": -0.29116939347102466,
+  "market_count": 20,
+  "exposure_by_domain": {
+    "roland-garros": 0.05555555555555555,
+    "nba-champion": 0.05555555555555555,
+    "serie-a": 0.05555555555555555,
+    "la-liga": 0.05555555555555555,
+    "new-mexico-primary": 0.05555555555555555,
+    "taylor-swift": 0.05555555555555555,
+    "grooming-gangs": 0.05555555555555555,
+    "colombia-election": 0.05555555555555555,
+    "prediction-markets": 0.05555555555555555,
+    "ligue-1": 0.05555555555555555,
+    "ufc": 0.05555555555555555,
+    "airdrops": 0.05555555555555555,
+    "best-of-2025": 0.05555555555555555,
+    "south-dakota-primary": 0.05555555555555555,
+    "primaries": 0.05555555555555555,
+    "nba": 0.05555555555555555,
+    "uefa-europa-league": 0.05555555555555555,
+    "league-of-legends": 0.05555555555555555
+  },
+  "mean_return": 0.00038842991276623567,
+  "volatility": 0.019842851211700038
+}

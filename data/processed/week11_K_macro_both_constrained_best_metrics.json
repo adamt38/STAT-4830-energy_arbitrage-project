@@ -1,0 +1,109 @@
+{
+  "strategy": "constrained_optuna_mean_downside_both",
+  "best_params": {
+    "learning_rate": 0.01962094879242268,
+    "lambda_penalty": 0.9765625,
+    "rolling_window": 96,
+    "domain_limit": 0.11875,
+    "max_weight": 0.049375,
+    "uniform_mix": 0.034375,
+    "evaluation_mode": "online",
+    "weight_parameterization": "projected_simplex",
+    "concentration_penalty_lambda": 24.726954371635134,
+    "covariance_penalty_lambda": 2.036234609539774,
+    "covariance_shrinkage": 0.0225,
+    "entropy_lambda": 0.0,
+    "variance_penalty": 1.96875,
+    "downside_penalty": 2.65625,
+    "regime_k": 0.47500000000000003,
+    "macro_integration": "both",
+    "lambda_macro_explicit": 4.53125,
+    "lambda_etf_tracking": 0.0,
+    "selection_source": "optuna_qmc",
+    "holdout_sortino_ratio": 0.06153819535193716,
+    "holdout_max_drawdown": -0.28028496346780296,
+    "holdout_mean_return": 0.00023891702138842876,
+    "holdout_volatility": 0.008177483104006796,
+    "max_domain_exposure": 0.09978661313652992,
+    "baseline_holdout_sortino": 0.0615628408460413,
+    "holdout_sortino_minus_baseline": -2.464549410414324e-05,
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      21,
+      31,
+      17,
+      92,
+      48
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "best_trial_baseline_alpha": 1.0
+  },
+  "domain_exposure": {
+    "roland-garros": 0.09978661313652992,
+    "nba-champion": 0.04999399185180664,
+    "serie-a": 0.050055354833602905,
+    "la-liga": 0.05004037171602249,
+    "new-mexico-primary": 0.0500057227909565,
+    "taylor-swift": 0.05002639815211296,
+    "grooming-gangs": 0.05005134269595146,
+    "colombia-election": 0.09971470013260841,
+    "prediction-markets": 0.050051093101501465,
+    "ligue-1": 0.050035446882247925,
+    "ufc": 0.05004861205816269,
+    "airdrops": 0.05006847530603409,
+    "best-of-2025": 0.050010837614536285,
+    "south-dakota-primary": 0.050022341310977936,
+    "primaries": 0.050031471997499466,
+    "nba": 0.05000517889857292,
+    "uefa-europa-league": 0.05003923177719116,
+    "league-of-legends": 0.050012726336717606
+  },
+  "feasibility_filter": {
+    "applied_threshold": 0.12,
+    "feasible_solution_found": true
+  },
+  "data_split": {
+    "tuning_steps": 6424,
+    "holdout_steps_total": 1606,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48
+  },
+  "optuna_summary": {
+    "n_trials": 100,
+    "n_jobs": 4,
+    "completed_trials": 99,
+    "pruned_trials": 1,
+    "best_trial_number": 21,
+    "search_time_sec": 33545.54173523499,
+    "sampler": "QMCSampler(sobol)",
+    "joint_macro_mode_search": false,
+    "output_artifact_suffix": "_macro_both",
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      21,
+      31,
+      17,
+      92,
+      48
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "objective_value_best": 0.1705098266374771
+  }
+}

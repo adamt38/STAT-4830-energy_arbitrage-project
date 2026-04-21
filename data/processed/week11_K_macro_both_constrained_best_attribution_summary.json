@@ -1,0 +1,27 @@
+{
+  "steps": 1606,
+  "asset_count": 20,
+  "total_portfolio_return": 0.3837007363498166,
+  "top_market_by_abs_contribution": {
+    "token_id": "89958419168244050451443228284990944744088214601708643333969277675829695680590",
+    "domain": "league-of-legends",
+    "question": "Will Ninjas in Pyjamas win the LPL 2026 season?",
+    "market_id": "693680",
+    "market_slug": "will-ninjas-in-pyjamas-win-the-lpl-2026-season",
+    "mean_weight": 0.05001270562911395,
+    "total_contribution": 0.1390332708829336,
+    "mean_step_contribution": 8.657115248003338e-05,
+    "contribution_share_of_total_return": 0.3623481992908614
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "colombia-election",
+    "total_contribution": 0.15540786543240148,
+    "contribution_share_of_total_return": 0.4050236309442927
+  },
+  "top_abs_corr_pair": {
+    "token_a": "104812555872482040859204311862207595317318459151981099582262357665296846969541",
+    "token_b": "44488146241641686838477630423381146915926290111161217223359635890474557300976",
+    "corr": -0.09260709521945565,
+    "abs_corr": 0.09260709521945565
+  }
+}
