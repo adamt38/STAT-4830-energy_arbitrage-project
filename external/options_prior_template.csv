@@ -1,4 +1,0 @@
-date_utc,symbol,strike,spot,delta,iv,days_to_expiry,notes
-2026-02-20,xle,95,88,0.36,0.29,90,delta used as probability proxy
-2026-02-20,xle,100,88,0.27,0.32,90,for same date/symbol rows are averaged
-2026-02-20,nvda,950,910,0.41,0.48,60,can come from yfinance or cboe export
