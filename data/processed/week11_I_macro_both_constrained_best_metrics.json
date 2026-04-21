@@ -1,0 +1,110 @@
+{
+  "strategy": "constrained_optuna_mean_downside_both",
+  "best_params": {
+    "learning_rate": 0.012741483739896734,
+    "lambda_penalty": 0.9296875,
+    "rolling_window": 24,
+    "domain_limit": 0.09125,
+    "max_weight": 0.045625,
+    "uniform_mix": 0.040625,
+    "evaluation_mode": "online",
+    "weight_parameterization": "projected_simplex",
+    "concentration_penalty_lambda": 13.522496441040662,
+    "covariance_penalty_lambda": 7.551416732516023,
+    "covariance_shrinkage": 0.037500000000000006,
+    "entropy_lambda": 0.0,
+    "variance_penalty": 1.78125,
+    "downside_penalty": 2.21875,
+    "regime_k": 0.7250000000000001,
+    "macro_integration": "both",
+    "lambda_macro_explicit": 1.09375,
+    "lambda_etf_tracking": 0.0,
+    "selection_source": "optuna_qmc",
+    "holdout_sortino_ratio": 0.1040017614032357,
+    "holdout_max_drawdown": -0.2853959133705628,
+    "holdout_mean_return": 0.00036984966039120445,
+    "holdout_volatility": 0.009406059000991795,
+    "max_domain_exposure": 0.09972143173217773,
+    "baseline_holdout_sortino": 0.10495284354530449,
+    "holdout_sortino_minus_baseline": -0.0009510821420687793,
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      31,
+      17,
+      92,
+      77,
+      21
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "best_trial_baseline_alpha": 1.0
+  },
+  "domain_exposure": {
+    "roland-garros": 0.050024520605802536,
+    "nba-champion": 0.049981117248535156,
+    "serie-a": 0.05006003379821777,
+    "la-liga": 0.050004780292510986,
+    "nba": 0.05000682920217514,
+    "new-mexico-primary": 0.05000486224889755,
+    "taylor-swift": 0.0500386580824852,
+    "grooming-gangs": 0.05004414916038513,
+    "colombia-election": 0.09972143173217773,
+    "best-of-2025": 0.04979059100151062,
+    "prediction-markets": 0.05005256459116936,
+    "ligue-1": 0.05003167316317558,
+    "ufc": 0.05001058429479599,
+    "airdrops": 0.050077568739652634,
+    "north-carolina-midterm": 0.0500577911734581,
+    "primaries": 0.049989234656095505,
+    "rhode-island-primary": 0.05006670951843262,
+    "uefa-europa-league": 0.05006507784128189,
+    "league-of-legends": 0.04997170343995094
+  },
+  "feasibility_filter": {
+    "applied_threshold": 0.12,
+    "feasible_solution_found": true
+  },
+  "data_split": {
+    "tuning_steps": 6197,
+    "holdout_steps_total": 1550,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48
+  },
+  "optuna_summary": {
+    "n_trials": 100,
+    "n_jobs": 4,
+    "completed_trials": 84,
+    "pruned_trials": 16,
+    "best_trial_number": 31,
+    "search_time_sec": 35006.32794675298,
+    "sampler": "QMCSampler(sobol)",
+    "joint_macro_mode_search": false,
+    "output_artifact_suffix": "_macro_both",
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      31,
+      17,
+      92,
+      77,
+      21
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "objective_value_best": 0.07933747299376717
+  }
+}
