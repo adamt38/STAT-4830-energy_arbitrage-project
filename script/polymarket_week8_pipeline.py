@@ -863,6 +863,71 @@ def main() -> None:
         "Only used when --momentum-screening is set. Shorter windows (e.g. 3.0) capture "
         "very recent price action; longer windows (e.g. 7.0) smooth out noise.",
     )
+    # ── Round 6 risk-aware objective overrides (mirror --rolling-windows / --lr-values) ──
+    parser.add_argument(
+        "--variance-penalty-values",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override variance_penalties search set (default: (0.5, 1.0, 2.0); reduced: "
+        "(1.0, 2.0)). Accepts comma-separated floats >= 0; set to a single value to pin, "
+        "or widen to sweep. Enables Optuna to search variance_penalty. Round 6 Pod S1.",
+    )
+    parser.add_argument(
+        "--downside-penalty-values",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override downside_penalties search set (default: (1.0, 2.0, 3.0); reduced: "
+        "(2.0, 3.0)). Accepts comma-separated floats >= 0. Round 6 Pod S1.",
+    )
+    parser.add_argument(
+        "--covariance-penalty-lambdas",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override covariance_penalty_lambdas (default: (0.5, 1.0, 5.0, 10.0)). "
+        "Accepts comma-separated floats >= 0. Round 6 Pod S1 pushes down to 0.1-0.5 to "
+        "test lighter co-movement shrinkage.",
+    )
+    parser.add_argument(
+        "--covariance-shrinkage-values",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override covariance_shrinkages (default: (0.02, 0.05, 0.10)). Accepts "
+        "comma-separated floats in [0.0, 1.0). Round 6 Pod S1 tests 0.01-0.10 range.",
+    )
+    parser.add_argument(
+        "--domain-limit-values",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override domain_limits search set (default: (0.08, 0.12, 0.18, 0.25); "
+        "reduced: (0.08, 0.12)). Accepts comma-separated floats in (0.0, 1.0]. Round 6 "
+        "Pods S1 and S5 sweep 0.06-0.10 to test whether tighter domain caps close the "
+        "drawdown gap.",
+    )
+    parser.add_argument(
+        "--max-weight-values",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override max_weights (default: (0.04, 0.06, 0.10, 0.15); reduced: "
+        "(0.04, 0.06, 0.10)). Accepts comma-separated floats in (0.0, 1.0]. Round 6 "
+        "Pod S5 pins to 0.04 matching the teammate's stock-PM-combined-strategy winner.",
+    )
+    parser.add_argument(
+        "--concentration-penalty-lambdas",
+        default=None,
+        metavar="V1,V2,...",
+        help="Override concentration_penalty_lambdas (default: (2.0, 5.0, 10.0, 20.0, "
+        "50.0)). Accepts comma-separated floats >= 0. Round 6 Pod S5 pins at 2.0 per "
+        "the teammate's week17 winner.",
+    )
+    parser.add_argument(
+        "--seed-override",
+        type=int,
+        default=None,
+        metavar="SEED",
+        help="Override experiment_config.seed (default 7). Round 6 Pod S4 uses this to "
+        "run the G recipe across {3, 7, 101, 202, 303} as a multi-seed robustness check "
+        "after G-seed42 collapsed G2's +0.0019 Sortino delta to +0.0002.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -1014,6 +1079,134 @@ def main() -> None:
             f"[CONFIG] learning_rates overridden via CLI: {lr_override}",
             flush=True,
         )
+
+    # ── Round 6 overrides: risk-aware objective + sizing ──────────────────────
+    # Each flag mirrors --rolling-windows / --lr-values: comma-separated floats,
+    # applied AFTER --reduced-search so a reduced-search run can still be widened
+    # explicitly. When the override is None we keep the (possibly reduced) default.
+    def _parse_float_override(
+        raw: str | None,
+        flag_name: str,
+        *,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        strict_min: bool = False,
+        strict_max: bool = False,
+    ) -> tuple[float, ...] | None:
+        if raw is None:
+            return None
+        try:
+            values = tuple(float(x.strip()) for x in str(raw).split(",") if x.strip())
+        except ValueError as exc:
+            raise SystemExit(
+                f"{flag_name} must be a comma-separated list of floats, got "
+                f"{raw!r}: {exc}"
+            )
+        if not values:
+            raise SystemExit(f"{flag_name} requires at least one float value.")
+        for v in values:
+            if min_value is not None:
+                if strict_min and v <= min_value:
+                    raise SystemExit(
+                        f"{flag_name} entries must be > {min_value}, got {values}."
+                    )
+                if not strict_min and v < min_value:
+                    raise SystemExit(
+                        f"{flag_name} entries must be >= {min_value}, got {values}."
+                    )
+            if max_value is not None:
+                if strict_max and v >= max_value:
+                    raise SystemExit(
+                        f"{flag_name} entries must be < {max_value}, got {values}."
+                    )
+                if not strict_max and v > max_value:
+                    raise SystemExit(
+                        f"{flag_name} entries must be <= {max_value}, got {values}."
+                    )
+        return values
+
+    variance_override = _parse_float_override(
+        args.variance_penalty_values, "--variance-penalty-values", min_value=0.0
+    )
+    if variance_override is not None:
+        experiment_config = replace(experiment_config, variance_penalties=variance_override)
+        print(f"[CONFIG] variance_penalties overridden via CLI: {variance_override}", flush=True)
+
+    downside_override = _parse_float_override(
+        args.downside_penalty_values, "--downside-penalty-values", min_value=0.0
+    )
+    if downside_override is not None:
+        experiment_config = replace(experiment_config, downside_penalties=downside_override)
+        print(f"[CONFIG] downside_penalties overridden via CLI: {downside_override}", flush=True)
+
+    cov_lambda_override = _parse_float_override(
+        args.covariance_penalty_lambdas, "--covariance-penalty-lambdas", min_value=0.0
+    )
+    if cov_lambda_override is not None:
+        experiment_config = replace(
+            experiment_config, covariance_penalty_lambdas=cov_lambda_override
+        )
+        print(
+            f"[CONFIG] covariance_penalty_lambdas overridden via CLI: {cov_lambda_override}",
+            flush=True,
+        )
+
+    cov_shrinkage_override = _parse_float_override(
+        args.covariance_shrinkage_values,
+        "--covariance-shrinkage-values",
+        min_value=0.0,
+        max_value=1.0,
+        strict_max=True,
+    )
+    if cov_shrinkage_override is not None:
+        experiment_config = replace(
+            experiment_config, covariance_shrinkages=cov_shrinkage_override
+        )
+        print(
+            f"[CONFIG] covariance_shrinkages overridden via CLI: {cov_shrinkage_override}",
+            flush=True,
+        )
+
+    domain_limit_override = _parse_float_override(
+        args.domain_limit_values,
+        "--domain-limit-values",
+        min_value=0.0,
+        max_value=1.0,
+        strict_min=True,
+    )
+    if domain_limit_override is not None:
+        experiment_config = replace(experiment_config, domain_limits=domain_limit_override)
+        print(f"[CONFIG] domain_limits overridden via CLI: {domain_limit_override}", flush=True)
+
+    max_weight_override = _parse_float_override(
+        args.max_weight_values,
+        "--max-weight-values",
+        min_value=0.0,
+        max_value=1.0,
+        strict_min=True,
+    )
+    if max_weight_override is not None:
+        experiment_config = replace(experiment_config, max_weights=max_weight_override)
+        print(f"[CONFIG] max_weights overridden via CLI: {max_weight_override}", flush=True)
+
+    conc_lambda_override = _parse_float_override(
+        args.concentration_penalty_lambdas,
+        "--concentration-penalty-lambdas",
+        min_value=0.0,
+    )
+    if conc_lambda_override is not None:
+        experiment_config = replace(
+            experiment_config, concentration_penalty_lambdas=conc_lambda_override
+        )
+        print(
+            f"[CONFIG] concentration_penalty_lambdas overridden via CLI: {conc_lambda_override}",
+            flush=True,
+        )
+
+    if args.seed_override is not None:
+        experiment_config = replace(experiment_config, seed=int(args.seed_override))
+        print(f"[CONFIG] seed overridden via CLI: {int(args.seed_override)}", flush=True)
+
     config_hash = _config_hash(base_build_config, experiment_config)
 
     def _stage_banner(name: str) -> None:

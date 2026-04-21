@@ -1,0 +1,4 @@
+date_utc,equity_hedge_tilt,notes
+20260220,0.0,neutral: tilt in [-1 bearish] .. [+1 bullish]; bullish reduces short-equity hedge
+20260221,-0.3,bearish analyst revisions -> keep more short SPY in hedge sleeve
+20260222,0.4,bullish breadth -> soften short SPY leg

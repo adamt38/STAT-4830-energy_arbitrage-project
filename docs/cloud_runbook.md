@@ -835,18 +835,39 @@ Expected-value-per-pod ranking, highest first:
 
 Minimum viable Round 4 if compute-constrained: **just pod I**. If two pods: **I + L**. If three: **I + L + M**. Four pods exercises the full matrix.
 
-### 14.8. Levers originally deferred — now implemented (used in §15 Round 5)
+### 14.8. Levers originally deferred — now implemented (used in §15 Round 5 and §16 Round 6)
 
-Round 4 left two levers on the table because they required code changes, not just flag changes. Both are now implemented and ready for Round 5:
+Round 4 left two levers on the table because they required code changes, not just flag changes. Both are now implemented and were used in Round 5:
 
 - **LR-ceiling widening — shipped as `--lr-values`.** C2's winning learning rate of 0.045 sat at the top of the `--reduced-search` LR range `(0.005, 0.01, 0.02, 0.05)`. `script/polymarket_week8_pipeline.py` now takes `--lr-values LR1,LR2,...` (mirrors `--rolling-windows`). The flag overrides `ExperimentConfig.learning_rates` **after** `--reduced-search` is applied, so `--reduced-search --lr-values 0.04,0.06,0.08,0.10,0.12` widens the search past the Round 2 ceiling without touching the other reduced-search narrowings.
 - **Post-hoc α-blend evaluator — shipped as `script/posthoc_alpha_blend.py`.** Takes an artifact prefix + constrained stem, loads the already-written baseline and constrained holdout timeseries, sweeps `α ∈ [0, 1]`, and reports Sortino / mean / volatility / max-dd / total-return / cumulative-log-wealth for each blend. Does **not** re-run Optuna. This is the risk-adjusted sensitivity test that `--baseline-shrinkage` cannot do (because every Round 2 pod that searched over shrinkage collapsed to α=0 — the training objective never rewards dilution inside a fold). Sanity-tested on `week8`: interior argmax at α=0.5 (Sortino +0.086) beats α=1.0 (+0.070), i.e. the pure constrained portfolio was over-exposed on a risk-adjusted basis.
 
-Use these in §15 Round 5 below.
+Round 5 opened three more deferred levers, all now implemented and used in §16 Round 6:
+
+- **Risk-aware objective overrides — shipped as eight new CLI flags on `script/polymarket_week8_pipeline.py`.** `ExperimentConfig` already had `variance_penalties`, `downside_penalties`, `covariance_penalty_lambdas`, `covariance_shrinkages`, `domain_limits`, `max_weights`, `concentration_penalty_lambdas`, and `seed`, and the inner loop of `src.constrained_optimizer._run_online_pass` already consumed every one of them — but the pipeline CLI only exposed `--rolling-windows` and `--lr-values`. Round 6 ships the missing flags:
+  - `--variance-penalty-values V1,V2,...` overrides `variance_penalties` (enables Optuna search on the mean − λ·var term).
+  - `--downside-penalty-values` overrides `downside_penalties` (semi-variance penalty).
+  - `--covariance-penalty-lambdas` overrides the covariance-shrinkage strength.
+  - `--covariance-shrinkage-values` overrides the shrinkage target (0.0 → sample cov, → 1.0 → identity).
+  - `--domain-limit-values` overrides the per-domain L∞ cap.
+  - `--max-weight-values` overrides the per-asset L∞ cap.
+  - `--concentration-penalty-lambdas` overrides the concentration L2 penalty.
+  - `--seed-override` overrides `ExperimentConfig.seed` (enables multi-seed robustness: Pod S4).
+  Every flag mirrors the `--rolling-windows` / `--lr-values` pattern: comma-separated floats (or one int for `--seed-override`), applied **after** `--reduced-search`, backwards-compatible default (flag unset → existing behavior).
+- **Port of teammate Colin's `src/pm_risk_overlay.py` + `src/equity_signal.py`.** Two standalone modules cherry-picked verbatim from `origin/stock-PM-combined-strategy` onto `cloud-runs-R6` (no modifications to the teammate branch). `pm_risk_overlay` provides `build_equity_domain_tilt_multiplier` (SPY-driven domain tilts via `yfinance`), `pm_category_spread_returns` + `top_negative_correlation_pairs` (zero-investment PM-category pairs trading), and resolution-shock multipliers. `equity_signal` provides the PM-domain ↔ equity-sector pair-ranking diagnostics they depend on. All four `data/external/*_template.csv` files (domain-ticker map, cross-asset mapping, analyst features, options prior) ported with them for easy reuse.
+- **Two post-hoc overlay evaluators** (same `posthoc_alpha_blend.py` convention):
+  - `script/posthoc_overlay_tilt.py` — reads `{prefix}_markets_filtered.csv` + `{prefix}_price_history.csv`, applies `build_equity_domain_tilt_multiplier` at a sweep of `--tilt-strengths`, and compares the tilted domain-equal portfolio to the pure equal-weight baseline. Requires network access + a populated `--ticker-map CSV`. Used by Pod S2.
+  - `script/posthoc_overlay_spread.py` — reads `{prefix}_category_correlation.csv` (already produced by `covariance_diagnostics`), identifies the top-N negatively correlated domain pairs at `--corr-threshold`, and sweeps `--max-pairs` × `--spread-lambdas` combinations. No network required. Smoke-tested on `week8`: interior argmax at (max_pairs=5, λ=0.1) beats the pure baseline by +0.0014 Sortino, confirming the overlay extracts a tiny-but-real signal. Used by Pod S3.
+
+Use these in §16 Round 6 below.
 
 ## 15. Round 5 — LR ceiling + post-hoc α-blend
 
-**Status:** ready to launch. Gates on §14 Round 4 completion (pods I4/K4/L4/M4 fanned into `cloud-runs`). Purpose is twofold:
+**Status: complete. See §15.9 closeout and §16 Round 6 below.**
+
+### 15.0. Round 5 purpose (historical)
+
+Round 5 launched against §14 Round 4 completion (pods I4/K4/L4/M4 fanned into `cloud-runs`). Purpose was twofold:
 
 1. **Forward-search the LR plateau above C2's 0.045 cap.** C2 converged at the top of the reduced-search LR range, which means the true Sortino-optimal LR may be 0.06-0.10 (we never looked). Pods O and P sweep above the ceiling. Pod Q combines the LR lever with Round 4's winning `macro=both + momentum top-20 / 5d` recipe.
 2. **Post-hoc α-blend on every Round 2 / Round 4 winner.** Pod R runs no optimization — it just scores already-completed runs. This tells us, for each pod, whether the reported α=1.0 Sortino is risk-adjusted-optimal or whether a blended allocation would have dominated. Often *that* table is the one that belongs in the writeup.
@@ -1067,3 +1088,222 @@ Minimum viable Round 5: **just pod R**. If two pods: **R + Q**. If three: **R + 
 - **Joint (LR, entropy) search.** Every reduced-search pod fixes `entropy_lambda=0`. If Round 5 unlocks a higher-LR regime, the optimal entropy may no longer be zero. Would require adding an `--entropy-lambdas` override flag (same 10-line pattern as `--lr-values`).
 - **Post-hoc α-blend with Sortino-optimal α as a reportable metric.** If Pod R shows that α* < 1 dominates on every pod, we could formalize this as a second-stage estimator ("pipeline + post-hoc shrinkage") and report both. Not a new experiment — a writeup decision.
 - **α-blend frontier on the Kelly (week10) outputs.** The `kelly_best_timeseries.csv` has `portfolio_return` too; `posthoc_alpha_blend.py` accepts arbitrary prefixes, so blending Kelly-vs-baseline is a one-liner once Round 3 finishes.
+
+### 15.9. Round 5 closeout — results
+
+All five Round 4 / Round 5 pods finished and pushed. Every pod either tied or lost to the equal-weight baseline on holdout Sortino:
+
+| Pod | Holdout Sortino | Baseline | Δ | Max DD | Notable config |
+|---|---:|---:|---:|---:|---|
+| I4 | +0.1040 | +0.1050 | **−0.0010** | −28.5% | mom 20/5d, rw=24 (Round 4 best) |
+| K4 | +0.0615 | +0.0616 | **−0.0000** | −28.0% | mom 20/5d, rw=96 |
+| L4 | +0.0600 | +0.0950 | **−0.0350** | −24.9% | mom 25/10d (aggressive momentum hurt) |
+| M4 | −0.0301 | +0.0179 | **−0.0480** | −17.4% | no momentum (best DD, worst Sortino) |
+| Q5 | +0.0808 | +0.0839 | **−0.0030** | −32.3% | Pod I recipe + LR sweep 0.04-0.12 |
+
+Separately, **Pod G-seed42** (a teammate re-run of Round 2's G recipe with seed=42) reported Sortino +0.0236 vs baseline +0.0234 (Δ +0.0002). G2's Round 2 Δ +0.0019 — our only historical "win" — collapsed to +0.0002 under a different seed, with the absolute Sortino falling from +0.2576 to +0.0236. The G2 result was almost certainly sampling noise.
+
+Three takeaways drive §16 Round 6:
+
+1. **The reduced-search / momentum-screening family is saturated.** Neither widening LR past 0.045 (Pod Q reached 0.063) nor tuning the momentum window (L4 vs I4) produced deltas above zero. Trying to squeeze more out of the same objective is low-expected-value.
+2. **Drawdowns are catastrophic and structural.** Five pods in a row produced −17% to −32% drawdowns on holdout, regardless of momentum / rolling-window / LR settings. This is a sizing / risk-control problem, not an alpha-search problem.
+3. **A teammate branch already has a 50× better Δ-vs-baseline.** `origin/stock-PM-combined-strategy`'s week17 run hit Sortino +0.1538 vs baseline +0.0520 (Δ **+0.1018**) with max DD −9.4%, using variance / downside / covariance penalties and tighter domain/weight caps — all already implemented in our `ExperimentConfig` but previously unexposed on the CLI. Round 6 is about *using levers we already have*.
+
+## 16. Round 6 — Risk-aware objective port + equity / PM overlays
+
+**Status: ready to launch.** Five CPU-only pods available (same class as Round 4/5). All code ships on `origin/cloud-runs-R6`; teammate branch `origin/stock-PM-combined-strategy` is left untouched. The new levers wired in §14.8 above expose the risk-aware objective terms already inside `constrained_optimizer` but previously hidden from the CLI, plus two post-hoc overlay evaluators that test teammate Colin's equity-tilt and PM-category-spread ideas on our data without modifying the inner loop.
+
+### 16.1. Hypothesis matrix
+
+| Pod | Hypothesis | Lever(s) exercised |
+|---|---|---|
+| **S1** | A richer objective (variance + downside + covariance penalties, tight weight caps, long rolling window) beats the plain Sortino-maximizing setup by the same order of magnitude the teammate's week17 branch did. | Full objective + sizing sweep; no momentum. Highest expected value. |
+| **S5** | The drawdown is a *sizing* problem, not an *alpha* problem. If we pin the teammate's winning position caps (`max_weight=0.04`, `domain_limit=0.08`, `concentration_penalty=2.0`) onto Round 4's best recipe (Pod I), the holdout DD drops from −28.5% toward −10% without sacrificing Sortino. | Tighter caps only; everything else = Pod I. Cheapest drawdown attack. |
+| **S4** | G2's Δ +0.0019 and G-seed42's Δ +0.0002 straddle zero; we need the variance of Δ across seeds to state a noise floor. | G recipe × 5 seeds `{3, 7, 101, 202, 303}`. Diagnostic, not optimization. |
+| **S2** | The equity-domain tilt signal (SPY-informed) adds risk-adjusted value on top of the equal-weight baseline. Run *after* fan-in, post-hoc. | `script/posthoc_overlay_tilt.py` with `tilt_strengths = {0, 5, 10, 20, 33.3}`. |
+| **S3** | Zero-investment PM-category spreads on the top negatively correlated pairs add uncorrelated alpha. Post-hoc. | `script/posthoc_overlay_spread.py` sweeping `max_pairs × spread_lambda`. |
+
+**Priority order if any pod slips: S1 > S5 > S4 > S2 > S3.** S2 and S3 are post-hoc evaluators that run in minutes on a small CPU pod against any fanned-in prefix — they don't need their own training pod, so you can run them on whichever pod finishes first once the artifacts are available.
+
+### 16.2. Pod S1 command (full risk-aware objective sweep)
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+
+python -u script/polymarket_week8_pipeline.py \
+  --artifact-prefix week13_S1 \
+  --macro-modes both \
+  --reduced-search \
+  --variance-penalty-values 0.25,0.5,1.0,2.0 \
+  --downside-penalty-values 0.5,1.0,2.0,3.0 \
+  --covariance-penalty-lambdas 0.1,0.5,1.0,2.0,5.0 \
+  --covariance-shrinkage-values 0.01,0.02,0.05,0.10 \
+  --domain-limit-values 0.06,0.08,0.10,0.12 \
+  --max-weight-values 0.03,0.04,0.05,0.06 \
+  --rolling-windows 96,144,288 \
+  --top-k-bagging 5 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 200 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-S1 \
+  --git-commit-message "S1: full risk-aware objective + tight caps + rw sweep ${RUN_TAG}" \
+  2>&1 | tee "run_S1_${RUN_TAG}.log"
+```
+
+Notes. `--reduced-search` is kept so the LR / penalty_lambda / uniform_mix search spaces stay narrow (Sobol density matters more than absolute count); the Round 6 overrides are applied *after* reduced-search and widen only the levers we explicitly sweep. No `--momentum-screening` — M4 showed it's no longer load-bearing when sizing is tight.
+
+### 16.3. Pod S5 command (tighter-sizing ablation on Pod I recipe)
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+
+python -u script/polymarket_week8_pipeline.py \
+  --artifact-prefix week13_S5 \
+  --macro-modes both \
+  --reduced-search \
+  --momentum-screening --momentum-top-n 20 --momentum-lookback-days 5 \
+  --max-weight-values 0.04 \
+  --domain-limit-values 0.08 \
+  --concentration-penalty-lambdas 2.0 \
+  --rolling-windows 24,96 \
+  --top-k-bagging 5 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 200 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-S5 \
+  --git-commit-message "S5: Pod-I recipe + teammate tight caps (mw=0.04 dl=0.08 cpl=2.0) ${RUN_TAG}" \
+  2>&1 | tee "run_S5_${RUN_TAG}.log"
+```
+
+This isolates the caps. Everything else matches Pod I4. If holdout DD falls from −28.5% to, say, −12% with Sortino roughly preserved, the whole Round 4 DD story was sizing.
+
+### 16.4. Pod S4 command (multi-seed robustness of the G recipe)
+
+This is one pod running five short sequential Optuna sweeps rather than one long one — we want five independent best-configs, not one averaged config.
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+
+for SEED in 3 7 101 202 303; do
+  python -u script/polymarket_week8_pipeline.py \
+    --artifact-prefix week13_S4_seed${SEED} \
+    --macro-modes both \
+    --reduced-search \
+    --seed-override ${SEED} \
+    --top-k-bagging 5 \
+    --optuna-n-jobs 4 \
+    --optuna-trials 100 \
+    --git-commit-and-push \
+    --git-push-branch cloud-runs-S4 \
+    --git-commit-message "S4 seed=${SEED}: G recipe robustness ${RUN_TAG}" \
+    2>&1 | tee "run_S4_seed${SEED}_${RUN_TAG}.log"
+done
+```
+
+Budget. 5 seeds × 100 trials × 4 jobs ≈ same compute as one 200-trial pod. The artifact set is `week13_S4_seed{3,7,101,202,303}_*`. After fan-in, compute `mean ± std` of `holdout_sortino_minus_baseline` across the five seeds — that gives the noise floor we need to contextualize any Round 6 Δ.
+
+### 16.5. Pod S2 command (post-hoc equity-domain tilt sweep)
+
+Runs after S1 or S5 fan-in. Any prefix whose `_markets_filtered.csv` and `_price_history.csv` exist under `data/processed/` works. Requires network (`yfinance`) and a populated `--ticker-map` (start from the template, map your top domains to matching ETFs: e.g. `crypto-prices → BITO`, `bigtech → QQQ`, `fifa-world-cup → SPY` as a catch-all).
+
+```bash
+source .venv/bin/activate
+
+# Edit data/external/domain_ticker_map_template.csv (or copy it) first — the
+# template has a few sample rows. Only domains present in your universe will
+# be tilted; the rest stay at multiplier = 1.0.
+
+python script/posthoc_overlay_tilt.py \
+  --artifact-prefix week13_S1 \
+  --ticker-map data/external/domain_ticker_map_template.csv \
+  --tilt-strengths 0,5,10,20,33.3 \
+  --max-multiplier 2.0 \
+  --output-stem week13_S1_equity_tilt
+```
+
+Success looks like: an interior argmax at `tilt_strength > 0` that beats the `tilt_strength = 0` row by ≥ +0.01 Sortino. That unlocks Round 7 where the tilt multiplier is folded into the optimizer's inner loop (currently it only multiplies a domain-equal allocation post-hoc).
+
+### 16.6. Pod S3 command (post-hoc PM-category spread sweep)
+
+Runs after S1 or S5 fan-in. No network needed; reads `{prefix}_category_correlation.csv` (written by `covariance_diagnostics` in every Round 4+ pod).
+
+```bash
+source .venv/bin/activate
+
+python script/posthoc_overlay_spread.py \
+  --artifact-prefix week13_S1 \
+  --max-pairs 0,2,5,10 \
+  --spread-lambdas 0.0,0.05,0.1,0.25,0.5 \
+  --corr-threshold -0.002 \
+  --output-stem week13_S1_pm_spread
+```
+
+Sanity-test baseline on `week8` showed the overlay extracts Δ = +0.0014 Sortino at `(max_pairs=5, λ=0.1)`. For this to clear the noise floor reported by Pod S4, we'd want Δ ≥ +0.01 on at least one row.
+
+### 16.7. What each Round 6 pod writes
+
+- **S1, S5** — standard constrained pipeline outputs: `{prefix}_constrained_best_metrics.json`, `_constrained_best_timeseries.csv`, `_baseline_metrics.json`, `_run_manifest.json`, plus the full `{prefix}_category_correlation.csv` that S3 will consume.
+- **S4** — five independent constrained pipeline outputs, one per seed, prefixed `week13_S4_seed{3,7,101,202,303}_*`.
+- **S2** — `data/processed/{output_stem}.csv` (one row per tilt strength) and `..._summary.md`. Also prints a JSON summary to stdout with the argmax row.
+- **S3** — `data/processed/{output_stem}.csv` (one row per `max_pairs × spread_lambda` combo) and `..._summary.md`. Stdout JSON includes the list of selected negative-correlation pairs.
+
+### 16.8. Fan-back-in to `cloud-runs` (mirrors §8 and §13.5)
+
+```bash
+# Local, after each S-pod finishes and pushes:
+git fetch origin
+git checkout cloud-runs
+git merge --no-ff origin/cloud-runs-S1 -m "Fan-in: Round 6 Pod S1 (full risk-aware objective)"
+# repeat for S4, S5; S2/S3 outputs are post-hoc artifacts and can be fanned
+# in by committing them directly from the pod running the overlay script.
+git push origin cloud-runs
+
+# Optional cleanup once merged:
+git push origin --delete cloud-runs-S1 cloud-runs-S4 cloud-runs-S5
+```
+
+### 16.9. Quick "did Round 6 beat baseline?" peek
+
+After S1 / S4 / S5 land in `cloud-runs`:
+
+```bash
+for stem in week13_S1_macro_both week13_S4_seed3_macro_both week13_S4_seed7_macro_both \
+             week13_S4_seed101_macro_both week13_S4_seed202_macro_both \
+             week13_S4_seed303_macro_both week13_S5_macro_both; do
+  path="data/processed/${stem}_constrained_best_metrics.json"
+  [ -f "$path" ] || { echo "missing $stem"; continue; }
+  python3 - <<PY
+import json
+d = json.load(open("$path"))
+bp = d.get("best_params", {})
+print(f"$stem: sortino={bp.get('holdout_sortino_ratio', 0):+.4f}  "
+      f"baseline={bp.get('baseline_holdout_sortino', 0):+.4f}  "
+      f"delta={bp.get('holdout_sortino_minus_baseline', 0):+.4f}  "
+      f"max_dd={bp.get('holdout_max_drawdown', 0):+.4%}")
+PY
+done
+```
+
+### 16.10. Success criteria
+
+1. **S1 or S5** produces `holdout_max_drawdown` better (less negative) than −15%. Currently every Round 4/5 pod sits in −17% to −32%. Closing the DD gap is a load-bearing outcome even if Sortino Δ stays near zero.
+2. **S1** produces `holdout_sortino_minus_baseline` ≥ +0.02 — one full order of magnitude above the all-time best of +0.0019 (G2). Below +0.02 is noise; above it is the first credible alpha we've observed on this universe.
+3. **S4** produces a Sortino-Δ 5-seed distribution that lets the writeup quote `mean ± std` and declare a noise floor. Even if all seeds are < 0, that's information: we can then state quantitatively that any reported Δ below the std is not evidence of skill.
+4. **S2 and/or S3** show an interior Sortino argmax with Δ ≥ +0.01 vs the no-overlay row. If yes, the overlay graduates to a Round 7 candidate to fold inside the inner loop; if no, that lever is closed.
+
+### 16.11. Open levers for Round 7+
+
+- **Tilt inside the optimizer.** If Pod S2 clears bar 4 above, wire `build_equity_domain_tilt_multiplier` into `_run_online_pass` so the tilt is optimized *jointly* with the other penalties instead of applied on top. Roughly a 50-line change in `src.constrained_optimizer`.
+- **PM-category spread inside the objective.** Same for Pod S3: add a `spread_lambda * r_spread_t` term to the per-step objective.
+- **Kelly × tight caps (K10D-tight).** The one Round 6 experiment we *cannot* run on CPU pods because of compute budget: re-run the Kelly pipeline with `--max-weights 0.04 --concentration-penalty-lambdas 2.0` and dynamic copula *on*. Holds until a GPU pod frees up.
+- **Regime-dependent objective.** Two-regime mixture: one set of (variance, downside, covariance) penalties when the SPY z-score is positive, another when it's negative. Would use `src.equity_signal.compute_risk_regime_zscore` (already ported in §14.8).
+
