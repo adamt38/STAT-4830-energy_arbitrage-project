@@ -1112,6 +1112,169 @@ Three corrected takeaways drive §16 Round 6:
 
 **Status: ready to launch.** Five CPU-only pods available (same class as Round 4/5). All code ships on `origin/cloud-runs-R6`; teammate branch `origin/stock-PM-combined-strategy` is left untouched. The new levers wired in §14.8 above expose the risk-aware objective terms already inside `constrained_optimizer` but previously hidden from the CLI, plus two post-hoc overlay evaluators that test teammate Colin's equity-tilt and PM-category-spread ideas on our data without modifying the inner loop.
 
+### 16.0. Step-by-step: from a fresh pod to a running experiment
+
+Run these **in order**, once per pod. Each pod runs exactly one of S1 / S4 / S5 — do NOT combine multiple experiments on one pod. S2 and S3 are post-hoc (§16.5–16.6) and run on a pod that already has fan-in artifacts available; they can share a pod with each other but not with a training run.
+
+Before you start, you'll need **two things** ready on your laptop:
+
+1. Your GitHub username.
+2. A fine-grained GitHub PAT with `Contents: Read and write` permission on the `adamt38/STAT-4830-energy_arbitrage-project` repo. Generate it at https://github.com/settings/tokens?type=beta if you don't have one. **Treat this like a password** — do not paste it into chat, screenshots, or commits.
+
+#### Step 1 — SSH into the pod
+
+```bash
+# From your laptop. Replace <pod-id> with whatever Prime Intellect shows.
+prime pods ssh <pod-id>
+```
+
+You're now a fresh shell on the pod. Everything below runs **inside the pod**.
+
+#### Step 2 — Clone the repo and check out the Round 6 branch
+
+```bash
+cd ~
+git clone https://github.com/adamt38/STAT-4830-energy_arbitrage-project.git
+cd STAT-4830-energy_arbitrage-project
+git fetch origin
+git checkout cloud-runs-R6
+git reset --hard origin/cloud-runs-R6
+```
+
+**Critical:** you check out `cloud-runs-R6`, **not** plain `cloud-runs`. The Round 6 CLI flags (`--variance-penalty-values`, `--max-weight-values`, `--seed-override`, etc.) only exist on `cloud-runs-R6` until fan-in at the end of the round.
+
+Sanity-check the branch is right — this must print `cloud-runs-R6`:
+
+```bash
+git rev-parse --abbrev-ref HEAD
+```
+
+#### Step 3 — Install OS + Python dependencies
+
+```bash
+# OS deps (sudo password-less on Prime Intellect pods)
+sudo apt update
+sudo apt install -y curl build-essential python3-venv tmux
+
+# Python env (uv + .venv)
+export PATH="$HOME/.local/bin:$PATH"
+bash script/install.sh
+source .venv/bin/activate
+
+# scipy is required by Optuna QMCSampler but not in requirements.txt
+uv pip install scipy
+
+# yfinance is required *only* for Pod S2 (equity-domain tilt). Safe to skip
+# on S1/S4/S5 pods; installing anyway is fine and costs ~8 MB.
+uv pip install yfinance
+```
+
+Sanity-check the venv — this must print a path inside `.venv/bin/`:
+
+```bash
+which python
+```
+
+#### Step 4 — Configure git identity and GitHub credentials
+
+Required for `--git-commit-and-push` to work (all S-pod commands use this flag). If you skip this step the pipeline will still train successfully but will fail to push results at the end and you'll lose the artifacts when the pod is torn down.
+
+```bash
+# Identity — only shows up in commit metadata; any email/name is fine.
+git config --global user.email "you@example.edu"
+git config --global user.name  "Your Name"
+
+# Credentials — store the PAT so `git push` works non-interactively.
+git config --global credential.helper store
+
+# Fill in <USERNAME> and <FINE_GRAINED_PAT> inline. DO NOT quote the PAT.
+cat > ~/.git-credentials <<'EOF'
+https://<USERNAME>:<FINE_GRAINED_PAT>@github.com
+EOF
+chmod 600 ~/.git-credentials
+```
+
+Sanity-check the PAT works — this must print a SHA without prompting for a password:
+
+```bash
+git ls-remote origin HEAD
+```
+
+If it prompts for a username/password, your PAT is wrong or your credentials file has a typo — fix it now, not later.
+
+#### Step 5 — Start a tmux session
+
+**This step is non-negotiable.** If you run the pipeline directly in the SSH shell, closing your laptop lid (or any network blip) kills the run. tmux keeps the process alive on the pod.
+
+```bash
+cd ~/STAT-4830-energy_arbitrage-project
+tmux new -s r6
+```
+
+You're now inside a tmux session named `r6`. `Ctrl-b d` detaches (the run keeps going); `tmux attach -t r6` reattaches from a later SSH.
+
+#### Step 6 — Set threading and timestamp env (inside tmux)
+
+Fresh tmux sessions do **not** inherit exports from the outer shell, so these must run inside tmux. The pipeline reads threading config at process start — a pod configured wrong will train at 4× slower speeds with no warning.
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+```
+
+The numbers above assume a **16-vCPU pod** (`nproc` = 16). If your pod is a different size, adjust per the table in §3a and also change `--optuna-n-jobs` inside the pipeline command in Step 7. Quick rule: `OMP_NUM_THREADS × --optuna-n-jobs` should equal `nproc`. Check with:
+
+```bash
+nproc
+```
+
+#### Step 7 — Paste the pipeline command for **this pod's experiment**
+
+**Pick exactly one** of the blocks below based on which pod you're running. Paste the whole block into tmux. It will run for 3–6 hours depending on the experiment.
+
+| If this pod runs | Copy-paste this block |
+|---|---|
+| **S1** (full risk-aware objective sweep) | §16.2 below |
+| **S4** (multi-seed I4 robustness, 5 sequential runs) | §16.4 below |
+| **S5** (sizing-frontier grid on I4) | §16.3 below |
+| **S2** (post-hoc equity tilt, runs after S1/S5 fan-in) | §16.5 below |
+| **S3** (post-hoc PM-category spread, runs after S1/S5 fan-in) | §16.6 below |
+
+Within a few seconds of pasting you should see Optuna's progress lines like `[I 2026-04-19 ...] Trial 0 finished with value: 0.0823` streaming to the pane. If nothing prints for more than 60 seconds, something is wrong — see Step 10.
+
+#### Step 8 — Detach and close your laptop
+
+Hit `Ctrl-b d`. The tmux session now runs in the background on the pod. You can close your SSH session, close your laptop, whatever — the experiment will finish and push results to its own `cloud-runs-S<N>` branch on its own.
+
+#### Step 9 — Check on a running pod later
+
+SSH back in, then:
+
+```bash
+cd ~/STAT-4830-energy_arbitrage-project
+tmux attach -t r6
+```
+
+Inside tmux, look for lines like `Trial 180/200 finished` to gauge progress. Scroll up with `Ctrl-b [` (then `q` to exit scroll mode). `Ctrl-b d` again when you want to detach.
+
+When the run finishes you'll see the final `Training complete. Pushing to cloud-runs-S<N>...` line followed by `git push` output, then the shell prompt returns. That's the signal the pod is done — tear it down to save credits.
+
+#### Step 10 — Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `error: unable to access ... 403` on push | PAT missing `Contents: Read and write` | regenerate PAT, redo Step 4 |
+| `ModuleNotFoundError: No module named 'scipy'` | skipped Step 3 | `source .venv/bin/activate && uv pip install scipy` |
+| `ModuleNotFoundError: No module named 'yfinance'` on S2 | skipped the yfinance install | `uv pip install yfinance` |
+| `unrecognized arguments: --variance-penalty-values` (or any Round 6 flag) | wrong branch — you're on plain `cloud-runs`, not `cloud-runs-R6` | redo Step 2 with the correct branch name |
+| tmux detaches but run is gone when you reattach | ran without tmux, or the pod rebooted | restart from Step 5; any partial artifacts in `data/processed/` are safe to overwrite |
+| "Only 1/200 trials finished in 2 hours" | threading misconfigured (OMP × n_jobs ≠ nproc) | `Ctrl-c` to kill, fix `OMP_NUM_THREADS` per §3a, restart from Step 6 |
+| Pod disconnects mid-run | network blip; tmux survives it | reattach with `tmux attach -t r6`; if tmux is gone, the pod itself rebooted and you need to restart from Step 5 |
+
+**Rule of thumb:** if anything surprises you, stop the run (`Ctrl-c` inside tmux), fix it, and restart from Step 6. Partial artifacts in `data/processed/` are overwritten on the next run with the same `--artifact-prefix`, so you can't get into a corrupted state by restarting.
+
 ### 16.1. Hypothesis matrix (revised against §15.9 corrected results)
 
 | Pod | Hypothesis | Lever(s) exercised |
