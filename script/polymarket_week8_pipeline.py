@@ -7,12 +7,12 @@ import csv
 import datetime as dt
 import hashlib
 import json
+import logging
 import os
 import pathlib
-import subprocess
+import shutil
 import sys
 import time
-from dataclasses import replace
 from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -26,18 +26,19 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.baseline import (
-    _build_price_matrix,
-    _read_csv,
-    pretty_float,
-    pretty_pct,
-    run_equal_weight_baseline,
-    save_baseline_outputs,
-)
-from src.constrained_optimizer import ExperimentConfig, run_experiment_grid, run_optuna_search, split_index_for_returns
-from src.exogenous_features import build_and_save_exogenous
+from src.baseline import pretty_float, pretty_pct, run_equal_weight_baseline, save_baseline_outputs
+from src.constrained_optimizer import ExperimentConfig, run_experiment_grid, run_optuna_search
 from src.covariance_diagnostics import run_covariance_diagnostics
+from src.equity_signal import (
+    EquitySignalConfig,
+    REGIME_PENALTY_SCALES,
+    compute_risk_regime_zscore,
+    get_dynamic_concentration_params,
+    get_regime,
+)
+from src.baseline_vs_hedge_figures import figure_title_banner
 from src.polymarket_data import BuildConfig, NoMarketsAfterHistoryFilterError, build_dataset
+from src.stock_oil_hedge import StockOilHedgeConfig, run_stock_oil_hedge_experiment
 
 
 def _read_series(path: pathlib.Path) -> list[dict[str, str]]:
@@ -90,12 +91,11 @@ def _write_run_manifest(
     stage_durations_sec: dict[str, float],
     used_min_history_days: float,
     artifact_groups: dict[str, dict[str, str]],
-    extra: dict[str, Any] | None = None,
 ) -> pathlib.Path:
     processed = project_root / "data" / "processed"
     processed.mkdir(parents=True, exist_ok=True)
     manifest_path = processed / f"{artifact_prefix}_run_manifest.json"
-    payload: dict[str, Any] = {
+    payload = {
         "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "artifact_prefix": artifact_prefix,
         "config_hash": config_hash,
@@ -103,86 +103,8 @@ def _write_run_manifest(
         "stage_durations_sec": stage_durations_sec,
         "artifacts": artifact_groups,
     }
-    if extra:
-        payload.update(extra)
     manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return manifest_path
-
-
-def _git_commit_and_push(
-    project_root: pathlib.Path,
-    *,
-    remote: str,
-    branch: str,
-    message: str,
-) -> None:
-    """Stage processed outputs, commit if needed, pull --rebase, push HEAD to remote branch."""
-    if not (project_root / ".git").is_dir():
-        print("Skipping git publish: no .git directory (not a git checkout).", flush=True)
-        return
-
-    def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            ["git", *args],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-    paths_to_add: list[str] = []
-    for rel in ("data/processed", "figures", "docs"):
-        p = project_root / rel
-        if p.exists():
-            paths_to_add.append(rel)
-    if not paths_to_add:
-        print("Skipping git publish: data/processed, figures, and docs are all missing.", flush=True)
-        return
-
-    add_r = _run(["add", *paths_to_add])
-    if add_r.returncode != 0:
-        raise RuntimeError(
-            f"git add failed ({add_r.returncode}):\n{add_r.stderr or add_r.stdout}"
-        )
-
-    diff_r = _run(["diff", "--cached", "--quiet"])
-    if diff_r.returncode == 0:
-        print("Git publish: nothing new to commit; skipping pull/push.", flush=True)
-        return
-
-    commit_r = _run(["commit", "-m", message])
-    if commit_r.returncode != 0:
-        raise RuntimeError(
-            f"git commit failed ({commit_r.returncode}):\n{commit_r.stderr or commit_r.stdout}"
-        )
-
-    pull_r = _run(["pull", "--rebase", remote, branch])
-    if pull_r.returncode != 0:
-        err = (pull_r.stderr or "") + (pull_r.stdout or "")
-        if "couldn't find remote ref" in err or "could not find remote ref" in err:
-            print(
-                f"Git publish: pull --rebase skipped (remote branch {remote}/{branch!r} missing); "
-                "attempting push only.",
-                flush=True,
-            )
-        else:
-            raise RuntimeError(
-                f"git pull --rebase {remote} {branch} failed ({pull_r.returncode}):\n{err}"
-            )
-
-    push_r = _run(["push", remote, f"HEAD:{branch}"])
-    if push_r.returncode != 0:
-        raise RuntimeError(
-            f"git push {remote} HEAD:{branch} failed ({push_r.returncode}):\n"
-            f"{push_r.stderr or push_r.stdout}"
-        )
-
-    head_r = _run(["rev-parse", "--abbrev-ref", "HEAD"])
-    head_name = (head_r.stdout or "").strip() or "?"
-    print(
-        f"Git publish: committed and pushed branch {head_name!r} to {remote}/{branch}.",
-        flush=True,
-    )
 
 
 def _make_week9_diagnostics_report(
@@ -190,33 +112,26 @@ def _make_week9_diagnostics_report(
     *,
     artifact_prefix: str,
     min_history_days_used: float,
-    constrained_artifact_stem: str | None = None,
 ) -> pathlib.Path:
-    """Create a compact week 9 markdown report from latest artifacts.
-
-    ``artifact_prefix`` selects baseline, exogenous, and covariance files (e.g. ``week8``).
-    ``constrained_artifact_stem`` overrides paths for Optuna holdout outputs when using
-    ``output_artifact_suffix`` (e.g. ``week8_macro_explicit``); defaults to ``artifact_prefix``.
-    """
+    """Create a compact week 9 markdown report from latest artifacts."""
     processed = project_root / "data" / "processed"
     docs_dir = project_root / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
-    cstem = constrained_artifact_stem if constrained_artifact_stem is not None else artifact_prefix
 
     baseline_metrics = _read_json(processed / f"{artifact_prefix}_baseline_metrics.json")
-    constrained_metrics = _read_json(processed / f"{cstem}_constrained_best_metrics.json")
+    constrained_metrics = _read_json(processed / f"{artifact_prefix}_constrained_best_metrics.json")
     covariance_summary = _read_json(processed / f"{artifact_prefix}_covariance_summary.json")
     attribution_summary = _read_json(
-        processed / f"{cstem}_constrained_best_attribution_summary.json"
+        processed / f"{artifact_prefix}_constrained_best_attribution_summary.json"
     )
     market_contrib = _read_series(
-        processed / f"{cstem}_constrained_best_market_return_contributions.csv"
+        processed / f"{artifact_prefix}_constrained_best_market_return_contributions.csv"
     )
     domain_contrib = _read_series(
-        processed / f"{cstem}_constrained_best_domain_return_contributions.csv"
+        processed / f"{artifact_prefix}_constrained_best_domain_return_contributions.csv"
     )
     corr_pairs = _read_series(
-        processed / f"{cstem}_constrained_best_top_market_correlation_pairs.csv"
+        processed / f"{artifact_prefix}_constrained_best_top_market_correlation_pairs.csv"
     )
     baseline_ts = _read_series(processed / f"{artifact_prefix}_baseline_timeseries.csv")
 
@@ -271,84 +186,11 @@ def _make_week9_diagnostics_report(
     constrained_dd = _to_float(best_params.get("holdout_max_drawdown", 0.0))
     dd_delta = constrained_dd - baseline_holdout_max_dd
 
-    def _max_dd_masked(returns: np.ndarray) -> float:
-        if returns.size == 0:
-            return 0.0
-        c = np.cumprod(1.0 + returns)
-        peak = np.maximum.accumulate(c)
-        dd = c / np.clip(peak, 1e-8, None) - 1.0
-        return float(np.min(dd))
-
-    exog_path = processed / f"{artifact_prefix}_exogenous_features.csv"
-    open_closed_section: list[str] = []
-    if exog_path.exists() and holdout_steps_total > 0:
-        exog_rows = _read_series(exog_path)
-        exog_holdout = exog_rows[-holdout_steps_total:]
-        constrained_ts_path = processed / f"{cstem}_constrained_best_timeseries.csv"
-        constrained_hold = _read_series(constrained_ts_path) if constrained_ts_path.exists() else []
-        ch_rets = np.array([float(r["portfolio_return"]) for r in constrained_hold], dtype=float)
-        if (
-            len(exog_holdout) == len(baseline_holdout_rows)
-            and ch_rets.size == baseline_holdout_rets.size
-            and baseline_holdout_rets.size > 0
-        ):
-            open_flags = np.array(
-                [_to_int(r.get("is_equity_open", 0), default=0) for r in exog_holdout],
-                dtype=int,
-            )
-            stale_flags = np.array(
-                [_to_int(r.get("exog_is_stale", 1), default=1) for r in exog_holdout],
-                dtype=int,
-            )
-            open_m = open_flags == 1
-            closed_m = open_flags == 0
-            pct_open = 100.0 * float(np.mean(open_flags))
-            pct_stale = 100.0 * float(np.mean(stale_flags))
-            bl_open = baseline_holdout_rets[open_m]
-            bl_closed = baseline_holdout_rets[closed_m]
-            ch_open = ch_rets[open_m]
-            ch_closed = ch_rets[closed_m]
-            open_closed_section = [
-                "",
-                "## Holdout — US equity session vs closed (exogenous mask)",
-                "",
-                "Subset metrics use chronological holdout steps where `is_equity_open` is 1 "
-                "(NYSE regular hours, Mon–Fri 09:30–16:00 ET; exchange holidays are not excluded). "
-                "Max drawdown on each subset uses cumulative wealth `cumprod(1+r)` over **only** those steps "
-                "(gapped timeline, not calendar-interpolated).",
-                "",
-                f"- Holdout steps with equity open: `{pct_open:.1f}%`",
-                f"- Holdout steps marked exog-stale: `{pct_stale:.1f}%`",
-                "",
-                "| Subset | Metric | Baseline | Constrained |",
-                "|--------|--------|----------|-------------|",
-                f"| Open | Sortino | {_sortino_np(bl_open):.4f} | {_sortino_np(ch_open):.4f} |",
-                f"| Open | Mean return | {float(np.mean(bl_open)) if bl_open.size else 0.0:.8f} | "
-                f"{float(np.mean(ch_open)) if ch_open.size else 0.0:.8f} |",
-                f"| Open | Volatility | {float(np.std(bl_open)) if bl_open.size else 0.0:.8f} | "
-                f"{float(np.std(ch_open)) if ch_open.size else 0.0:.8f} |",
-                f"| Open | Max drawdown (subset) | {_max_dd_masked(bl_open):.4%} | {_max_dd_masked(ch_open):.4%} |",
-                f"| Closed | Sortino | {_sortino_np(bl_closed):.4f} | {_sortino_np(ch_closed):.4f} |",
-                f"| Closed | Mean return | {float(np.mean(bl_closed)) if bl_closed.size else 0.0:.8f} | "
-                f"{float(np.mean(ch_closed)) if ch_closed.size else 0.0:.8f} |",
-                f"| Closed | Volatility | {float(np.std(bl_closed)) if bl_closed.size else 0.0:.8f} | "
-                f"{float(np.std(ch_closed)) if ch_closed.size else 0.0:.8f} |",
-                f"| Closed | Max drawdown (subset) | {_max_dd_masked(bl_closed):.4%} | {_max_dd_masked(ch_closed):.4%} |",
-            ]
-        else:
-            open_closed_section = [
-                "",
-                "## Holdout — US equity session vs closed",
-                "",
-                "*Skipped: exogenous holdout row count, baseline holdout, or constrained timeseries length mismatch.*",
-            ]
-
     lines = [
         "# Week 9 Diagnostics Report",
         "",
         "## Run Context",
         f"- artifact prefix: `{artifact_prefix}`",
-        f"- constrained artifact stem: `{cstem}`",
         f"- min history days used after backoff: `{min_history_days_used}`",
         f"- market count: `{_to_int(baseline_metrics.get('market_count', 0), default=0)}`",
         f"- tuning steps: `{_to_int(split_info.get('tuning_steps', 0), default=0)}`",
@@ -365,7 +207,6 @@ def _make_week9_diagnostics_report(
         f"| Max drawdown | {baseline_holdout_max_dd:.4%} | {constrained_dd:.4%} | {dd_delta:+.4%} |",
         f"| Mean return | {float(np.mean(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0:.8f} | {_to_float(best_params.get('holdout_mean_return', 0.0)):.8f} | {_to_float(best_params.get('holdout_mean_return', 0.0)) - (float(np.mean(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0):+.8f} |",
         f"| Volatility | {float(np.std(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0:.8f} | {_to_float(best_params.get('holdout_volatility', 0.0)):.8f} | {_to_float(best_params.get('holdout_volatility', 0.0)) - (float(np.std(baseline_holdout_rets)) if baseline_holdout_rets.size else 0.0):+.8f} |",
-        *open_closed_section,
         "",
         "## Full-Series Baseline Reference",
         f"- baseline sortino (full): `{_to_float(baseline_metrics.get('sortino_ratio', 0.0)):.4f}`",
@@ -447,7 +288,7 @@ def _make_week9_diagnostics_report(
         ]
     )
 
-    report_path = docs_dir / "week9_diagnostics_report.md"
+    report_path = docs_dir / f"{artifact_prefix}_diagnostics_report.md"
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_path
 
@@ -475,47 +316,30 @@ def _build_dataset_with_history_backoff(
     raise RuntimeError("Dataset build failed without a captured error.")
 
 
-def _load_cached_dataset_artifacts(
-    project_root: pathlib.Path,
-    *,
-    artifact_prefix: str,
-) -> dict[str, pathlib.Path]:
-    """Return required cached dataset artifacts if they all exist."""
-    processed = project_root / "data" / "processed"
-    raw = project_root / "data" / "raw"
-    artifacts = {
-        "events_raw": raw / f"{artifact_prefix}_events_raw.json",
-        "markets_filtered": processed / f"{artifact_prefix}_markets_filtered.csv",
-        "price_history": processed / f"{artifact_prefix}_price_history.csv",
-        "data_quality": processed / f"{artifact_prefix}_data_quality.json",
-        "category_liquidity": processed / f"{artifact_prefix}_category_liquidity.csv",
-        "considered_domains": processed / f"{artifact_prefix}_considered_domains.json",
-    }
-    missing = [str(path) for path in artifacts.values() if not path.exists()]
-    if missing:
-        raise RuntimeError(
-            "Cached dataset fallback requested, but required artifacts are missing: "
-            + ", ".join(missing)
-        )
-    markets_rows = _read_series(artifacts["markets_filtered"])
-    price_rows = _read_series(artifacts["price_history"])
-    if not markets_rows or not price_rows:
-        raise RuntimeError(
-            "Cached dataset artifacts exist but are empty. "
-            "A previous failed fetch likely overwrote week8 processed files."
-        )
-    return artifacts
+def _clone_processed_artifacts(processed: pathlib.Path, src_prefix: str, dst_prefix: str) -> int:
+    """Copy ``{src_prefix}_*`` files in processed/ to ``{dst_prefix}_*`` (same suffix)."""
+    n = 0
+    for path in sorted(processed.glob(f"{src_prefix}_*")):
+        if not path.is_file():
+            continue
+        suffix = path.name[len(f"{src_prefix}_") :]
+        dest = processed / f"{dst_prefix}_{suffix}"
+        shutil.copy2(path, dest)
+        n += 1
+    return n
 
 
-def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
+def _make_figures(project_root: pathlib.Path, *, artifact_prefix: str) -> dict[str, pathlib.Path]:
     processed = project_root / "data" / "processed"
     figures_dir = project_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    baseline_series = _read_series(processed / "week8_baseline_timeseries.csv")
-    constrained_series = _read_series(processed / "week8_constrained_best_timeseries.csv")
+    title_banner = figure_title_banner(artifact_prefix)
+
+    baseline_series = _read_series(processed / f"{artifact_prefix}_baseline_timeseries.csv")
+    constrained_series = _read_series(processed / f"{artifact_prefix}_constrained_best_timeseries.csv")
     if constrained_series:
-        # Align baseline and constrained plots to the same holdout horizon.
+        # Align baseline and equity-hedge portfolio plots to the same holdout horizon.
         baseline_series = baseline_series[-len(constrained_series) :]
 
     baseline_ret = [float(row["portfolio_return"]) for row in baseline_series]
@@ -535,29 +359,31 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
 
     fig_equity, ax_equity = plt.subplots()
     ax_equity.plot(baseline_cum, label="Equal-weight baseline")
-    ax_equity.plot(constrained_cum, label="Constrained OGD/SGD")
-    ax_equity.set_title("Portfolio Cumulative Return")
+    ax_equity.plot(constrained_cum, label="Equity hedge portfolio")
+    ax_equity.set_title(f"{title_banner}Portfolio cumulative return vs baseline")
     ax_equity.set_xlabel("Step")
     ax_equity.set_ylabel("Growth of $1")
     ax_equity.legend()
-    equity_path = figures_dir / "week8_iteration_equity_curve_comparison.png"
+    equity_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_equity_curve_comparison.png"
     fig_equity.savefig(equity_path, dpi=120)
     plt.close(fig_equity)
 
     fig_dd, ax_dd = plt.subplots()
     ax_dd.plot(baseline_dd, label="Equal-weight baseline")
-    ax_dd.plot(constrained_dd, label="Constrained OGD/SGD")
-    ax_dd.set_title("Portfolio Drawdown")
+    ax_dd.plot(constrained_dd, label="Equity hedge portfolio")
+    ax_dd.set_title(f"{title_banner}Portfolio drawdown vs baseline")
     ax_dd.set_xlabel("Step")
     ax_dd.set_ylabel("Drawdown")
     ax_dd.legend()
-    dd_path = figures_dir / "week8_iteration_drawdown_comparison.png"
+    dd_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_drawdown_comparison.png"
     fig_dd.savefig(dd_path, dpi=120)
     plt.close(fig_dd)
 
-    with (processed / "week8_baseline_metrics.json").open("r", encoding="utf-8") as handle:
+    with (processed / f"{artifact_prefix}_baseline_metrics.json").open("r", encoding="utf-8") as handle:
         baseline_metrics = json.load(handle)
-    with (processed / "week8_constrained_best_metrics.json").open("r", encoding="utf-8") as handle:
+    with (processed / f"{artifact_prefix}_constrained_best_metrics.json").open(
+        "r", encoding="utf-8"
+    ) as handle:
         constrained_metrics = json.load(handle)
 
     baseline_exp = baseline_metrics.get("exposure_by_domain", {})
@@ -567,20 +393,25 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
         {
             "category": domain,
             "baseline_exposure": float(baseline_exp.get(domain, 0.0)),
-            "constrained_exposure": float(constrained_exp.get(domain, 0.0)),
+            "equity_hedge_portfolio_exposure": float(constrained_exp.get(domain, 0.0)),
             "delta_exposure": float(constrained_exp.get(domain, 0.0)) - float(baseline_exp.get(domain, 0.0)),
         }
         for domain in all_domains
     ]
-    exposure_table_path = processed / "week8_category_exposure_table.csv"
+    exposure_table_path = processed / f"{artifact_prefix}_category_exposure_table.csv"
     with exposure_table_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=["category", "baseline_exposure", "constrained_exposure", "delta_exposure"],
+            fieldnames=[
+                "category",
+                "baseline_exposure",
+                "equity_hedge_portfolio_exposure",
+                "delta_exposure",
+            ],
         )
         writer.writeheader()
         writer.writerows(
-            sorted(exposure_rows, key=lambda row: row["constrained_exposure"], reverse=True)
+            sorted(exposure_rows, key=lambda row: row["equity_hedge_portfolio_exposure"], reverse=True)
         )
 
     # Use top categories so the chart remains readable.
@@ -589,7 +420,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
         row["category"]
         for row in sorted(
             exposure_rows,
-            key=lambda row: max(row["baseline_exposure"], row["constrained_exposure"]),
+            key=lambda row: max(row["baseline_exposure"], row["equity_hedge_portfolio_exposure"]),
             reverse=True,
         )[:top_n]
     ]
@@ -599,14 +430,16 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     x = range(len(ranked_domains))
     width = 0.4
     fig_exp, ax_exp = plt.subplots(figsize=(13, 5))
-    ax_exp.bar([i - width / 2 for i in x], baseline_vals, width=width, label="Baseline")
-    ax_exp.bar([i + width / 2 for i in x], constrained_vals, width=width, label="Constrained")
-    ax_exp.set_title("Category Exposure Comparison")
+    ax_exp.bar([i - width / 2 for i in x], baseline_vals, width=width, label="Baseline (1/K per category)")
+    ax_exp.bar([i + width / 2 for i in x], constrained_vals, width=width, label="Equity hedge portfolio")
+    ax_exp.set_title(
+        f"{title_banner}Category exposure: baseline vs optimized equity hedge portfolio"
+    )
     ax_exp.set_ylabel("Portfolio Weight")
     ax_exp.set_xticks(list(x))
     ax_exp.set_xticklabels(ranked_domains, rotation=35, ha="right")
     ax_exp.legend()
-    exposure_path = figures_dir / "week8_iteration_category_exposure_comparison.png"
+    exposure_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_category_exposure_comparison.png"
     fig_exp.tight_layout()
     fig_exp.savefig(exposure_path, dpi=120)
     plt.close(fig_exp)
@@ -630,13 +463,13 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     constrained_roll = _rolling_mean(constrained_ret, rolling_window)
     fig_roll, ax_roll = plt.subplots()
     ax_roll.plot(baseline_roll, label="Baseline", linewidth=2.0)
-    ax_roll.plot(constrained_roll, label="Constrained", linewidth=2.0)
+    ax_roll.plot(constrained_roll, label="Equity hedge portfolio", linewidth=2.0)
     ax_roll.axhline(0.0, linestyle="--", linewidth=1.0, color="gray")
-    ax_roll.set_title("Rolling Mean Step Return (Holdout)")
+    ax_roll.set_title(f"{title_banner}Rolling mean step return (holdout)")
     ax_roll.set_xlabel("Step")
     ax_roll.set_ylabel("Mean Return")
     ax_roll.legend()
-    rolling_path = figures_dir / "week8_iteration_rolling_mean_return_comparison.png"
+    rolling_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_rolling_mean_return_comparison.png"
     fig_roll.tight_layout()
     fig_roll.savefig(rolling_path, dpi=120)
     plt.close(fig_roll)
@@ -644,14 +477,14 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     # Return distribution comparison for risk shape.
     fig_hist, ax_hist = plt.subplots()
     ax_hist.hist(baseline_ret, bins=60, alpha=0.5, label="Baseline")
-    ax_hist.hist(constrained_ret, bins=60, alpha=0.5, label="Constrained")
+    ax_hist.hist(constrained_ret, bins=60, alpha=0.5, label="Equity hedge portfolio")
     ax_hist.axvline(float(np.mean(baseline_ret)), linestyle="--", linewidth=1.0, color="tab:blue")
     ax_hist.axvline(float(np.mean(constrained_ret)), linestyle="--", linewidth=1.0, color="tab:orange")
-    ax_hist.set_title("Step Return Distribution (Holdout)")
+    ax_hist.set_title(f"{title_banner}Step return distribution (holdout)")
     ax_hist.set_xlabel("Step Return")
     ax_hist.set_ylabel("Frequency")
     ax_hist.legend()
-    hist_path = figures_dir / "week8_iteration_return_distribution_comparison.png"
+    hist_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_return_distribution_comparison.png"
     fig_hist.tight_layout()
     fig_hist.savefig(hist_path, dpi=120)
     plt.close(fig_hist)
@@ -666,9 +499,9 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_delta.axhline(0.0, linestyle="--", linewidth=1.0, color="gray")
     ax_delta.set_xticks(list(range(len(exp_labels))))
     ax_delta.set_xticklabels(exp_labels, rotation=35, ha="right")
-    ax_delta.set_title("Top Category Exposure Deltas (Constrained - Baseline)")
+    ax_delta.set_title(f"{title_banner}Top category exposure deltas (hedge portfolio − baseline)")
     ax_delta.set_ylabel("Delta Weight")
-    exposure_delta_path = figures_dir / "week8_iteration_top_exposure_deltas.png"
+    exposure_delta_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_top_exposure_deltas.png"
     fig_delta.tight_layout()
     fig_delta.savefig(exposure_delta_path, dpi=120)
     plt.close(fig_delta)
@@ -680,12 +513,12 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     constrained_vol = float(constrained_metrics.get("best_params", {}).get("holdout_volatility", 0.0))
     fig_scatter, ax_scatter = plt.subplots()
     ax_scatter.scatter([baseline_vol], [baseline_mean], s=130, label="Baseline")
-    ax_scatter.scatter([constrained_vol], [constrained_mean], s=130, label="Constrained (holdout)")
-    ax_scatter.set_title("Risk-Return Snapshot")
+    ax_scatter.scatter([constrained_vol], [constrained_mean], s=130, label="Equity hedge portfolio (holdout)")
+    ax_scatter.set_title(f"{title_banner}Risk–return snapshot (holdout)")
     ax_scatter.set_xlabel("Volatility")
     ax_scatter.set_ylabel("Mean Step Return")
     ax_scatter.legend()
-    risk_return_path = figures_dir / "week8_iteration_risk_return_snapshot.png"
+    risk_return_path = figures_dir / f"{artifact_prefix}_equity_hedge_portfolio_risk_return_snapshot.png"
     fig_scatter.tight_layout()
     fig_scatter.savefig(risk_return_path, dpi=120)
     plt.close(fig_scatter)
@@ -703,75 +536,57 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Week 8 Polymarket pipeline (data → baseline → exog → Optuna → report).")
+    project_root = REPO_ROOT
+    run_started = time.perf_counter()
+
+    parser = argparse.ArgumentParser(description="Polymarket constrained optimizer pipeline.")
     parser.add_argument(
-        "--macro-integration",
-        choices=("rescale", "explicit", "both"),
-        default="rescale",
-        help="Macro objective path for Optuna (default rescale = legacy m_risk + uniform_mix bumps).",
+        "--artifact-prefix",
+        default="week11",
+        help="Prefix for processed artifacts and figures (default: week11 for Week 11 run).",
     )
     parser.add_argument(
-        "--macro-modes",
+        "--clone-from-prefix",
         default=None,
-        help="Comma-separated macro modes (rescale,explicit,both). Runs Optuna once per mode with "
-        "output_artifact_suffix _macro_<mode> (none for rescale) so files do not overwrite.",
+        help="Copy data/processed/{src}_* to {artifact-prefix}_* then continue (reuse prior build).",
     )
     parser.add_argument(
-        "--optuna-artifact-suffix",
-        default=None,
-        help="Suffix appended to week8 for constrained outputs (default: empty for rescale, else _macro_<mode>).",
-    )
-    parser.add_argument(
-        "--joint-macro-mode-search",
+        "--skip-data-build",
         action="store_true",
-        help="Single Optuna study with categorical macro_mode and conditional regime_k / lambda_macro_explicit.",
+        help="Skip API/data build; requires existing {artifact-prefix}_markets_filtered.csv (or clone first).",
     )
     parser.add_argument(
-        "--etf-tracking",
+        "--quick",
         action="store_true",
-        help="Penalize deviation of rolling-window portfolio returns from equal-weight SPY/QQQ/XLE/TLT/BTC log returns "
-        "(from exogenous_features CSV). Optuna searches lambda_etf_tracking.",
+        help="Run only 5 Optuna trials (sanity / fast iteration).",
     )
     parser.add_argument(
         "--optuna-trials",
         type=int,
         default=None,
-        help="Override Optuna trial count (default 100, or 5 when QUICK_SANITY_CHECK is True).",
+        metavar="N",
+        help="Optuna trial count (overrides --quick when set). Default: 5 with --quick else 100.",
     )
     parser.add_argument(
-        "--optuna-n-jobs",
-        type=int,
-        default=1,
-        help="Parallel Optuna trials (passed to study.optimize n_jobs). Use 1 for sequential (default). "
-        "Use -1 for auto (cpu_count). On many-core pods, try 16–32 with OMP_NUM_THREADS=1 TORCH_NUM_THREADS=1.",
-    )
-    parser.add_argument(
-        "--git-commit-and-push",
+        "--skip-stock-oil-hedge",
         action="store_true",
-        help="After a successful run: git add data/processed figures docs, commit, "
-        "git pull --rebase <remote> <branch>, git push <remote> HEAD:<branch>. "
-        "Requires git credentials (SSH key or token) and a normal checkout on the machine.",
+        help="Skip PM+stock/oil hedge timeseries (use when offline or Stooq/yfinance unavailable).",
     )
     parser.add_argument(
-        "--git-remote",
-        default="origin",
-        help="Remote for --git-commit-and-push (default: origin).",
-    )
-    parser.add_argument(
-        "--git-push-branch",
-        default="cloud-runs",
-        help="Branch for pull --rebase and push HEAD:<branch> (default: cloud-runs).",
-    )
-    parser.add_argument(
-        "--git-commit-message",
-        default=None,
-        metavar="MSG",
-        help="Commit message for --git-commit-and-push. Default: timestamped auto message.",
+        "--constant-hedge-blend",
+        action="store_true",
+        help="Use fixed hedge_allocation every bar instead of VIX regime capital split (Architecture 1).",
     )
     args = parser.parse_args()
+    if not logging.root.handlers:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    artifact_prefix = args.artifact_prefix
+    processed_dir = project_root / "data" / "processed"
+    processed_dir.mkdir(parents=True, exist_ok=True)
 
-    project_root = REPO_ROOT
-    run_started = time.perf_counter()
+    if args.clone_from_prefix:
+        n_copied = _clone_processed_artifacts(processed_dir, args.clone_from_prefix, artifact_prefix)
+        print(f"Cloned {n_copied} processed files: {args.clone_from_prefix}_* → {artifact_prefix}_*")
 
     base_build_config = BuildConfig(
         max_events=1000,
@@ -792,7 +607,7 @@ def main() -> None:
             "pre-market",
             "rewards-20-4pt5-50",
         ),
-        artifact_prefix="week8",
+        artifact_prefix=artifact_prefix,
         history_interval="max",
         history_fidelity=10,
         use_cached_events_if_available=True,
@@ -801,7 +616,12 @@ def main() -> None:
     )
     # ── Toggle: set QUICK_SANITY_CHECK = False for the full Optuna run ──
     QUICK_SANITY_CHECK = False
-    OPTUNA_N_TRIALS = 5 if QUICK_SANITY_CHECK else 100
+    if args.optuna_trials is not None:
+        OPTUNA_N_TRIALS = max(1, int(args.optuna_trials))
+    elif QUICK_SANITY_CHECK or args.quick:
+        OPTUNA_N_TRIALS = 5
+    else:
+        OPTUNA_N_TRIALS = 100
 
     # With 10-min data we have ~6× more time steps; scale walk-forward so fold count stays similar
     if base_build_config.history_fidelity <= 10:
@@ -811,18 +631,63 @@ def main() -> None:
         walkforward_train_steps = 240
         walkforward_test_steps = 48
 
+    regime, vix_value = get_regime(EquitySignalConfig())
+    regime_scales = REGIME_PENALTY_SCALES[regime]
+
+    def _stage_banner(name: str) -> None:
+        elapsed_total = time.perf_counter() - run_started
+        print(f"\n{'#'*60}", flush=True)
+        print(f"  PIPELINE STAGE: {name}", flush=True)
+        print(f"  (total elapsed: {elapsed_total / 60:.1f}m)", flush=True)
+        print(f"{'#'*60}\n", flush=True)
+
+    used_min_history_days = 24.0
+    data_artifacts: dict[str, pathlib.Path] = {}
+    if args.skip_data_build:
+        markets_path = processed_dir / f"{artifact_prefix}_markets_filtered.csv"
+        if not markets_path.is_file():
+            raise SystemExit(
+                f"Missing {markets_path}. Run without --skip-data-build or use --clone-from-prefix."
+            )
+        manifest_try = processed_dir / f"{artifact_prefix}_run_manifest.json"
+        if manifest_try.is_file():
+            try:
+                used_min_history_days = float(
+                    _read_json(manifest_try).get("min_history_days_used", used_min_history_days)
+                )
+            except (TypeError, ValueError, KeyError):
+                pass
+        print("Skipping data build (--skip-data-build).")
+        data_sec = 0.0
+    else:
+        _stage_banner("Data Build")
+        stage_started = time.perf_counter()
+        data_artifacts, used_min_history_days = _build_dataset_with_history_backoff(
+            project_root=project_root,
+            base_config=base_build_config,
+            history_day_candidates=(24.0,),
+        )
+        data_sec = time.perf_counter() - stage_started
+        print(f"Data build complete in {data_sec / 60:.1f}m")
+        print(f"- min_history_days_used: {used_min_history_days}")
+        for key, value in data_artifacts.items():
+            print(f"- {key}: {value}")
+
     experiment_config = ExperimentConfig(
         learning_rates=(0.005, 0.01, 0.02, 0.05, 0.1, 0.2),
         penalties_lambda=(0.25, 0.5, 1.0, 2.0),
         rolling_windows=(24, 48, 96, 144, 288),
         steps_per_window=5,
-        objective="mean_downside",
+        objective="excess_mean_downside",
         variance_penalty=1.0,
         downside_penalty=2.0,
         variance_penalties=(0.5, 1.0, 2.0),
         downside_penalties=(1.0, 2.0, 3.0),
+        enable_equity_signal=True,
+        equity_signal_lambda=0.0,
+        equity_signal_lambdas=(),
+        equity_signal_mapping_csv=None,
         optimizer_type="adam",
-        weight_parameterization="projected_simplex",  # switch to "projected_simplex" to enable PGD-style updates
         evaluation_modes=("online",),
         primary_evaluation_mode="online",
         enable_two_stage_search=False,
@@ -842,54 +707,65 @@ def main() -> None:
         walkforward_train_steps=walkforward_train_steps,
         walkforward_test_steps=walkforward_test_steps,
         seed=7,
-        optuna_n_jobs=args.optuna_n_jobs,
     )
-    macro_modes_list = (
-        [x.strip() for x in args.macro_modes.split(",") if x.strip()] if args.macro_modes else []
+    experiment_config = ExperimentConfig(
+        **{
+            **experiment_config.__dict__,
+            "variance_penalty": float(regime_scales["variance_penalty"]),
+            "downside_penalty": float(regime_scales["downside_penalty"]),
+            "max_domain_exposure_threshold": float(regime_scales["max_domain_exposure_threshold"]),
+        }
     )
-    for m in macro_modes_list:
-        if m not in ("rescale", "explicit", "both"):
-            raise SystemExit(f"Invalid --macro-modes entry {m!r}; expected rescale, explicit, or both.")
-    if args.joint_macro_mode_search and macro_modes_list:
-        raise SystemExit("Use either --joint-macro-mode-search or --macro-modes, not both.")
-    if not macro_modes_list and not args.joint_macro_mode_search:
-        experiment_config = replace(experiment_config, macro_integration=args.macro_integration)
-    if args.etf_tracking:
-        experiment_config = replace(experiment_config, use_etf_tracking=True)
+    risk_score = compute_risk_regime_zscore()
+    dyn_conc = get_dynamic_concentration_params(risk_score)
+    merged_conc_lambdas = tuple(
+        sorted(set(experiment_config.concentration_penalty_lambdas) | {dyn_conc["concentration_penalty_lambda"]})
+    )
+    experiment_config = ExperimentConfig(
+        **{
+            **experiment_config.__dict__,
+            "max_domain_exposure_threshold": float(dyn_conc["max_domain_exposure_threshold"]),
+            "concentration_penalty_lambdas": merged_conc_lambdas,
+        }
+    )
+    print(
+        "Regime-adaptive config:"
+        f" regime={regime.value}, vix={f'{vix_value:.2f}' if vix_value is not None else 'n/a'},"
+        f" variance_penalty={experiment_config.variance_penalty:.2f},"
+        f" downside_penalty={experiment_config.downside_penalty:.2f}"
+    )
+    print(
+        "ETF risk-regime concentration:"
+        f" risk_score={risk_score:.4f},"
+        f" max_domain_exposure_threshold={experiment_config.max_domain_exposure_threshold:.2f},"
+        f" concentration_penalty_lambdas={experiment_config.concentration_penalty_lambdas}"
+    )
     config_hash = _config_hash(base_build_config, experiment_config)
 
-    def _stage_banner(name: str) -> None:
-        elapsed_total = time.perf_counter() - run_started
-        print(f"\n{'#'*60}", flush=True)
-        print(f"  PIPELINE STAGE: {name}", flush=True)
-        print(f"  (total elapsed: {elapsed_total / 60:.1f}m)", flush=True)
-        print(f"{'#'*60}\n", flush=True)
-
-    _stage_banner("Data Build")
-    stage_started = time.perf_counter()
-    try:
-        data_artifacts, used_min_history_days = _build_dataset_with_history_backoff(
-            project_root=project_root,
-            base_config=base_build_config,
-            history_day_candidates=(24.0, 18.0, 12.0, 7.0),
-        )
-    except NoMarketsAfterHistoryFilterError as exc:
-        print(f"Data build failed ({exc}); falling back to cached processed dataset.")
-        data_artifacts = _load_cached_dataset_artifacts(
-            project_root=project_root,
-            artifact_prefix=base_build_config.artifact_prefix,
-        )
-        used_min_history_days = base_build_config.min_history_days
-    data_sec = time.perf_counter() - stage_started
-    print(f"Data build complete in {data_sec / 60:.1f}m")
-    print(f"- min_history_days_used: {used_min_history_days}")
-    for key, value in data_artifacts.items():
-        print(f"- {key}: {value}")
+    equity_regime_path = processed_dir / f"{artifact_prefix}_pipeline_equity_regime.json"
+    equity_regime_path.write_text(
+        json.dumps(
+            {
+                "regime": regime.value,
+                "vix_value": vix_value,
+                "applied_scales": regime_scales,
+                "risk_regime_zscore": risk_score,
+                "dynamic_concentration": dyn_conc,
+                "merged_concentration_penalty_lambdas": list(merged_conc_lambdas),
+            },
+            indent=2,
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    print(f"- equity_regime_summary: {equity_regime_path}")
 
     _stage_banner("Equal-Weight Baseline")
     stage_started = time.perf_counter()
-    baseline_result = run_equal_weight_baseline(project_root, artifact_prefix="week8")
-    baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix="week8")
+    baseline_result = run_equal_weight_baseline(project_root, artifact_prefix=artifact_prefix)
+    baseline_artifacts = save_baseline_outputs(
+        project_root, baseline_result, artifact_prefix=artifact_prefix
+    )
     baseline_sec = time.perf_counter() - stage_started
     print(f"Baseline complete in {baseline_sec:.1f}s")
     print(f"- markets: {baseline_result.market_count}")
@@ -898,97 +774,48 @@ def main() -> None:
     for key, value in baseline_artifacts.items():
         print(f"- {key}: {value}")
 
-    _stage_banner("Exogenous Yahoo features")
+    _stage_banner(f"Optuna Bayesian Search ({OPTUNA_N_TRIALS} trials)")
     stage_started = time.perf_counter()
-    exogenous_artifacts: dict[str, pathlib.Path] = {}
-    ap = "week8"
-    markets_p = project_root / "data" / "processed" / f"{ap}_markets_filtered.csv"
-    history_p = project_root / "data" / "processed" / f"{ap}_price_history.csv"
-    baseline_ts_p = project_root / "data" / "processed" / f"{ap}_baseline_timeseries.csv"
-    ts_values, _, _ = _build_price_matrix(_read_csv(markets_p), _read_csv(history_p))
-    if len(ts_values) >= 2:
-        step_ts = ts_values[1:]
-        baseline_rows = _read_series(baseline_ts_p)
-        baseline_ts_list = [_to_int(row.get("timestamp"), default=-1) for row in baseline_rows]
-        if baseline_ts_list != step_ts:
-            raise RuntimeError(
-                "Exogenous step timestamps must match baseline_timeseries exactly (order and values)."
-            )
-        split_idx_exog = split_index_for_returns(len(step_ts), experiment_config)
-        csv_p, json_p = build_and_save_exogenous(
-            project_root,
-            ap,
-            step_ts,
-            split_idx_exog,
-            baseline_timestamps=baseline_ts_list,
-        )
-        exogenous_artifacts = {"exogenous_features": csv_p, "exogenous_quality": json_p}
-    exogenous_sec = time.perf_counter() - stage_started
-    print(f"Exogenous features complete in {exogenous_sec:.1f}s")
-    for key, value in exogenous_artifacts.items():
-        print(f"- {key}: {value}")
-
-    n_trials_opt = args.optuna_trials if args.optuna_trials is not None else OPTUNA_N_TRIALS
-    _stage_banner(f"Optuna quasi-random search ({n_trials_opt} trials, QMCSampler)")
-    stage_started = time.perf_counter()
-    manifest_constrained_flat: dict[str, str] = {}
-    last_optuna_suffix = ""
-    constrained_artifacts: dict[str, pathlib.Path] = {}
-
-    if macro_modes_list:
-        constrained_sec_total = 0.0
-        for m in macro_modes_list:
-            suf = "" if m == "rescale" else f"_macro_{m}"
-            cfg_m = replace(experiment_config, macro_integration=m)
-            t0 = time.perf_counter()
-            arts = run_optuna_search(
-                project_root,
-                artifact_prefix="week8",
-                config=cfg_m,
-                n_trials=n_trials_opt,
-                joint_macro_mode_search=False,
-                output_artifact_suffix=suf,
-            )
-            constrained_sec_total += time.perf_counter() - t0
-            for k, v in arts.items():
-                manifest_constrained_flat[f"{m}__{k}"] = str(v)
-            constrained_artifacts = arts
-            last_optuna_suffix = suf
-        constrained_sec = constrained_sec_total
-    else:
-        suf_single = args.optuna_artifact_suffix
-        if suf_single is None:
-            suf_single = (
-                ""
-                if (args.joint_macro_mode_search or args.macro_integration == "rescale")
-                else f"_macro_{args.macro_integration}"
-            )
-        constrained_artifacts = run_optuna_search(
-            project_root,
-            artifact_prefix="week8",
-            config=experiment_config,
-            n_trials=n_trials_opt,
-            joint_macro_mode_search=args.joint_macro_mode_search,
-            output_artifact_suffix=suf_single,
-        )
-        constrained_sec = time.perf_counter() - stage_started
-        manifest_constrained_flat = {k: str(v) for k, v in constrained_artifacts.items()}
-        last_optuna_suffix = suf_single
+    constrained_artifacts = run_optuna_search(
+        project_root,
+        artifact_prefix=artifact_prefix,
+        config=experiment_config,
+        n_trials=OPTUNA_N_TRIALS,
+    )
+    constrained_sec = time.perf_counter() - stage_started
     print(f"\nOptuna search complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
     for key, value in constrained_artifacts.items():
         print(f"- {key}: {value}")
 
     _stage_banner("Covariance Diagnostics")
     stage_started = time.perf_counter()
-    covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix="week8")
+    covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix=artifact_prefix)
     covariance_sec = time.perf_counter() - stage_started
     print(f"Covariance diagnostics complete in {covariance_sec:.1f}s")
     for key, value in covariance_artifacts.items():
         print(f"- {key}: {value}")
 
+    stock_oil_artifacts: dict[str, pathlib.Path] = {}
+    stock_oil_sec = 0.0
+    if not args.skip_stock_oil_hedge:
+        _stage_banner("Architecture 1: VIX regime PM vs stock/oil hedge split")
+        stage_started = time.perf_counter()
+        hedge_cfg = StockOilHedgeConfig(
+            regime_switching_pm_hedge_split=not args.constant_hedge_blend,
+        )
+        stock_oil_artifacts = run_stock_oil_hedge_experiment(
+            project_root,
+            artifact_prefix=artifact_prefix,
+            config=hedge_cfg,
+        )
+        stock_oil_sec = time.perf_counter() - stage_started
+        print(f"Stock/oil hedge series complete in {stock_oil_sec:.1f}s")
+        for key, value in stock_oil_artifacts.items():
+            print(f"- {key}: {value}")
+
     _stage_banner("Figure Generation")
     stage_started = time.perf_counter()
-    figure_artifacts = _make_figures(project_root)
+    figure_artifacts = _make_figures(project_root, artifact_prefix=artifact_prefix)
     figures_sec = time.perf_counter() - stage_started
     print(f"Figures complete in {figures_sec:.1f}s")
     for key, value in figure_artifacts.items():
@@ -996,12 +823,10 @@ def main() -> None:
 
     _stage_banner("Week 9 Diagnostics Report")
     stage_started = time.perf_counter()
-    week9_cstem = f"week8{last_optuna_suffix}" if last_optuna_suffix else "week8"
     week9_report_path = _make_week9_diagnostics_report(
         project_root=project_root,
-        artifact_prefix="week8",
+        artifact_prefix=artifact_prefix,
         min_history_days_used=used_min_history_days,
-        constrained_artifact_stem=week9_cstem if week9_cstem != "week8" else None,
     )
     report_sec = time.perf_counter() - stage_started
     print(f"Report complete in {report_sec:.1f}s")
@@ -1009,14 +834,14 @@ def main() -> None:
 
     manifest_path = _write_run_manifest(
         project_root=project_root,
-        artifact_prefix="week8",
+        artifact_prefix=artifact_prefix,
         config_hash=config_hash,
         stage_durations_sec={
             "data_build": data_sec,
             "baseline": baseline_sec,
-            "exogenous_features": exogenous_sec,
             "constrained_grid_and_holdout": constrained_sec,
             "covariance_diagnostics": covariance_sec,
+            "stock_oil_hedge": stock_oil_sec,
             "figure_generation": figures_sec,
             "week9_report_generation": report_sec,
             "total": time.perf_counter() - run_started,
@@ -1025,24 +850,12 @@ def main() -> None:
         artifact_groups={
             "data": {k: str(v) for k, v in data_artifacts.items()},
             "baseline": {k: str(v) for k, v in baseline_artifacts.items()},
-            "exogenous": {k: str(v) for k, v in exogenous_artifacts.items()},
-            "constrained": manifest_constrained_flat,
+            "constrained": {k: str(v) for k, v in constrained_artifacts.items()},
             "covariance": {k: str(v) for k, v in covariance_artifacts.items()},
+            "stock_oil_hedge": {k: str(v) for k, v in stock_oil_artifacts.items()},
             "figures": {k: str(v) for k, v in figure_artifacts.items()},
             "reports": {"week9_diagnostics_report": str(week9_report_path)},
-        },
-        extra={
-            "macro_modes_ran": macro_modes_list if macro_modes_list else None,
-            "single_macro_integration": (
-                None
-                if macro_modes_list or args.joint_macro_mode_search
-                else args.macro_integration
-            ),
-            "joint_macro_mode_search": args.joint_macro_mode_search,
-            "etf_tracking": args.etf_tracking,
-            "optuna_constrained_artifact_suffix": last_optuna_suffix,
-            "week9_constrained_artifact_stem": week9_cstem,
-            "git_commit_and_push_requested": bool(args.git_commit_and_push),
+            "equity_regime": {"pipeline_equity_regime": str(equity_regime_path)},
         },
     )
     total_sec = time.perf_counter() - run_started
@@ -1051,17 +864,6 @@ def main() -> None:
     print(f"  Total time: {total_sec / 60:.1f}m ({total_sec / 3600:.1f}h)", flush=True)
     print(f"{'#'*60}", flush=True)
     print(f"- run_manifest: {manifest_path}")
-
-    if args.git_commit_and_push:
-        tag = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%MZ")
-        commit_msg = args.git_commit_message or f"Week8 pipeline cloud run {tag}"
-        _stage_banner("Git commit and push")
-        _git_commit_and_push(
-            project_root,
-            remote=args.git_remote,
-            branch=args.git_push_branch,
-            message=commit_msg,
-        )
 
 
 if __name__ == "__main__":
