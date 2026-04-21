@@ -1091,39 +1091,40 @@ Minimum viable Round 5: **just pod R**. If two pods: **R + Q**. If three: **R + 
 
 ### 15.9. Round 5 closeout — results
 
-All five Round 4 / Round 5 pods finished and pushed. Every pod either tied or lost to the equal-weight baseline on holdout Sortino:
+All five Round 4 / Round 5 pods finished and pushed, plus teammate Colin's G-seed42 re-run. Numbers below are the **per-pod `docs/week9_diagnostics_report.md`** values (equal-weight baseline computed on the *same* holdout slice as the constrained model). The earlier write-up of this section cited a different "baseline Sortino" from the constrained-metrics JSON that is *not* the right comparison — it's recomputed inside `run_optuna_search` with walk-forward slicing and top-K bagging, which changes the baseline construction. The table below supersedes that.
 
-| Pod | Holdout Sortino | Baseline | Δ | Max DD | Notable config |
-|---|---:|---:|---:|---:|---|
-| I4 | +0.1040 | +0.1050 | **−0.0010** | −28.5% | mom 20/5d, rw=24 (Round 4 best) |
-| K4 | +0.0615 | +0.0616 | **−0.0000** | −28.0% | mom 20/5d, rw=96 |
-| L4 | +0.0600 | +0.0950 | **−0.0350** | −24.9% | mom 25/10d (aggressive momentum hurt) |
-| M4 | −0.0301 | +0.0179 | **−0.0480** | −17.4% | no momentum (best DD, worst Sortino) |
-| Q5 | +0.0808 | +0.0839 | **−0.0030** | −32.3% | Pod I recipe + LR sweep 0.04-0.12 |
+| Pod | Baseline Sortino | Constrained Sortino | Δ Sortino | Baseline DD | Constrained DD | Δ DD | Notable config |
+|---|---:|---:|---:|---:|---:|---:|---|
+| **I4** | +0.0963 | +0.1040 | **+0.0077** | −29.70% | −28.54% | **+1.16 pp** | mom 20/5d, rw=24 (Round 4 best) |
+| K4 | +0.0618 | +0.0615 | −0.0003 | −29.12% | −28.03% | **+1.09 pp** | mom 20/5d, rw=96 |
+| L4 | +0.1123 | +0.0600 | **−0.0523** | −22.38% | −24.89% | −2.51 pp | mom 25/10d (aggressive momentum hurt) |
+| M4 | +0.0179 | −0.0301 | **−0.0480** | −6.12% | −17.39% | **−11.27 pp** | no momentum (baseline was near-flat; constrained over-concentrated) |
+| **Q5** | +0.0751 | +0.0808 | **+0.0057** | −35.10% | −32.34% | **+2.75 pp** | Pod I recipe + LR sweep 0.04-0.12 |
+| G-seed42 | +0.0238 | −0.0102 | **−0.0340** | −7.47% | −7.72% | −0.25 pp | G recipe, seed=42 |
 
-Separately, **Pod G-seed42** (a teammate re-run of Round 2's G recipe with seed=42) reported Sortino +0.0236 vs baseline +0.0234 (Δ +0.0002). G2's Round 2 Δ +0.0019 — our only historical "win" — collapsed to +0.0002 under a different seed, with the absolute Sortino falling from +0.2576 to +0.0236. The G2 result was almost certainly sampling noise.
+Three corrected takeaways drive §16 Round 6:
 
-Three takeaways drive §16 Round 6:
-
-1. **The reduced-search / momentum-screening family is saturated.** Neither widening LR past 0.045 (Pod Q reached 0.063) nor tuning the momentum window (L4 vs I4) produced deltas above zero. Trying to squeeze more out of the same objective is low-expected-value.
-2. **Drawdowns are catastrophic and structural.** Five pods in a row produced −17% to −32% drawdowns on holdout, regardless of momentum / rolling-window / LR settings. This is a sizing / risk-control problem, not an alpha-search problem.
-3. **A teammate branch already has a 50× better Δ-vs-baseline.** `origin/stock-PM-combined-strategy`'s week17 run hit Sortino +0.1538 vs baseline +0.0520 (Δ **+0.1018**) with max DD −9.4%, using variance / downside / covariance penalties and tighter domain/weight caps — all already implemented in our `ExperimentConfig` but previously unexposed on the CLI. Round 6 is about *using levers we already have*.
+1. **I4 and Q5 modestly beat baseline on both metrics.** Not the "all pods lost" picture the earlier table suggested. I4 +0.0077 Sortino / +1.16 pp DD; Q5 +0.0057 Sortino / +2.75 pp DD. K4 was neutral on Sortino but improved DD by +1.09 pp. Three of five pods improved drawdown — the sizing/momentum combo is adding *some* risk-adjusted value, it just isn't large.
+2. **Seed noise is an order of magnitude larger than every win we've logged.** Pod G2 (Round 2) reported Δ = +0.0019. Pod G-seed42 (same recipe, seed=42) reported Δ = **−0.0340**. |ΔΔ| ≈ 0.036 Sortino from seed alone. Every single-seed Δ we have — including I4's +0.0077 — is **inside that noise floor**. We therefore do not yet have statistically defensible evidence that any of our pipelines beats equal-weight. Pod S4 (multi-seed) is the experiment that settles this.
+3. **A teammate branch has a ~10–13× larger Δ, well outside the noise floor.** `origin/stock-PM-combined-strategy`'s week17 run hit Sortino +0.1538 vs baseline +0.0520 (Δ **+0.1018**) with max DD −9.4%. Δ = 0.1018 is ~2.8σ above the G2↔G-seed42 noise floor and almost certainly a real effect. It uses variance/downside/covariance penalties and tighter domain/weight caps — all already implemented inside our `ExperimentConfig._run_online_pass` but previously hidden from the CLI. Round 6 is about *exposing and sweeping levers we already have*, centred on the region where our winners (I4, Q5) and the teammate's winner actually lived rather than pinning to a single point.
 
 ## 16. Round 6 — Risk-aware objective port + equity / PM overlays
 
 **Status: ready to launch.** Five CPU-only pods available (same class as Round 4/5). All code ships on `origin/cloud-runs-R6`; teammate branch `origin/stock-PM-combined-strategy` is left untouched. The new levers wired in §14.8 above expose the risk-aware objective terms already inside `constrained_optimizer` but previously hidden from the CLI, plus two post-hoc overlay evaluators that test teammate Colin's equity-tilt and PM-category-spread ideas on our data without modifying the inner loop.
 
-### 16.1. Hypothesis matrix
+### 16.1. Hypothesis matrix (revised against §15.9 corrected results)
 
 | Pod | Hypothesis | Lever(s) exercised |
 |---|---|---|
-| **S1** | A richer objective (variance + downside + covariance penalties, tight weight caps, long rolling window) beats the plain Sortino-maximizing setup by the same order of magnitude the teammate's week17 branch did. | Full objective + sizing sweep; no momentum. Highest expected value. |
-| **S5** | The drawdown is a *sizing* problem, not an *alpha* problem. If we pin the teammate's winning position caps (`max_weight=0.04`, `domain_limit=0.08`, `concentration_penalty=2.0`) onto Round 4's best recipe (Pod I), the holdout DD drops from −28.5% toward −10% without sacrificing Sortino. | Tighter caps only; everything else = Pod I. Cheapest drawdown attack. |
-| **S4** | G2's Δ +0.0019 and G-seed42's Δ +0.0002 straddle zero; we need the variance of Δ across seeds to state a noise floor. | G recipe × 5 seeds `{3, 7, 101, 202, 303}`. Diagnostic, not optimization. |
-| **S2** | The equity-domain tilt signal (SPY-informed) adds risk-adjusted value on top of the equal-weight baseline. Run *after* fan-in, post-hoc. | `script/posthoc_overlay_tilt.py` with `tilt_strengths = {0, 5, 10, 20, 33.3}`. |
+| **S4** (promoted) | σ(Δ) across seeds is small enough (< 0.004) that I4's Δ +0.0077 is a real signal, not noise. Or it isn't, in which case we need the multi-seed **mean Δ** for I4 as the actual reportable. Diagnostic, gates the rest. | **Pod-I4 recipe** × 5 seeds `{3, 7, 101, 202, 303}`. Swapped from G (known loser) to I4 (our only individual-seed win). |
+| **S1** | A richer objective (variance + downside + covariance penalties + sizing caps sized *around* our winners, not tighter than any of them) captures the bulk of the teammate's Δ = +0.1018 edge. | Full 8-lever objective sweep with sizing bracketed between I4's defaults and the teammate's caps. Explicitly keeps I4's winning `rw=24` in the rolling-window search. |
+| **S5** | Progressive tightening beyond I4's defaults moves us along a Sortino/DD frontier — how much DD can we buy per unit Sortino we spend? A *grid*, not a pin. | Pod-I4 recipe + 2D grid `max_weight × domain_limit × concentration_penalty_lambda` (3×3×3 = 27 combinations Optuna samples). |
+| **S2** | The equity-domain tilt signal (SPY-informed) adds risk-adjusted value on top of a domain-equal baseline. Run *after* S1/S5 fan-in, post-hoc. | `script/posthoc_overlay_tilt.py` with `tilt_strengths = {0, 5, 10, 20, 33.3}`. |
 | **S3** | Zero-investment PM-category spreads on the top negatively correlated pairs add uncorrelated alpha. Post-hoc. | `script/posthoc_overlay_spread.py` sweeping `max_pairs × spread_lambda`. |
 
-**Priority order if any pod slips: S1 > S5 > S4 > S2 > S3.** S2 and S3 are post-hoc evaluators that run in minutes on a small CPU pod against any fanned-in prefix — they don't need their own training pod, so you can run them on whichever pod finishes first once the artifacts are available.
+**Priority order if any pod slips: S4 > S1 > S5 > S2 > S3.** S4 is first because without a noise floor no other pod's result is interpretable — a +0.02 Sortino Δ from S1 is exciting only if σ(Δ) is clearly below that. S1 is second because it has the highest upside (the teammate's +0.1018 benchmark) but also the highest variance (eight simultaneously-swept levers). S5 is third as an ablation that isolates *sizing* from *objective change*. S2/S3 are minutes-long post-hoc evaluators that piggyback on whichever training pod finishes first.
+
+**What changed vs the earlier version of this section.** The earlier matrix had S1 pinning `max_weight 0.03–0.06` (tighter than any of our Round-4/5 winners, which used defaults ≈0.10) and `rolling_windows 96,144,288` (dropping I4's winning `rw=24`); S5 pinning three sizing knobs to single values (no frontier); S4 running five seeds of the G recipe (a known Round-5 loser, Δ=−0.034). All three have been revised below.
 
 ### 16.2. Pod S1 command (full risk-aware objective sweep)
 
@@ -1137,25 +1138,33 @@ python -u script/polymarket_week8_pipeline.py \
   --artifact-prefix week13_S1 \
   --macro-modes both \
   --reduced-search \
+  --momentum-screening --momentum-top-n 20 --momentum-lookback-days 5 \
   --variance-penalty-values 0.25,0.5,1.0,2.0 \
   --downside-penalty-values 0.5,1.0,2.0,3.0 \
-  --covariance-penalty-lambdas 0.1,0.5,1.0,2.0,5.0 \
-  --covariance-shrinkage-values 0.01,0.02,0.05,0.10 \
-  --domain-limit-values 0.06,0.08,0.10,0.12 \
-  --max-weight-values 0.03,0.04,0.05,0.06 \
-  --rolling-windows 96,144,288 \
+  --covariance-penalty-lambdas 0.1,0.5,1.0,2.0 \
+  --covariance-shrinkage-values 0.02,0.05,0.10 \
+  --domain-limit-values 0.08,0.12,0.16 \
+  --max-weight-values 0.04,0.06,0.08,0.10 \
+  --concentration-penalty-lambdas 0.5,1.0,2.0 \
+  --rolling-windows 24,96,144 \
   --top-k-bagging 5 \
   --optuna-n-jobs 4 \
   --optuna-trials 200 \
   --git-commit-and-push \
   --git-push-branch cloud-runs-S1 \
-  --git-commit-message "S1: full risk-aware objective + tight caps + rw sweep ${RUN_TAG}" \
+  --git-commit-message "S1: full risk-aware objective + sizing bracket around I4+teammate ${RUN_TAG}" \
   2>&1 | tee "run_S1_${RUN_TAG}.log"
 ```
 
-Notes. `--reduced-search` is kept so the LR / penalty_lambda / uniform_mix search spaces stay narrow (Sobol density matters more than absolute count); the Round 6 overrides are applied *after* reduced-search and widen only the levers we explicitly sweep. No `--momentum-screening` — M4 showed it's no longer load-bearing when sizing is tight.
+Notes on the revisions vs the first draft:
 
-### 16.3. Pod S5 command (tighter-sizing ablation on Pod I recipe)
+- **`max_weight 0.04,0.06,0.08,0.10`** now brackets both the teammate's winner (0.04) and our proven-winning I4 default (≈0.10). The earlier `0.03–0.06` was uniformly tighter than every one of our Round-4/5 wins — it risked throwing out the bathwater.
+- **`domain_limit 0.08,0.12,0.16`** same logic: the teammate's 0.08 on one side, the I4 default on the other.
+- **`rolling_windows 24,96,144`** keeps I4's winning `rw=24` in the search; the earlier `96,144,288` dropped it.
+- **`--momentum-screening` is ON.** M4 (no-momentum) was the single worst pod on DD (−11.3 pp vs baseline). The "momentum isn't load-bearing" claim was wrong; keep it.
+- `--reduced-search` is kept so the LR / penalty_lambda / uniform_mix search spaces stay narrow (Sobol density matters more than absolute count); the Round 6 overrides are applied *after* reduced-search and widen only the levers we explicitly sweep.
+
+### 16.3. Pod S5 command (sizing-frontier grid on Pod I4 recipe)
 
 ```bash
 source .venv/bin/activate
@@ -1168,24 +1177,26 @@ python -u script/polymarket_week8_pipeline.py \
   --macro-modes both \
   --reduced-search \
   --momentum-screening --momentum-top-n 20 --momentum-lookback-days 5 \
-  --max-weight-values 0.04 \
-  --domain-limit-values 0.08 \
-  --concentration-penalty-lambdas 2.0 \
-  --rolling-windows 24,96 \
+  --max-weight-values 0.04,0.06,0.08 \
+  --domain-limit-values 0.08,0.12,0.16 \
+  --concentration-penalty-lambdas 0.5,1.0,2.0 \
+  --rolling-windows 24 \
   --top-k-bagging 5 \
   --optuna-n-jobs 4 \
   --optuna-trials 200 \
   --git-commit-and-push \
   --git-push-branch cloud-runs-S5 \
-  --git-commit-message "S5: Pod-I recipe + teammate tight caps (mw=0.04 dl=0.08 cpl=2.0) ${RUN_TAG}" \
+  --git-commit-message "S5: Pod-I4 recipe + 3x3x3 sizing grid ${RUN_TAG}" \
   2>&1 | tee "run_S5_${RUN_TAG}.log"
 ```
 
-This isolates the caps. Everything else matches Pod I4. If holdout DD falls from −28.5% to, say, −12% with Sortino roughly preserved, the whole Round 4 DD story was sizing.
+**What changed vs the first draft.** The earlier S5 pinned `max_weight=0.04`, `domain_limit=0.08`, `concentration_penalty_lambda=2.0` to single values — the teammate's optimum on the teammate's universe. On a single point, if that combination kills Sortino on our universe, we learn "doesn't work here" and nothing actionable. A 3×3×3 grid (27 cells, Optuna-sampled) traces the actual Sortino/DD frontier between I4's defaults and the teammate's optimum. Rolling window is pinned to I4's winner (`rw=24`) so sizing is the only thing moving. All three swept levers are strictly tighter than I4's defaults, so this is a monotonic tightening study.
 
-### 16.4. Pod S4 command (multi-seed robustness of the G recipe)
+Success looks like: a best-cell with `holdout DD ≤ −18%` (improving I4's −28.5% by ~10 pp) while `holdout Sortino ≥ +0.08` (preserving I4's edge). If the best cell reads worse than I4 on both metrics, sizing is not the lever.
 
-This is one pod running five short sequential Optuna sweeps rather than one long one — we want five independent best-configs, not one averaged config.
+### 16.4. Pod S4 command (multi-seed robustness of the I4 winning recipe)
+
+This is one pod running five short sequential Optuna sweeps rather than one long one — we want five independent best-configs, not one averaged config. Single-seed Δ is what every Round-4/5 diagnostic reports, so σ of Δ across seeds is exactly the right quantity.
 
 ```bash
 source .venv/bin/activate
@@ -1198,18 +1209,26 @@ for SEED in 3 7 101 202 303; do
     --artifact-prefix week13_S4_seed${SEED} \
     --macro-modes both \
     --reduced-search \
+    --momentum-screening --momentum-top-n 20 --momentum-lookback-days 5 \
+    --rolling-windows 24 \
     --seed-override ${SEED} \
     --top-k-bagging 5 \
     --optuna-n-jobs 4 \
     --optuna-trials 100 \
     --git-commit-and-push \
     --git-push-branch cloud-runs-S4 \
-    --git-commit-message "S4 seed=${SEED}: G recipe robustness ${RUN_TAG}" \
+    --git-commit-message "S4 seed=${SEED}: I4 recipe robustness ${RUN_TAG}" \
     2>&1 | tee "run_S4_seed${SEED}_${RUN_TAG}.log"
 done
 ```
 
-Budget. 5 seeds × 100 trials × 4 jobs ≈ same compute as one 200-trial pod. The artifact set is `week13_S4_seed{3,7,101,202,303}_*`. After fan-in, compute `mean ± std` of `holdout_sortino_minus_baseline` across the five seeds — that gives the noise floor we need to contextualize any Round 6 Δ.
+**What changed vs the first draft.** The earlier S4 ran five seeds of the *G* recipe. G is a known Round-5 *loser* (G-seed42: Δ = −0.034). Measuring σ on a recipe we aren't trying to validate wastes information. S4 now measures σ(Δ) around the only **individual-seed winner** we have — Pod I4 (Δ = +0.0077). Three outcomes:
+
+- **If σ(Δ) ≤ 0.003:** I4's +0.0077 is ~2.5σ signal. Round 7 can build on it.
+- **If 0.003 < σ(Δ) ≤ 0.008:** I4 is ambiguous; the 5-seed mean Δ is the actual reportable.
+- **If σ(Δ) > 0.008:** I4's win is indistinguishable from noise; only S1 (objective change) and the teammate's +0.1018 signal remain live.
+
+Budget. 5 seeds × 100 trials × 4 jobs ≈ same compute as one 200-trial pod. Artifact set is `week13_S4_seed{3,7,101,202,303}_*`. After fan-in, compute `mean ± std` of `holdout_sortino_minus_baseline` (from each diagnostics report) across the five seeds.
 
 ### 16.5. Pod S2 command (post-hoc equity-domain tilt sweep)
 
