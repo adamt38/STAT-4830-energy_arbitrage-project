@@ -851,6 +851,47 @@ def main() -> None:
         help="Random seed passed to ExperimentConfig.seed (default 7). Use a different value "
         "for replication runs to verify that a positive holdout delta is not seed-specific.",
     )
+    parser.add_argument(
+        "--learnable-inclusion",
+        action="store_true",
+        help="Direction A (meta-selection): add a second parameter vector (inclusion logits, "
+        "one per market) to the online optimizer. Effective weight is sigmoid(s_i) * softmax(w)_i, "
+        "renormalized. Both vectors are jointly optimized by Adam/SGD. Two regularizers keep the "
+        "gates well-behaved: a soft cardinality penalty targeting --inclusion-target-k active "
+        "markets, and a binary-entropy penalty pushing each gate to 0 or 1. Initial gates are "
+        "seeded from a momentum proxy (cumulative return over the warmup window). Generalizes "
+        "--momentum-screening from a hand-picked top-K to a learned online selection. Use with "
+        "the FULL universe (do NOT pass --momentum-screening).",
+    )
+    parser.add_argument(
+        "--inclusion-target-k",
+        type=int,
+        default=15,
+        help="Target number of active markets for learnable inclusion (default 15). "
+        "The cardinality regularizer pushes Σ sigmoid(inclusion_logits) toward this value.",
+    )
+    parser.add_argument(
+        "--inclusion-init-gain",
+        type=float,
+        default=2.0,
+        help="Scale factor for the momentum-proxy initialization of inclusion logits (default 2.0). "
+        "Larger values start high-|momentum| markets with gates closer to 1 and low-|momentum| "
+        "markets with gates closer to 0. Optuna searches over this range when --learnable-inclusion.",
+    )
+    parser.add_argument(
+        "--lambda-inclusion-cardinality",
+        type=float,
+        default=1.0,
+        help="Strength of the cardinality penalty for learnable inclusion (default 1.0). Optuna "
+        "searches this range when --learnable-inclusion is set.",
+    )
+    parser.add_argument(
+        "--lambda-inclusion-commitment",
+        type=float,
+        default=0.05,
+        help="Strength of the binary-entropy commitment penalty for learnable inclusion "
+        "(default 0.05). Larger values push gates harder toward 0 or 1.",
+    )
     args = parser.parse_args()
 
     project_root = REPO_ROOT
@@ -931,6 +972,11 @@ def main() -> None:
         walkforward_test_steps=walkforward_test_steps,
         seed=int(args.seed),
         optuna_n_jobs=args.optuna_n_jobs,
+        learnable_inclusion_enabled=bool(args.learnable_inclusion),
+        inclusion_target_k=int(args.inclusion_target_k),
+        inclusion_init_gain=float(args.inclusion_init_gain),
+        lambda_inclusion_cardinality=float(args.lambda_inclusion_cardinality),
+        lambda_inclusion_commitment=float(args.lambda_inclusion_commitment),
     )
     macro_modes_list = (
         [x.strip() for x in args.macro_modes.split(",") if x.strip()] if args.macro_modes else []
@@ -971,6 +1017,21 @@ def main() -> None:
             f"top_n={args.momentum_top_n}, lookback_days={args.momentum_lookback_days}",
             flush=True,
         )
+    if args.learnable_inclusion:
+        print(
+            f"\n[CONFIG] learnable inclusion ENABLED (Direction A): "
+            f"target_k={args.inclusion_target_k}, init_gain={args.inclusion_init_gain}, "
+            f"lambda_card={args.lambda_inclusion_cardinality}, "
+            f"lambda_commit={args.lambda_inclusion_commitment}",
+            flush=True,
+        )
+        if args.momentum_screening:
+            print(
+                "  WARNING: --momentum-screening and --learnable-inclusion are both set. "
+                "Learnable inclusion is designed for the FULL universe; momentum pre-filter "
+                "reduces the universe before the gates see it. Expected behavior may degrade.",
+                flush=True,
+            )
 
     _stage_banner("Data Build")
     stage_started = time.perf_counter()
@@ -1207,6 +1268,17 @@ def main() -> None:
                 "enabled": bool(args.momentum_screening),
                 "top_n": int(args.momentum_top_n) if args.momentum_screening else None,
                 "lookback_days": float(args.momentum_lookback_days) if args.momentum_screening else None,
+            },
+            "learnable_inclusion": {
+                "enabled": bool(args.learnable_inclusion),
+                "target_k": int(args.inclusion_target_k) if args.learnable_inclusion else None,
+                "init_gain": float(args.inclusion_init_gain) if args.learnable_inclusion else None,
+                "lambda_cardinality": (
+                    float(args.lambda_inclusion_cardinality) if args.learnable_inclusion else None
+                ),
+                "lambda_commitment": (
+                    float(args.lambda_inclusion_commitment) if args.learnable_inclusion else None
+                ),
             },
             "optuna_constrained_artifact_suffix": last_optuna_suffix,
             "week9_constrained_artifact_stem": week9_cstem,

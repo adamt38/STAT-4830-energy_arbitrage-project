@@ -94,6 +94,37 @@ class ExperimentConfig:
     macro_integration: Literal["rescale", "explicit", "both"] = "rescale"
     lambda_macro_explicit: float = 0.0
 
+    #: **Learnable market inclusion** (Direction A / "meta-selection").
+    #:
+    #: When True, the online optimizer adds a second parameter vector ``inclusion_logits``
+    #: (one scalar per market). The effective portfolio weight for asset *i* becomes::
+    #:
+    #:     gate_i  = sigmoid(inclusion_logits_i)          # in (0, 1)
+    #:     w_i     ∝ softmax(weight_logits)_i * gate_i    # multiplicatively gated, then renormed
+    #:
+    #: Both ``weight_logits`` and ``inclusion_logits`` are jointly optimized by Adam/SGD on
+    #: the same outer loop. Two regularizers keep the gates well-behaved:
+    #:
+    #:   - ``lambda_inclusion_cardinality * (Σ gates − inclusion_target_k)²`` — soft count constraint
+    #:   - ``lambda_inclusion_commitment * H_binary(gates)`` — binary entropy pushing gates to 0/1
+    #:
+    #: The gates are initialized from a momentum proxy computed inside ``_run_online_pass``
+    #: (cumulative return over the first few steps of the returns matrix), scaled by
+    #: ``inclusion_init_gain``. This embeds the momentum signal as a prior rather than a hard
+    #: pre-filter, so the optimizer can update inclusion decisions online as new data arrives.
+    #:
+    #: Meant to be used with the FULL market universe (no ``--momentum-screening``); the
+    #: optimizer learns which markets matter instead of relying on hand-picked top-K.
+    learnable_inclusion_enabled: bool = False
+    inclusion_init_gain: float = 2.0
+    inclusion_init_gains: tuple[float, ...] = (0.5, 1.0, 2.0, 3.0, 5.0)
+    lambda_inclusion_cardinality: float = 1.0
+    lambda_inclusion_cardinalities: tuple[float, ...] = (0.05, 0.25, 1.0, 3.0, 10.0)
+    lambda_inclusion_commitment: float = 0.05
+    lambda_inclusion_commitments: tuple[float, ...] = (0.0, 0.01, 0.05, 0.2, 1.0)
+    inclusion_target_k: int = 15
+    inclusion_target_ks: tuple[int, ...] = (10, 15, 20, 25)
+
 
 class OnlinePassPayload(TypedDict):
     """Typed payload returned by one online optimization pass."""
@@ -322,8 +353,14 @@ def _parameterized_weights(
     available_mask: torch.Tensor,
     uniform_mix: float,
     weight_parameterization: str,
+    inclusion_gates: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """Map unconstrained parameters to valid per-step portfolio weights."""
+    """Map unconstrained parameters to valid per-step portfolio weights.
+
+    When ``inclusion_gates`` is provided (Direction A learnable inclusion), each
+    asset's masked weight is multiplied by its gate in (0, 1) before renormalization.
+    Falls back to the original (ungated) simplex if all gates collapse to zero.
+    """
     if weight_parameterization == "projected_simplex":
         masked = torch.clamp(params, min=0.0) * available_mask
         masked_sum = torch.sum(masked)
@@ -339,6 +376,16 @@ def _parameterized_weights(
             masked = available_mask
             masked_sum = torch.sum(masked)
         masked = masked / torch.clamp(masked_sum, min=1e-8)
+    if inclusion_gates is not None:
+        gated = masked * inclusion_gates
+        gated_sum = torch.sum(gated)
+        if float(gated_sum.detach().cpu().item()) <= 1e-6:
+            # Degenerate: all gates ~ 0. Fall back to ungated masked weights so the
+            # portfolio does not divide by ~0. The cardinality penalty will still
+            # push the optimizer back toward a useful number of active gates.
+            gated = masked
+            gated_sum = torch.sum(gated)
+        masked = gated / torch.clamp(gated_sum, min=1e-8)
     uniform_weights = available_mask / torch.clamp(torch.sum(available_mask), min=1e-8)
     return (1.0 - uniform_mix) * masked + uniform_mix * uniform_weights
 
@@ -396,6 +443,11 @@ def _run_online_pass(
     lambda_macro_explicit: float = 0.0,
     etf_step_returns: np.ndarray | None = None,
     lambda_etf_tracking: float = 0.0,
+    learnable_inclusion_enabled: bool = False,
+    inclusion_init_gain: float = 2.0,
+    lambda_inclusion_cardinality: float = 1.0,
+    lambda_inclusion_commitment: float = 0.05,
+    inclusion_target_k: int = 15,
 ) -> OnlinePassPayload:
     if macro_integration not in {"rescale", "explicit", "both"}:
         raise RuntimeError(
@@ -425,14 +477,34 @@ def _run_online_pass(
         )
     else:
         params = torch.zeros(n_assets, dtype=torch.float32, requires_grad=True)
+
+    # Learnable inclusion logits (Direction A). Only created when enabled. Initialized
+    # from a momentum proxy on the first warmup rows of the returns matrix so that
+    # high-|return| assets start with a gate bias toward 1 and low-|return| assets toward 0.
+    inclusion_logits: torch.Tensor | None = None
+    if learnable_inclusion_enabled:
+        warmup = min(returns_matrix.shape[0], max(rolling_window, 24))
+        warmup_returns = np.nan_to_num(returns_matrix[:warmup], nan=0.0)
+        cum = np.sum(warmup_returns, axis=0)  # signed cumulative return over warmup
+        abs_cum = np.abs(cum)
+        if abs_cum.std() > 1e-8:
+            z = (abs_cum - abs_cum.mean()) / (abs_cum.std() + 1e-8)
+        else:
+            z = np.zeros_like(abs_cum)
+        init_vec = float(inclusion_init_gain) * z
+        inclusion_logits = torch.tensor(init_vec, dtype=torch.float32, requires_grad=True)
+        param_list = [params, inclusion_logits]
+    else:
+        param_list = [params]
     optimizer = (
-        torch.optim.Adam([params], lr=lr)
+        torch.optim.Adam(param_list, lr=lr)
         if optimizer_type == "adam"
-        else torch.optim.SGD([params], lr=lr)
+        else torch.optim.SGD(param_list, lr=lr)
     )
 
     realized_returns: list[float] = []
     weight_snapshots: list[np.ndarray] = []
+    gate_snapshots: list[np.ndarray] = []
     eval_asset_returns: list[np.ndarray] = []
 
     eval_start = evaluation_start_t if evaluation_start_t is not None else rolling_window
@@ -503,12 +575,20 @@ def _run_online_pass(
         if should_update:
             for _ in range(steps_per_window):
                 optimizer.zero_grad()
+                # Learnable inclusion gates (Direction A): σ(inclusion_logits) per asset,
+                # applied multiplicatively inside _parameterized_weights before renorm.
+                gates = (
+                    torch.sigmoid(inclusion_logits)
+                    if learnable_inclusion_enabled and inclusion_logits is not None
+                    else None
+                )
                 # Guaranteed diversification floor to prevent single-domain collapse.
                 weights = _parameterized_weights(
                     params=params,
                     available_mask=available_mask,
                     uniform_mix=uniform_mix_t,
                     weight_parameterization=weight_parameterization,
+                    inclusion_gates=gates,
                 )
                 portfolio = window @ weights
                 # Penalize excessive concentration and reward spread.
@@ -539,6 +619,27 @@ def _run_online_pass(
                     - covariance_penalty_lambda_t * covariance_penalty
                     + entropy_lambda * entropy_bonus
                 )
+                # Learnable inclusion regularizers (Direction A). Applied only to
+                # the gates on available markets, so unavailable assets don't
+                # artificially inflate the cardinality or entropy sums.
+                if learnable_inclusion_enabled and gates is not None:
+                    active_gates = gates * available_mask  # zero gates for unavailable assets
+                    gate_sum = torch.sum(active_gates)
+                    cardinality_penalty = (gate_sum - float(inclusion_target_k)).pow(2)
+                    gates_clamped = torch.clamp(active_gates, 1e-6, 1.0 - 1e-6)
+                    # Binary entropy of each gate on available assets, summed.
+                    binary_entropy = -torch.sum(
+                        available_mask
+                        * (
+                            gates_clamped * torch.log(gates_clamped)
+                            + (1.0 - gates_clamped) * torch.log(1.0 - gates_clamped)
+                        )
+                    )
+                    obj = (
+                        obj
+                        - lambda_inclusion_cardinality * cardinality_penalty
+                        - lambda_inclusion_commitment * binary_entropy
+                    )
                 if (
                     objective == "mean_downside"
                     and macro_integration in {"explicit", "both"}
@@ -570,15 +671,23 @@ def _run_online_pass(
                     weight_parameterization=weight_parameterization,
                 )
 
+        eval_gates = (
+            torch.sigmoid(inclusion_logits).detach()
+            if learnable_inclusion_enabled and inclusion_logits is not None
+            else None
+        )
         current_weights = _parameterized_weights(
             params=params,
             available_mask=available_mask,
             uniform_mix=uniform_mix_t,
             weight_parameterization=weight_parameterization,
+            inclusion_gates=eval_gates,
         ).detach().cpu().numpy()
         if t >= eval_start:
             weight_snapshots.append(current_weights)
             realized_returns.append(float(np.nan_to_num(step_returns_np, nan=0.0) @ current_weights))
+            if eval_gates is not None:
+                gate_snapshots.append(eval_gates.cpu().numpy())
             if capture_diagnostics:
                 eval_asset_returns.append(np.nan_to_num(step_returns_np, nan=0.0))
 
@@ -1766,6 +1875,30 @@ def run_optuna_search(
         else:
             baseline_alpha = 1.0
 
+        # Direction A — learnable market inclusion. Active iff cfg.learnable_inclusion_enabled.
+        # QMCSampler requires a static search space, so when disabled we still draw values but
+        # pass the inclusion-disabled flag into _run_online_pass (those draws become no-ops).
+        if cfg.learnable_inclusion_enabled:
+            inclusion_init_gain_val = _suggest(
+                trial, "inclusion_init_gain", cfg.inclusion_init_gains, log=False
+            )
+            lambda_inclusion_card_val = _suggest(
+                trial, "lambda_inclusion_cardinality", cfg.lambda_inclusion_cardinalities, log=True
+            )
+            lambda_inclusion_commit_val = _suggest(
+                trial, "lambda_inclusion_commitment", cfg.lambda_inclusion_commitments, log=False
+            )
+            inclusion_target_k_val = int(
+                trial.suggest_categorical(
+                    "inclusion_target_k", list(cfg.inclusion_target_ks)
+                )
+            )
+        else:
+            inclusion_init_gain_val = float(cfg.inclusion_init_gain)
+            lambda_inclusion_card_val = float(cfg.lambda_inclusion_cardinality)
+            lambda_inclusion_commit_val = float(cfg.lambda_inclusion_commitment)
+            inclusion_target_k_val = int(cfg.inclusion_target_k)
+
         train_steps = max(cfg.walkforward_train_steps, rolling_window + 1)
         test_steps = max(cfg.walkforward_test_steps, 1)
         all_fold_returns: list[float] = []
@@ -1809,6 +1942,11 @@ def run_optuna_search(
                 lambda_macro_explicit=lambda_macro_val,
                 etf_step_returns=etf_tracking_matrix,
                 lambda_etf_tracking=lambda_etf_val,
+                learnable_inclusion_enabled=cfg.learnable_inclusion_enabled,
+                inclusion_init_gain=inclusion_init_gain_val,
+                lambda_inclusion_cardinality=lambda_inclusion_card_val,
+                lambda_inclusion_commitment=lambda_inclusion_commit_val,
+                inclusion_target_k=inclusion_target_k_val,
             )
 
             if (
@@ -2097,6 +2235,29 @@ def run_optuna_search(
         macro_local, regime_k_local, lambda_macro_local, lambda_etf_local, _alpha_local = (
             _resolve_trial_holdout_params(trial_params)
         )
+        # Direction A — look up learnable inclusion hyperparameters for this trial.
+        if cfg.learnable_inclusion_enabled:
+            inclusion_init_gain_local = float(
+                trial_params.get("inclusion_init_gain", cfg.inclusion_init_gain)
+            )
+            lambda_inclusion_card_local = float(
+                trial_params.get(
+                    "lambda_inclusion_cardinality", cfg.lambda_inclusion_cardinality
+                )
+            )
+            lambda_inclusion_commit_local = float(
+                trial_params.get(
+                    "lambda_inclusion_commitment", cfg.lambda_inclusion_commitment
+                )
+            )
+            inclusion_target_k_local = int(
+                trial_params.get("inclusion_target_k", cfg.inclusion_target_k)
+            )
+        else:
+            inclusion_init_gain_local = float(cfg.inclusion_init_gain)
+            lambda_inclusion_card_local = float(cfg.lambda_inclusion_cardinality)
+            lambda_inclusion_commit_local = float(cfg.lambda_inclusion_commitment)
+            inclusion_target_k_local = int(cfg.inclusion_target_k)
         return _run_online_pass(
             returns_matrix=returns_matrix,
             domains=domains,
@@ -2141,6 +2302,11 @@ def run_optuna_search(
             lambda_macro_explicit=lambda_macro_local,
             etf_step_returns=etf_tracking_matrix,
             lambda_etf_tracking=lambda_etf_local,
+            learnable_inclusion_enabled=cfg.learnable_inclusion_enabled,
+            inclusion_init_gain=inclusion_init_gain_local,
+            lambda_inclusion_cardinality=lambda_inclusion_card_local,
+            lambda_inclusion_commitment=lambda_inclusion_commit_local,
+            inclusion_target_k=inclusion_target_k_local,
         )
 
     feasible_pool = feasible_trials if feasible_trials else completed_trials
