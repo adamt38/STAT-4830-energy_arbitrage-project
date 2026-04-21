@@ -1,0 +1,27 @@
+{
+  "steps": 1925,
+  "asset_count": 40,
+  "total_portfolio_return": -0.02883069720582651,
+  "top_market_by_abs_contribution": {
+    "token_id": "9556122149160720922715284597610520228366807023831966638741974320131898296289",
+    "domain": "economic-policy",
+    "question": "Will the Fed increase interest rates by 25+ bps after the April 2026 meeting?",
+    "market_id": "669663",
+    "market_slug": "will-the-fed-increase-interest-rates-by-25-bps-after-the-april-2026-meeting",
+    "mean_weight": 0.0349609599794528,
+    "total_contribution": -0.04523804663939634,
+    "mean_step_contribution": -2.350028396851758e-05,
+    "contribution_share_of_total_return": 1.5690930509392607
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "economic-policy",
+    "total_contribution": -0.04523804663939634,
+    "contribution_share_of_total_return": 1.5690930509392607
+  },
+  "top_abs_corr_pair": {
+    "token_a": "9556122149160720922715284597610520228366807023831966638741974320131898296289",
+    "token_b": "19063193541024384703688685779087142926481547676681055667364352656903314720497",
+    "corr": -0.22404294235105257,
+    "abs_corr": 0.22404294235105257
+  }
+}

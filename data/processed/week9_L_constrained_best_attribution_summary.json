@@ -1,0 +1,27 @@
+{
+  "steps": 2011,
+  "asset_count": 40,
+  "total_portfolio_return": 0.07570008761127896,
+  "top_market_by_abs_contribution": {
+    "token_id": "19063193541024384703688685779087142926481547676681055667364352656903314720497",
+    "domain": "basketball",
+    "question": "Will JB Bickerstaff win the 2025\u20132026 NBA Coach of the Year?",
+    "market_id": "643794",
+    "market_slug": "nba-2025-26-coach-of-the-year-jb-bickerstaff",
+    "mean_weight": 0.04640346942981216,
+    "total_contribution": 0.04887892642196442,
+    "mean_step_contribution": 2.4305781413209555e-05,
+    "contribution_share_of_total_return": 0.6456918078213914
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "basketball",
+    "total_contribution": 0.04887892642196442,
+    "contribution_share_of_total_return": 0.6456918078213914
+  },
+  "top_abs_corr_pair": {
+    "token_a": "19063193541024384703688685779087142926481547676681055667364352656903314720497",
+    "token_b": "9556122149160720922715284597610520228366807023831966638741974320131898296289",
+    "corr": -0.2491978834451481,
+    "abs_corr": 0.2491978834451481
+  }
+}
