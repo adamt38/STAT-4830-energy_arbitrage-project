@@ -1,0 +1,27 @@
+{
+  "steps": 1409,
+  "asset_count": 20,
+  "total_portfolio_return": 0.46002843270902183,
+  "top_market_by_abs_contribution": {
+    "token_id": "106572879185916710503631021854572801471104977091252507745096331167318654083650",
+    "domain": "nba-champion",
+    "question": "Will the Phoenix Suns win the 2026 NBA Finals?",
+    "market_id": "553877",
+    "market_slug": "will-the-phoenix-suns-win-the-2026-nba-finals",
+    "mean_weight": 0.04768798253403133,
+    "total_contribution": 0.10844680444830007,
+    "mean_step_contribution": 7.696721394485456e-05,
+    "contribution_share_of_total_return": 0.23573935160850173
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "colombia-election",
+    "total_contribution": 0.15139892683674888,
+    "contribution_share_of_total_return": 0.3291077595903992
+  },
+  "top_abs_corr_pair": {
+    "token_a": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+    "token_b": "82402823484466457361170410951601106261368113664328436062375970009969959380598",
+    "corr": 0.3928542118200399,
+    "abs_corr": 0.3928542118200399
+  }
+}
