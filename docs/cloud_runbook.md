@@ -1625,6 +1625,30 @@ which tmux      # must print /usr/bin/tmux
 
 If `tmux` is missing, Step 5 will fail with `tmux: command not found` — rerun `apt install -y tmux` before continuing.
 
+##### Step 3a — GPU sanity check (GPU pods only)
+
+On any GPU pod, verify PyTorch can actually see the GPU before running Step 5:
+
+```bash
+python -c "import torch; print('cuda:', torch.cuda.is_available(), '| device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO GPU')"
+```
+
+Expected output: `cuda: True | device: NVIDIA GeForce RTX 4090` (or whatever GPU the pod has).
+
+If it prints `cuda: False` or you see `CUDA initialization: The NVIDIA driver on your system is too old`, the auto-installed `torch` wheel was compiled for a newer CUDA runtime than the pod's driver. Force-downgrade to a version compatible with the image's CUDA toolkit:
+
+```bash
+# for Runpod's cuda_12_4_pytorch_2_4 image (CUDA 12.4 / 12.8 driver):
+uv pip install --reinstall "torch==2.5.1" --index-url https://download.pytorch.org/whl/cu124
+
+# for cuda_12_1_pytorch_2_2 image:
+uv pip install --reinstall "torch==2.4.1" --index-url https://download.pytorch.org/whl/cu121
+```
+
+Re-run the `torch.cuda.is_available()` check above until it returns `True`. **Do not start the Optuna run until this passes** — the pipeline will silently fall back to CPU and waste GPU-priced pod time at CPU-priced speeds (~25 min/trial instead of ~1-3 min/trial).
+
+`requirements.txt` now pins `torch<2.8` to cap this risk, but that ceiling may still pull a `cu126` wheel that's a step ahead of an older pod image — always run Step 3a on GPU pods.
+
 #### Step 4 — Configure git identity and GitHub credentials
 
 Identical to §16.0 Step 4:
@@ -1685,6 +1709,7 @@ Healthy signs:
 |---|---|---|
 | `unrecognized arguments: --fee-rate-values` | wrong branch (on R6 or plain cloud-runs) | redo Step 2 with `cloud-runs-R7` |
 | `ModuleNotFoundError: yfinance` | skipped the extra install in Step 3 | `source .venv/bin/activate && uv pip install yfinance` |
+| `CUDA initialization: The NVIDIA driver on your system is too old` on GPU pod | `torch` wheel newer than pod's CUDA driver → silently falls back to CPU, ruining the economics of a GPU pod | See Step 3a above — force-reinstall `torch==2.5.1` from the cu124 index, kill the run with `Ctrl-C`, restart |
 | K10E all trials return `fee_rate=0.0` | QMC sampler happened to pick only zero on sparse categorical | raise `--optuna-trials` to 300, or split into 4 pinned runs with `--fee-rate-override {0, 0.001, 0.005, 0.02}` |
 | DD penalty has no effect (K10F) | `dd_penalty * mean(relu(-rho_mc)**2)` bounded by `(max payoff)²≈0.25`; `dd_penalty=0` dominates | try `--dd-penalty-values 0,5,20,50,100` (shifted higher) |
 | Push fails with 403 | PAT missing `Contents: Read and write` | regenerate PAT, redo Step 4 |
