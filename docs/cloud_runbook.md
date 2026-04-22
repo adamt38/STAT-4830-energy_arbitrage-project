@@ -1604,9 +1604,11 @@ git rev-parse --abbrev-ref HEAD    # must print cloud-runs-R7
 
 #### Step 3 — Install OS + Python dependencies
 
+Runpod / Prime container images run as **root by default**, so `sudo` is not installed and not needed — call `apt` directly. On the rare non-root pod just prepend `sudo`.
+
 ```bash
-sudo apt update
-sudo apt install -y curl build-essential python3-venv tmux
+apt update
+apt install -y curl build-essential python3-venv tmux
 export PATH="$HOME/.local/bin:$PATH"
 bash script/install.sh
 source .venv/bin/activate
@@ -1618,7 +1620,10 @@ Sanity-check:
 
 ```bash
 which python    # must print a path inside .venv/bin/
+which tmux      # must print /usr/bin/tmux
 ```
+
+If `tmux` is missing, Step 5 will fail with `tmux: command not found` — rerun `apt install -y tmux` before continuing.
 
 #### Step 4 — Configure git identity and GitHub credentials
 
