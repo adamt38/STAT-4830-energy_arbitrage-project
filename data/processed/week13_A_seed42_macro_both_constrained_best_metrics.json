@@ -1,0 +1,108 @@
+{
+  "strategy": "constrained_optuna_mean_downside_both",
+  "best_params": {
+    "learning_rate": 0.047414958293974734,
+    "lambda_penalty": 0.9009949834617076,
+    "rolling_window": 24,
+    "domain_limit": 0.1036613565077696,
+    "max_weight": 0.041362486056131416,
+    "uniform_mix": 0.037633908289674084,
+    "evaluation_mode": "online",
+    "weight_parameterization": "projected_simplex",
+    "concentration_penalty_lambda": 9.106929127725708,
+    "covariance_penalty_lambda": 4.545605327314465,
+    "covariance_shrinkage": 0.04413723232080545,
+    "entropy_lambda": 0.0,
+    "variance_penalty": 1.2103543565419494,
+    "downside_penalty": 2.880848157416389,
+    "regime_k": 0.5263184184376358,
+    "macro_integration": "both",
+    "lambda_macro_explicit": 3.222802925322967,
+    "lambda_etf_tracking": 0.0,
+    "selection_source": "optuna_qmc",
+    "holdout_sortino_ratio": 0.1741922460083314,
+    "holdout_max_drawdown": -0.20865438818144844,
+    "holdout_mean_return": 0.0007360573227649388,
+    "holdout_volatility": 0.020360192356033816,
+    "max_domain_exposure": 0.09985263273119926,
+    "baseline_holdout_sortino": 0.1704567330023236,
+    "holdout_sortino_minus_baseline": 0.0037355130060077735,
+    "top_k_bagging": 5,
+    "baseline_shrinkage": true,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      3,
+      48,
+      31,
+      92,
+      11
+    ],
+    "bagged_alphas": [
+      0.4979682721704364,
+      0.890625,
+      0.59375,
+      0.2109375,
+      0.625
+    ],
+    "best_trial_baseline_alpha": 0.4979682721704364
+  },
+  "domain_exposure": {
+    "roland-garros": 0.05010117217898369,
+    "epstein": 0.050110749900341034,
+    "hockey": 0.09982350468635559,
+    "serie-a": 0.050137151032686234,
+    "comex-silver-futures": 0.05012931674718857,
+    "basketball": 0.05001075193285942,
+    "ligue-1": 0.09983767569065094,
+    "la-liga": 0.09985263273119926,
+    "nba": 0.05008025839924812,
+    "new-mexico-primary": 0.05009518936276436,
+    "league-of-legends": 0.05009879544377327,
+    "tennis": 0.04914224147796631,
+    "airdrops": 0.0501304492354393,
+    "south-dakota-primary": 0.05013374239206314,
+    "primaries": 0.050098441541194916,
+    "awards": 0.05012110620737076,
+    "nba-champion": 0.05009685829281807
+  },
+  "feasibility_filter": {
+    "applied_threshold": 0.12,
+    "feasible_solution_found": true
+  },
+  "data_split": {
+    "tuning_steps": 5543,
+    "holdout_steps_total": 1386,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48
+  },
+  "optuna_summary": {
+    "n_trials": 100,
+    "n_jobs": 4,
+    "completed_trials": 90,
+    "pruned_trials": 10,
+    "best_trial_number": 3,
+    "search_time_sec": 26173.660369833,
+    "sampler": "QMCSampler(sobol)",
+    "joint_macro_mode_search": false,
+    "output_artifact_suffix": "_macro_both",
+    "top_k_bagging": 5,
+    "baseline_shrinkage": true,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      3,
+      48,
+      31,
+      92,
+      11
+    ],
+    "bagged_alphas": [
+      0.4979682721704364,
+      0.890625,
+      0.59375,
+      0.2109375,
+      0.625
+    ],
+    "objective_value_best": 0.09950939316105673
+  }
+}
