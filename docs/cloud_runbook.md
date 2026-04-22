@@ -1692,7 +1692,18 @@ GPU pods: PyTorch will auto-use CUDA if available — no extra config. CPU-only 
 
 #### Step 8 — Detach (`Ctrl-b d`) and close your laptop
 
-Results push to `cloud-runs-K10E`, `cloud-runs-K10F`, or `cloud-runs-M5` on completion.
+Results push to `cloud-runs-K10E`, `cloud-runs-K10F`, or `cloud-runs-M5` on completion. **The pod does NOT auto-terminate after the push** — billing continues until you call `prime pods terminate <pod_id>`. Two options to automate that:
+
+- **Laptop-side watcher** (recommended, no API key on pod): in a laptop shell,
+
+  ```bash
+  bash script/auto_terminate_on_push.sh <pod_id> <branch_name>
+  # e.g. bash script/auto_terminate_on_push.sh 7d9574ffe0c34ed6af777db2fe7cf38b cloud-runs-K10E
+  ```
+
+  The watcher polls `git ls-remote origin <branch>` every 3 minutes and calls `prime pods terminate` the moment the branch appears. Safe to close the laptop terminal mid-run; re-invoke the script to resume watching. Use `nohup ... &` to keep running across shell close.
+
+- **Pod-side chain**: on the pod, `uv pip install prime-cli && export PRIME_API_KEY=<key> && export POD_ID=<this_pod_id>`, then chain the pipeline command with `; [ "${PIPESTATUS[0]}" -eq 0 ] && prime pods terminate "$POD_ID"`. Pod self-terminates on a successful run; stays alive on failure for debugging.
 
 #### Step 9 — Check on a running pod later
 
