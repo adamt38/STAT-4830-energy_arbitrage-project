@@ -1,0 +1,73 @@
+{
+  "strategy": "dynamic_copula_kelly_ogd",
+  "best_params": {
+    "lr_w": 0.025403020472792106,
+    "lr_theta": 0.0008352527197526529,
+    "rolling_window": 96,
+    "mc_samples": 256,
+    "turnover_lambda": 0.04909390285611153,
+    "copula_shrinkage": 0.08478154996410012,
+    "copula_temperature": 0.1,
+    "mlp_hidden_dim": 16,
+    "concentration_penalty_lambda": 7.450874351419637,
+    "max_weight": 0.06310719471424818,
+    "fee_rate": 0.0,
+    "dd_penalty": 0.0,
+    "weight_parameterization": "projected_simplex",
+    "optimizer_type": "adam",
+    "selection_source": "optuna_qmc_kelly",
+    "max_domain_exposure": 0.11726141185379801
+  },
+  "kelly_metrics": {
+    "holdout_log_wealth_total": 0.03399707529582058,
+    "holdout_log_wealth_per_step": 2.5016243779117422e-05,
+    "holdout_total_turnover_l1": 53.312489197403195,
+    "holdout_avg_turnover_l1": 0.03922920470743429,
+    "holdout_max_turnover_l1": 0.25366763286292554,
+    "holdout_max_drawdown": -0.26185484160988093,
+    "holdout_mean_realized_return": 5.351655413311891e-05,
+    "holdout_volatility": 0.007631282175075403,
+    "holdout_steps": 1359,
+    "mlp_param_count": 3566,
+    "copula_off_diag_abs_mean": 0.6318093538284302,
+    "pd_fallback_steps": 19738
+  },
+  "domain_exposure": {
+    "2026-nfl-draft-top-10": 0.059381621636894366,
+    "roland-garros": 0.11569753554296722,
+    "epstein": 0.04314979137900759,
+    "hockey": 0.09002857803872123,
+    "serie-a": 0.05871631973166076,
+    "basketball": 0.04274598495504319,
+    "ligue-1": 0.11726141185379801,
+    "la-liga": 0.11393836978617357,
+    "nba": 0.05863796650946711,
+    "claude-5": 0.03662802570671737,
+    "league-of-legends": 0.05776611974598556,
+    "gensyn": 0.0494053496460405,
+    "south-dakota-primary": 0.019448346440490732,
+    "primaries": 0.03441859196697281,
+    "nba-champion": 0.05832030203651206,
+    "airdrops": 0.044455692471912014
+  },
+  "data_split": {
+    "tuning_steps": 5434,
+    "holdout_steps_total": 1359,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48,
+    "rolling_window_used": 96
+  },
+  "optuna_summary": {
+    "n_trials": 5,
+    "n_jobs": 4,
+    "completed_trials": 5,
+    "pruned_trials": 0,
+    "best_trial_number": 4,
+    "search_time_sec": 1181.643058583024,
+    "sampler": "QMCSampler(sobol)",
+    "selection_objective": "mean_log_wealth - lambda_sel * mean_turnover",
+    "selection_turnover_penalty": 0.05,
+    "objective_value_best": -0.002150588465732825
+  }
+}

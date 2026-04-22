@@ -1,0 +1,38 @@
+{
+  "markets_count": 20,
+  "unique_market_ids": 20,
+  "unique_tokens": 20,
+  "history_points": 10081,
+  "market_missing_history": 0,
+  "duplicate_history_points": 0,
+  "non_monotonic_tokens": 0,
+  "domain_coverage": {
+    "nba-champion": 987,
+    "roland-garros": 776,
+    "primaries": 642,
+    "la-liga": 1012,
+    "2026-nfl-draft-top-10": 695,
+    "hockey": 323,
+    "airdrops": 554,
+    "ligue-1": 1381,
+    "league-of-legends": 407,
+    "new-mexico-primary": 666,
+    "basketball": 623,
+    "claude-5": 216,
+    "south-dakota-primary": 634,
+    "nba": 394,
+    "epstein": 403,
+    "serie-a": 368
+  },
+  "min_history_days_filter": 24.0,
+  "dropped_by_short_history_days": 5,
+  "dropped_by_short_history_points": 4,
+  "dropped_by_history_request_error": 0,
+  "momentum_screening": {
+    "enabled": true,
+    "lookback_days": 5.0,
+    "top_n": 20,
+    "candidates_before_screening": 191,
+    "selected_after_screening": 20
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "average_correlation_off_diag_mean": -0.5349534749984741,
+  "average_correlation_off_diag_abs_mean": 0.6318093538284302,
+  "average_correlation_off_diag_max_abs": 0.8864166140556335,
+  "average_correlation_condition_number": 277.3740539550781,
+  "pd_fallback_steps": 19738,
+  "pd_fallback_step_fraction": 14.52391464311994,
+  "n_assets": 20,
+  "n_holdout_steps": 1359,
+  "exogenous_features_used": [
+    "spy_ret_1",
+    "qqq_ret_1",
+    "btc_usd_ret_1"
+  ],
+  "disable_copula": false
+}

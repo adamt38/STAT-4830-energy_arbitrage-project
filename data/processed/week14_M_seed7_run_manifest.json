@@ -1,0 +1,65 @@
+{
+  "generated_at_utc": "2026-04-22T15:17:49.154322+00:00",
+  "artifact_prefix": "week14_M_seed7",
+  "config_hash": "63488241187f9daab12f2c932d544845909cc598eca0bfecd6203826880022ce",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build_or_reuse": 86.02195766696241,
+    "baseline": 0.2920670409221202,
+    "exogenous_features": 1.8106440000701696,
+    "kelly_search": 18397.029123583925,
+    "figure_generation": 0.7347351670032367,
+    "week10_report_generation": 0.01437900005839765,
+    "total": 18485.904435375007
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/raw/week14_M_seed7_events_raw.json",
+      "markets_filtered": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_markets_filtered.csv",
+      "price_history": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_price_history.csv",
+      "data_quality": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_data_quality.json",
+      "category_liquidity": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_category_liquidity.csv",
+      "considered_domains": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_considered_domains.json",
+      "momentum_scores": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_momentum_scores.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_baseline_timeseries.csv",
+      "baseline_metrics": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_baseline_metrics.json"
+    },
+    "exogenous": {
+      "exogenous_features": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_exogenous_features.csv",
+      "exogenous_quality": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_exogenous_quality.json"
+    },
+    "kelly": {
+      "kelly_grid": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_kelly_experiment_grid.csv",
+      "kelly_best_metrics": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_kelly_best_metrics.json",
+      "kelly_best_timeseries": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_kelly_best_timeseries.csv",
+      "kelly_best_weights": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_kelly_best_weights.csv",
+      "kelly_copula_diagnostics": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week14_M_seed7_kelly_copula_diagnostics.json"
+    },
+    "figures": {
+      "log_wealth_curve": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week14_M_seed7_iteration_log_wealth_curve.png",
+      "turnover_per_step": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week14_M_seed7_iteration_turnover_per_step.png",
+      "drawdown_comparison": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week14_M_seed7_iteration_drawdown_comparison.png",
+      "kelly_vs_baseline_log_wealth": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week14_M_seed7_iteration_kelly_vs_baseline_log_wealth.png",
+      "copula_corr_heatmap": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week14_M_seed7_iteration_copula_corr_heatmap.png"
+    },
+    "reports": {
+      "week10_kelly_diagnostics_report": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/docs/week10_kelly_diagnostics_report.md"
+    }
+  },
+  "input_artifact_prefix": "week8",
+  "rebuild_data": true,
+  "no_exogenous": false,
+  "mc_samples_override": null,
+  "lambda_turnover_override": null,
+  "fee_rate_override": null,
+  "fee_rate_values": [
+    0.0
+  ],
+  "dd_penalty_override": null,
+  "dd_penalty_values": [
+    0.0
+  ],
+  "git_commit_and_push_requested": true
+}
