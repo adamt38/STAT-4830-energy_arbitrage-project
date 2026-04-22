@@ -1560,3 +1560,359 @@ done
 - **Kelly × tight caps (K10D-tight).** The one Round 6 experiment we *cannot* run on CPU pods because of compute budget: re-run the Kelly pipeline with `--max-weights 0.04 --concentration-penalty-lambdas 2.0` and dynamic copula *on*. Holds until a GPU pod frees up.
 - **Regime-dependent objective.** Two-regime mixture: one set of (variance, downside, covariance) penalties when the SPY z-score is positive, another when it's negative. Would use `src.equity_signal.compute_risk_regime_zscore` (already ported in §14.8).
 
+
+## 17. Round 7 — Final Kelly squeeze (fee-aware + drawdown-controlled)
+
+Round 7 closes the three unresolved caveats around the K10C headline (gross +0.46 log-wealth, +58 pp CAGR delta vs baseline):
+
+1. **Fees not modeled.** The laptop post-hoc (see §17.7.1) showed K10C's gross edge has a **break-even of only 3.76 bps** per unit L1 turnover. At ~10 bps (a conservative Polymarket spread) K10C's net delta flips from +0.46 to **−0.76** log-wealth. K10B has a higher break-even (10.9 bps) because its turnover is ~4× lower.
+2. **DD blowup.** K10C max DD is −11.7% vs baseline −4.5% (2.6× worse). A fractional-Kelly α=0.5 blend (§17.7.2) halves the DD to −7.6% while keeping ~75% of the gross log-wealth gain — useful, but still a post-hoc fix, not an optimizer-native solution.
+3. **Statistical fragility.** Circular-block bootstrap (1000 resamples, block=50) puts K10C's 95% CI at `[+0.005, +0.973]` — just barely excluding zero. K10B/K10A straddle zero (Pr(Δ>0) = 0.93 / 0.81). The K10C win is real but marginal.
+
+Round 7 attacks these head-on: **K10E** puts the fee inside the optimizer (loss + reported return), **K10F** adds a downside-semivariance penalty to the Kelly objective, and **optional M5** tests whether the week8 MVO recipe's small Sortino edge survives a 40-market scale-up. Three laptop post-hocs (§17.7) run in parallel. K10D (pure `K10C + turnover_lambda` sweep, already running on pod ba619f11) stays as-is — it's the right control.
+
+### 17.0. Step-by-step: from a fresh pod to a running Round 7 experiment (K10E / K10F / M5)
+
+Same skeleton as §16.0 — the differences are: (a) you check out `cloud-runs-R7`, not `cloud-runs-R6`; (b) each block in Step 7 uses the new Kelly CLI flags `--fee-rate-values` / `--dd-penalty-values`; and (c) M5 uses the week8 pipeline, not the Kelly pipeline.
+
+Before you start, same as §16.0: GitHub username + fine-grained PAT with `Contents: Read and write` on the repo.
+
+#### Step 1 — SSH into the pod
+
+```bash
+prime pods ssh <pod-id>
+```
+
+#### Step 2 — Clone and check out `cloud-runs-R7`
+
+```bash
+cd ~
+git clone https://github.com/adamt38/STAT-4830-energy_arbitrage-project.git
+cd STAT-4830-energy_arbitrage-project
+git fetch origin
+git checkout cloud-runs-R7
+git reset --hard origin/cloud-runs-R7
+```
+
+**Critical:** `cloud-runs-R7`, not `cloud-runs-R6`. The `--fee-rate-values`, `--fee-rate-override`, `--dd-penalty-values`, `--dd-penalty-override` flags and the fee-aware / DD-aware code paths in `src/kelly_copula_optimizer.py` only exist on R7 until fan-in.
+
+Sanity-check:
+
+```bash
+git rev-parse --abbrev-ref HEAD    # must print cloud-runs-R7
+```
+
+#### Step 3 — Install OS + Python dependencies
+
+```bash
+sudo apt update
+sudo apt install -y curl build-essential python3-venv tmux
+export PATH="$HOME/.local/bin:$PATH"
+bash script/install.sh
+source .venv/bin/activate
+uv pip install scipy
+uv pip install yfinance   # Kelly pipeline pulls SPY/QQQ/BTC exog features
+```
+
+Sanity-check:
+
+```bash
+which python    # must print a path inside .venv/bin/
+```
+
+#### Step 4 — Configure git identity and GitHub credentials
+
+Identical to §16.0 Step 4:
+
+```bash
+git config --global user.email "you@example.edu"
+git config --global user.name  "Your Name"
+git config --global credential.helper store
+cat > ~/.git-credentials <<'EOF'
+https://<USERNAME>:<FINE_GRAINED_PAT>@github.com
+EOF
+chmod 600 ~/.git-credentials
+git ls-remote origin HEAD   # must print a SHA, no prompt
+```
+
+#### Step 5 — Start a tmux session
+
+```bash
+cd ~/STAT-4830-energy_arbitrage-project
+tmux new -s r7
+```
+
+#### Step 6 — Set threading and timestamp env (inside tmux)
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+```
+
+GPU pods: PyTorch will auto-use CUDA if available — no extra config. CPU-only pods take ~4–8h instead of ~2–4h.
+
+#### Step 7 — Paste the pipeline command for **this pod's experiment**
+
+| If this pod runs | Copy-paste block |
+|---|---|
+| **K10E** (fee-aware Kelly on 20-market universe) | §17.2 |
+| **K10F** (drawdown-controlled Kelly on 20-market universe) | §17.3 |
+| **M5** (S1 recipe at 40-market scale, **optional / 3rd pod only**) | §17.4 |
+
+#### Step 8 — Detach (`Ctrl-b d`) and close your laptop
+
+Results push to `cloud-runs-K10E`, `cloud-runs-K10F`, or `cloud-runs-M5` on completion.
+
+#### Step 9 — Check on a running pod later
+
+`tmux attach -t r7` then `Ctrl-b [` to scroll, `q` to exit, `Ctrl-b d` to detach.
+
+Healthy signs:
+- Optuna progress lines every few seconds (`Trial N finished with value: ...`).
+- No repeated `RuntimeError` or `CUDA out of memory`.
+- For K10E: Optuna logs the sampled `fee_rate` as a user attr on each trial.
+
+#### Step 10 — Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `unrecognized arguments: --fee-rate-values` | wrong branch (on R6 or plain cloud-runs) | redo Step 2 with `cloud-runs-R7` |
+| `ModuleNotFoundError: yfinance` | skipped the extra install in Step 3 | `source .venv/bin/activate && uv pip install yfinance` |
+| K10E all trials return `fee_rate=0.0` | QMC sampler happened to pick only zero on sparse categorical | raise `--optuna-trials` to 300, or split into 4 pinned runs with `--fee-rate-override {0, 0.001, 0.005, 0.02}` |
+| DD penalty has no effect (K10F) | `dd_penalty * mean(relu(-rho_mc)**2)` bounded by `(max payoff)²≈0.25`; `dd_penalty=0` dominates | try `--dd-penalty-values 0,5,20,50,100` (shifted higher) |
+| Push fails with 403 | PAT missing `Contents: Read and write` | regenerate PAT, redo Step 4 |
+
+### 17.1. Hypothesis matrix
+
+| Experiment | Pipeline | Key delta vs K10C best | Success criteria | Runtime on 16-vCPU |
+|---|---|---|---|---|
+| **K10E** fee-aware Kelly | `script/polymarket_week10_kelly_pipeline.py` | `--fee-rate-values 0,0.001,0.005,0.02` sweep ∪ default `turnover_lambdas` | Net-of-fees log-wealth delta ≥ +0.10 at `fee_rate = 0.001`. Equivalent: K10C's gross edge does *not* fully evaporate at realistic fees because the optimizer picked a lower-turnover policy under friction. | 4–8h CPU / 2–4h GPU |
+| **K10F** DD-controlled Kelly | `script/polymarket_week10_kelly_pipeline.py` | `--dd-penalty-values 0,0.5,2,5,10`, other levers pinned via `-override` flags | DD frontier with ≥1 point at `max_dd ≥ −7%` AND `log-wealth delta ≥ +0.30`. Strictly dominates post-hoc α-blend because DD is inside the loss. | 4–8h CPU / 2–4h GPU |
+| **M5** optional | `script/polymarket_week8_pipeline.py` | S1 best config + `--market-count-override 40` | `holdout_sortino_minus_baseline ≥ +0.02` at 40 markets. Tests whether S1's small Round 6 hint was a 20-market artifact. | 3–6h CPU |
+
+### 17.2. K10E — Fee-aware Kelly pipeline command
+
+Paste this whole block inside tmux on the K10E pod.
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+mkdir -p logs
+
+python script/polymarket_week10_kelly_pipeline.py \
+  --artifact-prefix week10_kelly_E \
+  --input-artifact-prefix week8 \
+  --optuna-trials 200 \
+  --optuna-n-jobs 4 \
+  --fee-rate-values 0,0.0010,0.0050,0.0200 \
+  --mc-samples-override 256 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-K10E \
+  --git-commit-message "K10E fee-aware Kelly sweep $RUN_TAG" \
+  2>&1 | tee logs/k10e_$RUN_TAG.log
+```
+
+Notes:
+- `--fee-rate-values` is a 4-level categorical Optuna dimension (0 / 10 / 50 / 200 bps **per unit L1 turnover**).
+- Every trial reports `holdout_log_wealth_total` **net of fees** — `fee_rate * turnover` is subtracted from each step's realized return before log-wealth accumulates.
+- `turnover_lambda` sweep stays at its default (`(0.0, 0.001, 0.01, 0.05, 0.1)`). Do NOT override it — we want the optimizer to co-choose `(fee_rate, lambda_turn)`.
+- 200 trials ≥ 4 fee levels × 5 turnover levels × 10 replicates — dense enough for Sobol coverage.
+
+### 17.3. K10F — Drawdown-controlled Kelly pipeline command
+
+Paste inside tmux on the K10F pod.
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+mkdir -p logs
+
+python script/polymarket_week10_kelly_pipeline.py \
+  --artifact-prefix week10_kelly_F \
+  --input-artifact-prefix week8 \
+  --optuna-trials 150 \
+  --optuna-n-jobs 4 \
+  --dd-penalty-values 0,0.5,2,5,10 \
+  --mc-samples-override 256 \
+  --lambda-turnover-override 0.0 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-K10F \
+  --git-commit-message "K10F DD-controlled Kelly sweep $RUN_TAG" \
+  2>&1 | tee logs/k10f_$RUN_TAG.log
+```
+
+Notes:
+- `--dd-penalty-values` adds `dd_penalty * mean(relu(-rho_mc)**2)` to the Kelly training objective, where `rho_mc` is the per-sample MC payoff tensor. Convex in weights, stable gradient.
+- We pin `--lambda-turnover-override 0.0` so only `dd_penalty` varies — otherwise turnover_lambda and dd_penalty together would make attribution impossible.
+- 150 trials = 5 dd_penalty levels × 30 replicates of the other categoricals — dense enough for a frontier plot of (annualized log-growth, realized max DD).
+- The Kelly selection objective (`mean_log_wealth − λ_sel · mean_turnover`) is unchanged; we are NOT selecting on DD, we are *penalizing* high-DD paths inside the training loop.
+
+### 17.4. M5 (optional) — S1 at 40-market scale
+
+Only run if a 3rd pod is free after launching K10E and K10F.
+
+```bash
+source .venv/bin/activate
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TORCH_NUM_THREADS=4
+export PYTHONUNBUFFERED=1
+RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
+mkdir -p logs
+
+python script/polymarket_week8_pipeline.py \
+  --artifact-prefix week13_M5 \
+  --rebuild-data \
+  --market-count-override 40 \
+  --optuna-trials 100 \
+  --optuna-n-jobs 4 \
+  --variance-penalty-values 1.48 \
+  --downside-penalty-values 2.26 \
+  --covariance-penalty-lambdas 0.47 \
+  --domain-limit-values 0.12 \
+  --max-weight-values 0.045 \
+  --rolling-windows 96 \
+  --lr-values 0.01 \
+  --lambda-penalty-values 0.005 \
+  --git-commit-and-push \
+  --git-push-branch cloud-runs-M5 \
+  --git-commit-message "M5 S1-at-40-markets scale test $RUN_TAG" \
+  2>&1 | tee logs/m5_$RUN_TAG.log
+```
+
+Notes:
+- `--rebuild-data` forces a fresh Polymarket fetch (+~20 min) because the cached `week8_*` inputs are locked at 20 markets. If a prior `week13_M5_*` dataset exists, drop `--rebuild-data`.
+- If M5 crashes with `NoMarketsAfterHistoryFilterError` at 40 markets, the 24-day history filter is too strict — the pipeline's built-in history backoff (24 → 18 → 12 → 7 days) should handle it; no manual intervention needed.
+- M5 is a **hedge experiment** — does not affect the Kelly headline. Answers one narrow question: does S1's small 20-market Sortino lift survive 2× universe growth?
+
+### 17.5. What finishes when
+
+K10E (200 trials, `--optuna-n-jobs 4` on 16 vCPU ≈ 50 effective serial trials):
+- CPU pod: **4–8 hours**.
+- GPU pod: **2–4 hours**.
+
+K10F (150 trials, same per-trial cost):
+- CPU pod: **3–6 hours**.
+- GPU pod: **1.5–3 hours**.
+
+M5 (100 trials on 40-market dataset, ~2× IO per trial):
+- CPU pod: **3–6 hours**.
+
+Start K10E and K10F in parallel; M5 last if a 3rd pod frees up during that window.
+
+### 17.6. Fan-in (after all pods finish)
+
+Once K10E / K10F / (optionally M5) / K10D have all pushed to their respective `cloud-runs-K10{D,E,F}` / `cloud-runs-M5` branches, merge each into a new `cloud-runs-R7-fanin` branch on your **laptop**:
+
+```bash
+cd ~/path/to/STAT-4830-energy_arbitrage-project
+git fetch origin
+git checkout cloud-runs-R7
+git checkout -b cloud-runs-R7-fanin
+
+# Each pod writes to a unique --artifact-prefix so there should be no conflicts.
+git merge --no-ff origin/cloud-runs-K10D -m "Fan-in K10D turnover sweep"
+git merge --no-ff origin/cloud-runs-K10E -m "Fan-in K10E fee-aware Kelly"
+git merge --no-ff origin/cloud-runs-K10F -m "Fan-in K10F DD-controlled Kelly"
+git merge --no-ff origin/cloud-runs-M5   -m "Fan-in M5 40-market MVO scale test" 2>/dev/null || true
+
+# Cache the new runs' artifacts for the laptop post-hocs:
+mkdir -p data/round7_cache
+for B in K10D K10E K10F; do
+  LETTER="${B#K10}"
+  git show "origin/cloud-runs-${B}:data/processed/week10_kelly_${LETTER}_kelly_best_timeseries.csv" \
+    > "data/round7_cache/${B}_kelly_best_timeseries.csv"
+  git show "origin/cloud-runs-${B}:data/processed/week10_kelly_${LETTER}_baseline_timeseries.csv" \
+    > "data/round7_cache/${B}_baseline_timeseries.csv"
+  git show "origin/cloud-runs-${B}:data/processed/week10_kelly_${LETTER}_kelly_best_metrics.json" \
+    > "data/round7_cache/${B}_kelly_best_metrics.json"
+done
+
+# Re-run the fee-ranking and bootstrap post-hocs over the combined run list.
+python script/posthoc_fee_ranking.py --runs K10A,K10B,K10C,K10D,K10E,K10F
+python script/posthoc_bootstrap_ci.py --runs K10A,K10B,K10C,K10D,K10E,K10F
+```
+
+### 17.7. Laptop post-hocs (runnable now — do not wait for pods)
+
+All three scripts read from `data/round7_cache/` (populated for K10A/B/C on 2026-04-19). They need no GPU and finish in under 30 min total.
+
+#### 17.7.1. Net-of-fees re-ranking
+
+```bash
+python script/posthoc_fee_ranking.py \
+  --cache-dir data/round7_cache \
+  --runs K10A,K10B,K10C \
+  --fee-rates 0,0.0010,0.0050,0.0200 \
+  --output-stem round7_fee_ranking
+```
+
+Output: `data/processed/round7_fee_ranking.csv` + `round7_fee_ranking.md` (includes a break-even-fee table).
+
+Pre-fan-in headline (produced 2026-04-19 before K10D/E/F finished):
+
+| Run | Δ log-w @ fee=0 | avg L1 turnover | **break-even fee (bps)** |
+|---|---:|---:|---:|
+| K10A | +0.1762 | 0.0275 | 5.60 |
+| K10B | +0.2903 | 0.0232 | **10.93** |
+| K10C | +0.4598 | 0.1071 | 3.76 |
+
+K10B's fee robustness (2× higher break-even than K10C despite smaller gross edge) is the surprise finding motivating the K10E sweep.
+
+#### 17.7.2. Fractional Kelly α-blend on K10C
+
+```bash
+# Copy cached CSVs into data/processed/ under the names the script expects.
+cp data/round7_cache/K10C_kelly_best_timeseries.csv data/processed/week10_kelly_C_kelly_best_timeseries.csv
+cp data/round7_cache/K10C_baseline_timeseries.csv   data/processed/week10_kelly_C_baseline_timeseries.csv
+
+python script/posthoc_alpha_blend.py \
+  --artifact-prefix week10_kelly_C \
+  --constrained-stem week10_kelly_C \
+  --constrained-suffix kelly_best \
+  --alphas 0.0,0.1,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.75,0.8,0.9,1.0 \
+  --output-stem week10_kelly_C_alpha_blend
+```
+
+Output: `data/processed/week10_kelly_C_alpha_blend_summary.md`. Pre-fan-in headline: α=0.50 keeps +0.647 log-wealth (~75% of K10C's +0.868 gross) while cutting DD from −11.7% to −7.6%. Best-Sortino argmax at α=0.60.
+
+#### 17.7.3. Bootstrap CI on Kelly log-wealth delta
+
+```bash
+python script/posthoc_bootstrap_ci.py \
+  --cache-dir data/round7_cache \
+  --runs K10A,K10B,K10C \
+  --n-boot 1000 \
+  --block-length 50 \
+  --seed 7 \
+  --output-stem round7_bootstrap_ci
+```
+
+Output: `data/processed/round7_bootstrap_ci.csv` + `round7_bootstrap_ci.md`. Pre-fan-in headline:
+
+| Run | Observed Δ | 95% CI | Pr(Δ>0) | z |
+|---|---:|---|---:|---:|
+| K10A | +0.176 | [−0.232, +0.599] | 0.807 | +0.80 |
+| K10B | +0.290 | [−0.097, +0.696] | 0.934 | +1.45 |
+| K10C | +0.460 | [+0.005, +0.973] | 0.975 | +1.91 |
+
+K10C's CI barely excludes zero — a real effect but statistically marginal. With fees it goes underwater (§17.7.1). Motivates K10E/F to find a net-of-fees real edge.
+
+### 17.8. Success criteria
+
+1. **K10E** finds ≥1 trial with `holdout_log_wealth_total > baseline + 0.10` at `fee_rate = 0.001` (10 bps). Equivalent: the Kelly edge is real **after realistic fees** when the optimizer is allowed to co-choose turnover.
+2. **K10F** produces a DD-frontier where some `dd_penalty` setting gives `max_drawdown ≥ −7%` AND `log-wealth delta ≥ +0.30`. Strictly dominates post-hoc α-blend because DD is now inside the loss.
+3. **Bootstrap CI at fan-in** (§17.6) produces a 95% CI for the best K10E *net-of-fees* configuration that excludes zero with `Pr(Δ > 0) ≥ 0.95` — the statistical validation the gross K10C result barely cleared.
+4. **M5** (optional) gives `holdout_sortino_minus_baseline ≥ +0.02` at 40 markets — confirming S1's Round 6 hint was real. Failure closes the MVO-on-small-universe lever forever.
+
+### 17.9. What Round 7 does NOT do
+
+- Does not re-run K10D's turnover sweep (already in-flight on pod ba619f11).
+- Does not expand the market universe beyond 40 (data availability, plus Kelly's copula MLP is O(K²) per step).
+- Does not sweep new MVO recipes on 20 markets — every Round 4–6 variant tied baseline inside the ±0.035 seed-noise band.
+- Does not add a CVaR constraint to Kelly (considered but rejected: batch-level CVaR is noisy; semivariance is a more stable surrogate for the DD goal).
+

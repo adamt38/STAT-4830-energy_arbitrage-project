@@ -96,6 +96,17 @@ class KellyExperimentConfig:
     mlp_hidden_dims: tuple[int, ...] = (8, 16, 32)
     concentration_penalty_lambdas: tuple[float, ...] = (10.0, 50.0)
     max_weights: tuple[float, ...] = (0.06, 0.10, 0.15)
+    #: Per-unit-turnover transaction cost applied BOTH inside the training
+    #: loss (``+ fee_rate * ||Delta w||_1``) AND subtracted from every
+    #: reported realized return (``r_net = r_gross - fee_rate * turnover``).
+    #: Decimals; e.g. 0.0010 = 10 bps per unit L1 weight change. 0.0 is a
+    #: pure Kelly baseline and reproduces the pre-R7 code path.
+    fee_rates: tuple[float, ...] = (0.0,)
+    #: Downside-semivariance penalty on MC-sampled returns inside the Kelly
+    #: objective: ``+ dd_penalty * mean(relu(-rho_mc)**2)``. Discourages
+    #: paths with high expected multiplicative losses. 0.0 reproduces pre-R7
+    #: code path.
+    dd_penalty_lambdas: tuple[float, ...] = (0.0,)
     steps_per_window: int = 3
     holdout_fraction: float = 0.2
     walkforward_train_steps: int = 240
@@ -361,6 +372,33 @@ def _standard_normal_cdf(z: torch.Tensor) -> torch.Tensor:
     return 0.5 * (1.0 + torch.erf(z / _SQRT2))
 
 
+def kelly_log_wealth_with_samples(
+    weights: torch.Tensor,
+    prices_t: torch.Tensor,
+    L_t: torch.Tensor,
+    eps: torch.Tensor,
+    temperature: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Like :func:`kelly_log_wealth` but also returns the per-sample clamped
+    portfolio return ``rho_clamped`` so callers can apply risk penalties
+    (e.g. downside semivariance on the MC path) without resampling.
+
+    Returns
+    -------
+    (log_wealth_scalar, rho_clamped) where ``rho_clamped`` has shape ``(S,)``.
+    """
+    z = eps @ L_t.transpose(0, 1)
+    u = _standard_normal_cdf(z)
+    p = prices_t.unsqueeze(0)
+    y_soft = torch.sigmoid((p - u) / max(temperature, 1e-6))
+    y_hard = (u <= p).to(dtype=u.dtype)
+    y = y_hard + (y_soft - y_soft.detach())
+    payoff = y * (1.0 - p) + (1.0 - y) * (-p)
+    rho = payoff @ weights
+    rho_clamped = torch.clamp(rho, min=-0.999)
+    return torch.mean(torch.log1p(rho_clamped)), rho_clamped
+
+
 def kelly_log_wealth(
     weights: torch.Tensor,
     prices_t: torch.Tensor,
@@ -383,21 +421,8 @@ def kelly_log_wealth(
     -------
     Scalar tensor: ``(1/S) sum_s log(1 + clamp(w^T payoff_s, -0.999, +inf))``.
     """
-    # Latent Gaussian samples with copula correlation: z = eps @ L^T -> (S, K)
-    z = eps @ L_t.transpose(0, 1)
-    u = _standard_normal_cdf(z)  # (S, K) uniform marginals
-    # Straight-through Bernoulli: forward = hard threshold, backward = sigmoid surrogate.
-    p = prices_t.unsqueeze(0)  # (1, K)
-    y_soft = torch.sigmoid((p - u) / max(temperature, 1e-6))
-    y_hard = (u <= p).to(dtype=u.dtype)
-    y = y_hard + (y_soft - y_soft.detach())  # (S, K), STE
-    # Per-share Polymarket payoff on a Yes-token bought at price p:
-    #   y=1 -> +(1 - p),   y=0 -> -p
-    payoff = y * (1.0 - p) + (1.0 - y) * (-p)  # (S, K)
-    rho = payoff @ weights  # (S,)
-    # Clamp from below so log1p never sees -1.
-    rho_clamped = torch.clamp(rho, min=-0.999)
-    return torch.mean(torch.log1p(rho_clamped))
+    log_w, _ = kelly_log_wealth_with_samples(weights, prices_t, L_t, eps, temperature)
+    return log_w
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +447,8 @@ def _run_kelly_online_pass(
     concentration_penalty_lambda: float,
     max_weight: float,
     seed: int,
+    fee_rate: float = 0.0,
+    dd_penalty: float = 0.0,
     evaluation_start_t: int | None = None,
     update_after_eval_start: bool = True,
     time_offset: int = 0,
@@ -549,7 +576,7 @@ def _run_kelly_online_pass(
 
                 # Resample epsilon every inner step (true SGD on the MC estimator).
                 eps_noise = torch.randn(int(mc_samples), n_assets, dtype=torch.float32)
-                kelly = kelly_log_wealth(
+                kelly, rho_mc = kelly_log_wealth_with_samples(
                     weights=weights,
                     prices_t=prices_t,
                     L_t=L,
@@ -561,11 +588,17 @@ def _run_kelly_online_pass(
                     torch.clamp(weights - max_weight, min=0.0).pow(2)
                 )
                 turnover = torch.sum(torch.abs(weights - prev_weights_train))
+                # Downside-semivariance on the MC path: E[(max(-rho, 0))**2]
+                # -- zero gradient when all MC draws are non-negative.
+                downside_mc = torch.mean(
+                    torch.clamp(-rho_mc, min=0.0).pow(2)
+                )
 
                 loss = (
                     -kelly
-                    + turnover_lambda * turnover
+                    + (turnover_lambda + fee_rate) * turnover
                     + concentration_penalty_lambda * concentration_penalty
+                    + dd_penalty * downside_mc
                 )
                 loss.backward()
                 optimizer.step()
@@ -586,12 +619,14 @@ def _run_kelly_online_pass(
             # Realized step return on the *actual* continuous price path
             # (apples-to-apples with the equal-weight baseline).
             step_returns_safe = np.nan_to_num(step_returns_np, nan=0.0)
-            r_t = float(step_returns_safe @ current_weights_np)
+            step_turnover_l1 = float(
+                np.sum(np.abs(current_weights_np - prev_weights_eval))
+            )
+            r_gross = float(step_returns_safe @ current_weights_np)
+            r_t = r_gross - float(fee_rate) * step_turnover_l1
             realized_returns.append(r_t)
             log_wealth_increments.append(float(np.log1p(max(r_t, -0.999))))
-            turnovers.append(
-                float(np.sum(np.abs(current_weights_np - prev_weights_eval)))
-            )
+            turnovers.append(step_turnover_l1)
             prev_weights_eval = current_weights_np
             if capture_diagnostics:
                 eval_weights.append(current_weights_np.copy())
@@ -660,6 +695,8 @@ def _walkforward_kelly_score(
     mlp_hidden_dim: int,
     concentration_penalty_lambda: float,
     max_weight: float,
+    fee_rate: float = 0.0,
+    dd_penalty: float = 0.0,
 ) -> tuple[float, float]:
     """Run walk-forward folds and return ``(mean_log_wealth_per_step, mean_turnover_per_step)``.
 
@@ -690,6 +727,8 @@ def _walkforward_kelly_score(
             mlp_hidden_dim=mlp_hidden_dim,
             concentration_penalty_lambda=concentration_penalty_lambda,
             max_weight=max_weight,
+            fee_rate=fee_rate,
+            dd_penalty=dd_penalty,
             seed=cfg.seed,
             evaluation_start_t=train_steps,
             update_after_eval_start=True,
@@ -718,6 +757,8 @@ def _walkforward_kelly_score(
             mlp_hidden_dim=mlp_hidden_dim,
             concentration_penalty_lambda=concentration_penalty_lambda,
             max_weight=max_weight,
+            fee_rate=fee_rate,
+            dd_penalty=dd_penalty,
             seed=cfg.seed,
             evaluation_start_t=rolling_window,
             update_after_eval_start=True,
@@ -746,6 +787,8 @@ def run_kelly_optuna_search(
     timeout_sec: int | None = None,
     mc_samples_override: int | None = None,
     turnover_lambda_override: float | None = None,
+    fee_rate_override: float | None = None,
+    dd_penalty_override: float | None = None,
     disable_copula: bool | None = None,
 ) -> dict[str, pathlib.Path]:
     """Optuna QMC search over the joint (weights, MLP) Kelly objective.
@@ -839,6 +882,24 @@ def run_kelly_optuna_search(
             log=True,
         )
         max_weight = _suggest(trial, "max_weight", cfg.max_weights, log=False)
+        if fee_rate_override is not None:
+            fee_rate = float(fee_rate_override)
+            trial.set_user_attr("fee_rate_override", float(fee_rate_override))
+        elif len(cfg.fee_rates) == 1:
+            fee_rate = float(cfg.fee_rates[0])
+        else:
+            fee_rate = float(
+                trial.suggest_categorical("fee_rate", list(cfg.fee_rates))
+            )
+        if dd_penalty_override is not None:
+            dd_penalty = float(dd_penalty_override)
+            trial.set_user_attr("dd_penalty_override", float(dd_penalty_override))
+        elif len(cfg.dd_penalty_lambdas) == 1:
+            dd_penalty = float(cfg.dd_penalty_lambdas[0])
+        else:
+            dd_penalty = _suggest(
+                trial, "dd_penalty", cfg.dd_penalty_lambdas, log=False
+            )
 
         mean_log_wealth, mean_turnover = _walkforward_kelly_score(
             tuning_returns=tuning_returns,
@@ -855,6 +916,8 @@ def run_kelly_optuna_search(
             mlp_hidden_dim=mlp_hidden,
             concentration_penalty_lambda=conc_lambda,
             max_weight=max_weight,
+            fee_rate=fee_rate,
+            dd_penalty=dd_penalty,
         )
         score = mean_log_wealth - cfg.selection_turnover_penalty * mean_turnover
         trial.set_user_attr("walkforward_mean_log_wealth_per_step", mean_log_wealth)
@@ -873,6 +936,8 @@ def run_kelly_optuna_search(
                 "mlp_hidden_dim": mlp_hidden,
                 "concentration_penalty_lambda": conc_lambda,
                 "max_weight": max_weight,
+                "fee_rate": fee_rate,
+                "dd_penalty": dd_penalty,
                 "walkforward_mean_log_wealth_per_step": mean_log_wealth,
                 "walkforward_mean_turnover_per_step": mean_turnover,
                 "selection_score": score,
@@ -913,6 +978,8 @@ def run_kelly_optuna_search(
         "mlp_hidden_dim",
         "concentration_penalty_lambda",
         "max_weight",
+        "fee_rate",
+        "dd_penalty",
         "walkforward_mean_log_wealth_per_step",
         "walkforward_mean_turnover_per_step",
         "selection_score",
@@ -949,6 +1016,20 @@ def run_kelly_optuna_search(
         bp.get("concentration_penalty_lambda", cfg.concentration_penalty_lambdas[0])
     )
     holdout_max_weight = float(bp.get("max_weight", cfg.max_weights[0]))
+    # fee_rate / dd_penalty pull from override, else from best trial, else
+    # from the first config value (pre-R7 behavior: all 0.0).
+    if fee_rate_override is not None:
+        holdout_fee_rate = float(fee_rate_override)
+    elif "fee_rate" in bp:
+        holdout_fee_rate = float(bp["fee_rate"])
+    else:
+        holdout_fee_rate = float(cfg.fee_rates[0])
+    if dd_penalty_override is not None:
+        holdout_dd_penalty = float(dd_penalty_override)
+    elif "dd_penalty" in bp:
+        holdout_dd_penalty = float(bp["dd_penalty"])
+    else:
+        holdout_dd_penalty = float(cfg.dd_penalty_lambdas[0])
 
     holdout_payload = _run_kelly_online_pass(
         returns_matrix=returns_matrix,
@@ -965,6 +1046,8 @@ def run_kelly_optuna_search(
         mlp_hidden_dim=holdout_mlp_hidden,
         concentration_penalty_lambda=holdout_conc_lambda,
         max_weight=holdout_max_weight,
+        fee_rate=holdout_fee_rate,
+        dd_penalty=holdout_dd_penalty,
         seed=cfg.seed,
         evaluation_start_t=split_idx,
         update_after_eval_start=True,
@@ -1010,6 +1093,8 @@ def run_kelly_optuna_search(
         "mlp_hidden_dim": holdout_mlp_hidden,
         "concentration_penalty_lambda": holdout_conc_lambda,
         "max_weight": holdout_max_weight,
+        "fee_rate": holdout_fee_rate,
+        "dd_penalty": holdout_dd_penalty,
         "weight_parameterization": cfg.weight_parameterization,
         "optimizer_type": cfg.optimizer_type,
         "selection_source": "optuna_qmc_kelly",
