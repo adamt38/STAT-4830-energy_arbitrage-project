@@ -1758,9 +1758,23 @@ Notes:
 - 150 trials = 5 dd_penalty levels × 30 replicates of the other categoricals — dense enough for a frontier plot of (annualized log-growth, realized max DD).
 - The Kelly selection objective (`mean_log_wealth − λ_sel · mean_turnover`) is unchanged; we are NOT selecting on DD, we are *penalizing* high-DD paths inside the training loop.
 
-### 17.4. M5 (optional) — S1 at 40-market scale
+### 17.4. M5 (optional) — S1 seed-robustness check
 
-Only run if a 3rd pod is free after launching K10E and K10F.
+**Correction vs the original Round 7 plan.** The plan framed M5 as "S1 at 40-market scale". That framing is wrong: `script/polymarket_week8_pipeline.py` hardcodes `max_markets=40` at line 944, and `script/polymarket_week10_kelly_pipeline.py` does the same at line 755. Every prior week8 / week10 run was already at 40 markets. There are also no `--rebuild-data`, `--market-count-override`, or `--lambda-penalty-values` CLI flags — those do not exist in the pipeline and the M5 launch block that referenced them was broken. A true scale-up would require (a) patching `BuildConfig(max_markets=...)` through a new CLI flag and (b) rebuilding the dataset from scratch — roughly a ~20 line code change plus a ~30 min data rebuild.
+
+**Pick one of three options:**
+
+#### Option A (recommended) — skip M5
+
+Round 7's pod-arm deliverable is K10D + K10E + K10F. M5 was always "optional 3rd pod" in the plan. Given S1 already ran at 40 markets and recorded `holdout_sortino_minus_baseline = −0.0009` (tied baseline with a fractionally negative sign), there is nothing to scale-test. Kill the M5 pod if one was already provisioned:
+
+```bash
+prime pods terminate <M5_pod_id>
+```
+
+#### Option B — repurpose M5 as an S1 seed-robustness check
+
+Pin every S1 best hyperparameter to a single-value list and sweep only the seed. Gives one extra data point on S1's Δ under a different RNG draw. Cost: ~$0.66 on a `$0.11/hr CPU NODE` × ~6 h.
 
 ```bash
 source .venv/bin/activate
@@ -1769,30 +1783,35 @@ export PYTHONUNBUFFERED=1
 RUN_TAG="$(date -u +%Y%m%dT%H%MZ)"
 mkdir -p logs
 
-python script/polymarket_week8_pipeline.py \
+python -u script/polymarket_week8_pipeline.py \
   --artifact-prefix week13_M5 \
-  --rebuild-data \
-  --market-count-override 40 \
-  --optuna-trials 100 \
-  --optuna-n-jobs 4 \
+  --macro-modes both \
+  --reduced-search \
+  --momentum-screening --momentum-top-n 20 --momentum-lookback-days 5 \
   --variance-penalty-values 1.48 \
   --downside-penalty-values 2.26 \
   --covariance-penalty-lambdas 0.47 \
+  --covariance-shrinkage-values 0.056 \
   --domain-limit-values 0.12 \
   --max-weight-values 0.045 \
+  --concentration-penalty-lambdas 0.69 \
   --rolling-windows 96 \
-  --lr-values 0.01 \
-  --lambda-penalty-values 0.005 \
+  --lr-values 0.039 \
+  --seed-override 42 \
+  --top-k-bagging 5 \
+  --optuna-n-jobs 4 \
+  --optuna-trials 100 \
   --git-commit-and-push \
   --git-push-branch cloud-runs-M5 \
-  --git-commit-message "M5 S1-at-40-markets scale test $RUN_TAG" \
+  --git-commit-message "M5 S1-recipe seed-42 robustness check $RUN_TAG" \
   2>&1 | tee logs/m5_$RUN_TAG.log
 ```
 
-Notes:
-- `--rebuild-data` forces a fresh Polymarket fetch (+~20 min) because the cached `week8_*` inputs are locked at 20 markets. If a prior `week13_M5_*` dataset exists, drop `--rebuild-data`.
-- If M5 crashes with `NoMarketsAfterHistoryFilterError` at 40 markets, the 24-day history filter is too strict — the pipeline's built-in history backoff (24 → 18 → 12 → 7 days) should handle it; no manual intervention needed.
-- M5 is a **hedge experiment** — does not affect the Kelly headline. Answers one narrow question: does S1's small 20-market Sortino lift survive 2× universe growth?
+Every sweep lever is pinned to the S1 best-params values from `origin/cloud-runs-S1:data/processed/week13_S1_macro_both_constrained_best_metrics.json`. The only degree of freedom is `--seed-override 42`. `yfinance` is not needed for this run — the S1 recipe uses only Polymarket + macro ETF features that the week8 pipeline fetches internally.
+
+#### Option C — code-patch for a real scale-up
+
+~20 line change to `script/polymarket_week8_pipeline.py` and `src/polymarket_data.py` to expose `max_markets` as a CLI flag, plus a fresh data rebuild. Not worth it for Round 7 given S1's existing Δ is −0.0009 before any scale hypothesis; document it as future work if the Kelly arm succeeds and MVO becomes relevant again.
 
 ### 17.5. What finishes when
 
