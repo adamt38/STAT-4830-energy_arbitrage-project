@@ -720,6 +720,36 @@ def main() -> None:
         help="Disable the dynamic copula (force R_t = I). Useful sanity baseline that "
         "isolates the Kelly + L1-turnover gain from the copula contribution.",
     )
+    # --- Momentum screening (Option B: ported from week8 pipeline) ---
+    # Reduces the candidate universe to the top-K markets by absolute recent
+    # price momentum before the Kelly optimizer ever sees them. Addresses the
+    # same dead-weight-market problem the week8 pipeline does: with fewer
+    # parameters the optimizer has better T/N ratio and constraint thresholds
+    # become meaningful. Only active when --rebuild-data is also set (momentum
+    # is a data-build-time filter, not a runtime lever).
+    parser.add_argument(
+        "--momentum-screening",
+        action="store_true",
+        help="Pre-screen the Polymarket universe by absolute recent price momentum "
+        "before the Kelly optimizer. Ranks candidate markets by |return over the "
+        "last N days| and keeps only the top-K movers. Must be used with "
+        "--rebuild-data (the filter runs during dataset build). Combines "
+        "cleanly with --fee-rate-values, --dd-penalty-values, --no-exogenous.",
+    )
+    parser.add_argument(
+        "--momentum-top-n",
+        type=int,
+        default=20,
+        help="Number of markets to retain after momentum screening (default 20). "
+        "Only used with --momentum-screening.",
+    )
+    parser.add_argument(
+        "--momentum-lookback-days",
+        type=float,
+        default=5.0,
+        help="Window (in days) for computing per-market momentum (default 5.0). "
+        "Only used with --momentum-screening.",
+    )
     parser.add_argument(
         "--reduced-search",
         action="store_true",
@@ -769,7 +799,29 @@ def main() -> None:
         use_cached_events_if_available=True,
         history_priority_enabled=True,
         history_priority_oversample_factor=5,
+        momentum_screening_enabled=bool(args.momentum_screening),
+        momentum_lookback_days=float(args.momentum_lookback_days),
+        momentum_top_n=(
+            int(args.momentum_top_n) if args.momentum_screening else None
+        ),
     )
+
+    if args.momentum_screening:
+        if not args.rebuild_data:
+            print(
+                "[WARNING] --momentum-screening was set but --rebuild-data is NOT. "
+                "Momentum screening is a data-build-time filter; the cached "
+                f"--input-artifact-prefix={args.input_artifact_prefix} dataset will "
+                "be used AS-IS (no momentum filter applied). Pass --rebuild-data "
+                "to force a fresh build with momentum screening active.",
+                flush=True,
+            )
+        else:
+            print(
+                f"[CONFIG] Momentum screening ENABLED: top_n={args.momentum_top_n}, "
+                f"lookback_days={args.momentum_lookback_days}",
+                flush=True,
+            )
 
     QUICK_SANITY_CHECK = False
     OPTUNA_N_TRIALS = 5 if QUICK_SANITY_CHECK else 100
