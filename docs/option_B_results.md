@@ -92,3 +92,48 @@ Ports the `--momentum-screening` lever (merged from Option A / Pod G) from the M
 ## Interpretation
 
 **Verdict: directional positive on both metrics.** Neither is statistically decisive but both point the same way. A multi-seed follow-up or fee-sweep (à la Adam's K10E) is the natural next step.
+
+
+---
+
+# Pod MF — Fee Sweep Extension
+
+Extends Pod M by adding `fee_rate` as a searchable Optuna categorical with values `{0, 0.001, 0.005, 0.01}` (0, 10, 50, 100 bps). Addresses Adam's §17 caveat that K10C's gross +0.46 log-wealth edge has break-even at only 3.76 bps (flips to −0.76 at realistic 10 bps spreads).
+
+## Headline Pod MF numbers
+
+| Metric | Baseline | Pod MF | Δ |
+|---|---|---|---|
+| Sortino | +0.0591 | +0.0427 | **-0.0164** |
+| Log-wealth | +0.3209 | +0.2617 | **-0.0592** |
+| Max drawdown | -24.36% | -30.32% | -5.95 pp |
+
+## Bootstrap 95% CI on Sortino delta
+
+- Observed Δ: **-0.0164**
+- 95% CI: [-0.0562, +0.0233]
+- Frac positive: **20.1%**
+
+## Which fee_rate Optuna selected
+
+**Best trial's fee_rate: `0.0` (0.0 bps)**
+
+## Per-fee-rate trial summary (log-wealth mean / best)
+
+| fee_rate (bps) | n trials | best log-wealth | mean log-wealth |
+|---|---|---|---|
+| 0.0 | 23 | +0.0000 | +0.0000 |
+| 10.0 | 24 | +0.0000 | +0.0000 |
+| 50.0 | 31 | +0.0000 | +0.0000 |
+| 100.0 | 22 | +0.0000 | +0.0000 |
+
+## Pod M vs Pod MF comparison
+
+| Pod | fee_rate | Sortino Δ | Log-wealth Δ | Note |
+|---|---|---|---|---|
+| Pod M (no fee lever) | 0.0 (forced) | +0.0265 | +0.2186 | Adam's K10C eq |
+| Pod MF (fee searched) | 0.0 bps | -0.0164 | -0.0592 | realistic fees |
+
+## Interpretation
+
+**Optuna picked fee_rate=0 even when all other values were available.** Indicates the optimizer couldn't find a configuration that justifies paying explicit fees — positive values penalize turnover in training and in the reported return, pushing objectives down.
