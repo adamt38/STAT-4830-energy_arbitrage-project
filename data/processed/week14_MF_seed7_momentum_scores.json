@@ -1,0 +1,146 @@
+{
+  "lookback_days": 5.0,
+  "top_n": 20,
+  "selected_markets": [
+    {
+      "token_id": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+      "market_slug": "will-ac-milan-win-the-202526-serie-a-league",
+      "question": "Will AC Milan win the 2025\u201326 Serie A league?",
+      "domain": "serie-a",
+      "momentum": 1.3333333333333333
+    },
+    {
+      "token_id": "76953082602184447446392227868698611312931515419726728725776351799308439033216",
+      "market_slug": "will-allen-waters-be-the-republican-nominee-for-senate-in-rhode-island",
+      "question": "Will Allen Waters be the Republican nominee for Senate in Rhode Island?",
+      "domain": "rhode-island-primary",
+      "momentum": 1.0
+    },
+    {
+      "token_id": "92206458231325096769152348269441704588222763710040504959674288895806154976594",
+      "market_slug": "megaeth-market-cap-fdv-2b-one-day-after-launch-392-656-565-965-418-578-388",
+      "question": "MegaETH market cap (FDV) >$3B one day after launch?",
+      "domain": "airdrops",
+      "momentum": 0.9743589743589743
+    },
+    {
+      "token_id": "98810428566585620214182469727337381592083535564740818468562839338072997379864",
+      "market_slug": "usdai-fdv-above-2b-one-day-after-launch-781-438-328-773-699-574-523-191",
+      "question": "USD.AI FDV above $2B one day after launch?",
+      "domain": "usdptai",
+      "momentum": -0.8571428571428571
+    },
+    {
+      "token_id": "82402823484466457361170410951601106261368113664328436062375970009969959380598",
+      "market_slug": "will-the-portland-trail-blazers-win-the-2026-nba-finals",
+      "question": "Will the Portland Trail Blazers win the 2026 NBA Finals?",
+      "domain": "nba-champion",
+      "momentum": 0.7999999999999998
+    },
+    {
+      "token_id": "103367863677987537227281870345670478293273189433945337168589532296599991222509",
+      "market_slug": "will-dante-moore-be-the-second-pick-in-the-2026-nfl-draft",
+      "question": "Will Dante Moore be the second pick in the 2026 NFL draft?",
+      "domain": "2026-nfl-draft-top-10",
+      "momentum": -0.75
+    },
+    {
+      "token_id": "59261866601270864198456845856841875150453626184437295894384368539724334278520",
+      "market_slug": "will-the-los-angeles-kings-win-the-western-conference-195",
+      "question": "Will the Los Angeles Kings win the Western Conference?",
+      "domain": "hockey",
+      "momentum": -0.7283950617283951
+    },
+    {
+      "token_id": "24315108267836543154857233535536136482524552716493402526894829400485516895736",
+      "market_slug": "will-the-phoenix-suns-win-the-nba-western-conference-finals",
+      "question": "Will the Phoenix Suns win the NBA Western Conference Finals?",
+      "domain": "nba",
+      "momentum": -0.7272727272727273
+    },
+    {
+      "token_id": "96156230578747105661476819749931380321917772151891667564189808442987244872145",
+      "market_slug": "will-the-boston-bruins-win-the-2026-nhl-stanley-cup",
+      "question": "Will the Boston Bruins win the 2026 NHL Stanley Cup?",
+      "domain": "stanley-cup",
+      "momentum": 0.7199999999999998
+    },
+    {
+      "token_id": "50252300898375978140712321807178556639478099096013757990329224333771594910605",
+      "market_slug": "will-greg-hull-win-the-2026-new-mexico-governor-republican-primary-election",
+      "question": "Will Greg Hull win the 2026 New Mexico Governor Republican primary election?",
+      "domain": "new-mexico-primary",
+      "momentum": 0.6987951807228916
+    },
+    {
+      "token_id": "5906729942132388187374842778427213872782907171873674796265663843960406830445",
+      "market_slug": "gensyn-fdv-above-400m-one-day-after-launch-356-264",
+      "question": "Gensyn FDV above $400M one day after launch?",
+      "domain": "gensyn",
+      "momentum": 0.6666666666666667
+    },
+    {
+      "token_id": "2317130722330994677503722994963086323403276367952762140016618274858179343506",
+      "market_slug": "will-villarreal-win-the-202526-la-liga",
+      "question": "Will Villarreal win the 2025\u201326 La Liga?",
+      "domain": "la-liga",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "49662274238485451283220527378586398370959042852997899886824914466317758572224",
+      "market_slug": "will-marseille-win-the-202526-french-ligue-1",
+      "question": "Will Marseille win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "77648433824716730185008177852682080573261442860361580435966309914289533557558",
+      "market_slug": "will-the-portland-trail-blazers-win-the-nba-western-conference-finals",
+      "question": "Will the Portland Trail Blazers win the NBA Western Conference Finals?",
+      "domain": "nba",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "7345183309756257693783741573478340128830660331823026035095352170224920670792",
+      "market_slug": "will-connie-chan-receive-the-most-votes-in-the-ca-11-primary",
+      "question": "Will Connie Chan receive the most votes in the CA-11 primary?",
+      "domain": "primaries",
+      "momentum": -0.6299559471365639
+    },
+    {
+      "token_id": "112756092474812837006608949040243623978128713942944679964506537771973932337876",
+      "market_slug": "will-chennai-super-kings-win-the-2026-indian-premier-league",
+      "question": "Will Chennai Super Kings win the 2026 Indian Premier League?",
+      "domain": "indian-premier-league",
+      "momentum": -0.6168224299065421
+    },
+    {
+      "token_id": "103950812176015306889097643332505690876545410954871160290129574415932884036868",
+      "market_slug": "will-taylor-fritz-win-the-2026-mens-french-open",
+      "question": "Will Taylor Fritz win the 2026 Men's French Open?",
+      "domain": "roland-garros",
+      "momentum": -0.5454545454545454
+    },
+    {
+      "token_id": "108548893345759572446077602443398325305734327289834850738242401844282632332811",
+      "market_slug": "epstein-client-list-released-by-june-30",
+      "question": "Epstein client list released by June 30?",
+      "domain": "epstein",
+      "momentum": -0.5375000000000001
+    },
+    {
+      "token_id": "104812555872482040859204311862207595317318459151981099582262357665296846969541",
+      "market_slug": "will-jack-draper-win-the-2026-mens-french-open",
+      "question": "Will Jack Draper win the 2026 Men's French Open?",
+      "domain": "roland-garros",
+      "momentum": -0.5
+    },
+    {
+      "token_id": "65396033350506725313266693161572493847482432654933099338943748693899562511370",
+      "market_slug": "will-dusty-johnson-win-the-2026-south-dakota-governor-republican-primary-election",
+      "question": "Will Dusty Johnson win the 2026 South Dakota Governor Republican primary election?",
+      "domain": "south-dakota-primary",
+      "momentum": 0.45205479452054803
+    }
+  ]
+}
