@@ -7,3 +7,6 @@ requests
 optuna
 pandas
 yfinance
+
+# Optuna QMCSampler (see docs/cloud_runbook.md §2d)
+scipy

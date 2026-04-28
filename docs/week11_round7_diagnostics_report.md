@@ -6,7 +6,7 @@ Round 7 closes the three caveats on the K10C headline (`kelly + dynamic copula`,
 2. **Max drawdown blew up** to −11.7% vs the baseline's −4.5% (2.6×).
 3. **Single-seed / single-config** — no statistical CI on the log-wealth delta.
 
-The round has two arms: **three laptop post-hocs** (ranked net-of-fees; fractional-Kelly α-blend on K10C; circular-block bootstrap CI), and **two new GPU pods** on `cloud-runs-R7` that push fees and drawdown *into the optimizer* (K10E fee-aware Kelly; K10F drawdown-controlled Kelly). K10D (pre-existing, `K10C + turnover_lambda` sweep on pod `ba619f11`) continues in parallel as the no-fee control. An optional M5 run tests whether the week8 MVO Sortino whisper survives a 40-market universe.
+The round has two arms: **three laptop post-hocs** (§1–3; complete in this repo), and **GPU pod sweeps** (K10D turnover; K10E fee-aware Kelly; K10F drawdown-controlled Kelly; optional M5) documented on `cloud-runs-R7` in `docs/cloud_runbook.md` §17. **Default-branch freeze:** K10D/E/F numerical tables are **not** in §4–5 below; §7 closes using post-hocs and K10A/B/C caches only.
 
 ## Run inventory
 
@@ -15,10 +15,12 @@ The round has two arms: **three laptop post-hocs** (ranked net-of-fees; fraction
 | K10A | `script/polymarket_week10_kelly_pipeline.py` | Kelly + log-wealth, **no copula** | `cloud-runs-K10A` | complete (Round 3) |
 | K10B | `script/polymarket_week10_kelly_pipeline.py` | Kelly + log-wealth + dynamic copula, `λ_turn=0` | `cloud-runs-K10B` | complete (Round 3) |
 | K10C | `script/polymarket_week10_kelly_pipeline.py` | Kelly + log-wealth + dynamic copula, full stack | `cloud-runs-K10C` | complete (Round 3) — **headline** |
-| K10D | `script/polymarket_week10_kelly_pipeline.py` | K10C + `turnover_lambda` sweep | `cloud-runs-K10D` | running on pod `ba619f11` (Round 6) |
-| **K10E** | `script/polymarket_week10_kelly_pipeline.py` (**patched R7**) | K10C + **`fee_rate`** sweep {0, 10, 50, 200 bps} × `turnover_lambda` | `cloud-runs-R7` → `cloud-runs-K10E` | pod launch pending |
-| **K10F** | `script/polymarket_week10_kelly_pipeline.py` (**patched R7**) | K10C + **downside-semivariance** penalty {0, 0.5, 2, 5, 10} | `cloud-runs-R7` → `cloud-runs-K10F` | pod launch pending |
-| M5 (optional) | `script/polymarket_week8_pipeline.py` | S1 best config at `--market-count-override 40` | `cloud-runs-R7` → `cloud-runs-M5` | pod launch optional |
+| K10D | `script/polymarket_week10_kelly_pipeline.py` | K10C + `turnover_lambda` sweep | `cloud-runs-K10D` | **not merged** — no `K10D` artifact bundle on default branch at repo freeze |
+| **K10E** | `script/polymarket_week10_kelly_pipeline.py` (**patched R7**) | K10C + **`fee_rate`** sweep {0, 10, 50, 200 bps} × `turnover_lambda` | `cloud-runs-R7` → `cloud-runs-K10E` | **not merged** — code paths documented in `docs/cloud_runbook.md` §17; no sweep outputs in tree |
+| **K10F** | `script/polymarket_week10_kelly_pipeline.py` (**patched R7**) | K10C + **downside-semivariance** penalty {0, 0.5, 2, 5, 10} | `cloud-runs-R7` → `cloud-runs-K10F` | **not merged** — same as K10E |
+| M5 (optional) | `script/polymarket_week8_pipeline.py` | S1 best config at `--market-count-override 40` | `cloud-runs-R7` → `cloud-runs-M5` | optional; not present in tree |
+
+**Repo note (2026-05):** This document is frozen against **laptop post-hocs** (§1–3) plus published code. Pod arms K10D/E/F were planned on GPU branches; **numerical tables in §4–5 were never backfilled on `main`**. §7 records the scientific close-out using only evidence available here. To populate §4–5, run the pod fan-in flow in `docs/cloud_runbook.md` §17.6 and re-run `posthoc_fee_ranking.py` / `posthoc_bootstrap_ci.py` with the extended run list.
 
 ## 1. Laptop post-hoc #1 — Net-of-fees re-ranking (Kelly runs)
 
@@ -83,14 +85,14 @@ Blend definition: `r_blend(t; α) = α · r_constrained(t) + (1 − α) · r_bas
 
 **Sweep:** `fee_rate ∈ {0, 0.0010, 0.0050, 0.0200}` (0 / 10 / 50 / 200 bps per unit L1 turnover), crossed with the default `turnover_lambdas = (0.0, 0.001, 0.01, 0.05, 0.1)`, 200 Optuna trials total.
 
-**Status.** Pending pod launch. Results will populate the table below at fan-in time (§6 below).
+**Status.** **No K10E sweep results in this repository.** The fee-aware *optimizer* path exists on branch `cloud-runs-R7` per the runbook; the headline evidence for fees remains the **post-hoc** ladder in §1 (re-ranking K10A/B/C timeseries).
 
 | Regime | Best `λ_turn` | Best `fee_rate` | Holdout log-wealth Δ (net) | Max DD | avg L1 turnover |
 |---|---:|---:|---:|---:|---:|
-| fee = 0 bps | TBD | 0 | TBD | TBD | TBD |
-| fee = 10 bps | TBD | 0.0010 | TBD | TBD | TBD |
-| fee = 50 bps | TBD | 0.0050 | TBD | TBD | TBD |
-| fee = 200 bps | TBD | 0.0200 | TBD | TBD | TBD |
+| fee = 0 bps | — | — | *see K10A/B/C rows in §1* | — | — |
+| fee = 10 bps | — | — | *not run in-tree* | — | — |
+| fee = 50 bps | — | — | *not run in-tree* | — | — |
+| fee = 200 bps | — | — | *not run in-tree* | — | — |
 
 **Success criterion:** ≥1 trial with `Δ log-wealth ≥ +0.10` *net* at 10 bps. Equivalent: the optimizer, when told fees exist, re-allocates enough toward low-turnover policies that the Kelly edge survives friction.
 
@@ -102,34 +104,39 @@ Blend definition: `r_blend(t; α) = α · r_constrained(t) + (1 − α) · r_bas
 
 **Sweep:** `dd_penalty ∈ {0, 0.5, 2, 5, 10}`, other levers pinned via `--lambda-turnover-override 0.0` and the K10C best config, 150 Optuna trials.
 
-**Status.** Pending pod launch. Frontier table below will populate at fan-in.
+**Status.** **No K10F sweep results in this repository.** The DD-penalty *loss term* is implemented on `cloud-runs-R7`; the empirical DD frontier in-tree is approximated by the **α-blend** trace in §2 (post-hoc leverage vs drawdown on K10C).
 
 | `dd_penalty` | Holdout log-wealth Δ | Max DD | Annualized log-growth | Sortino | Note |
 |---:|---:|---:|---:|---:|---|
-| 0 | TBD | TBD | TBD | TBD | reproduction of K10C |
-| 0.5 | TBD | TBD | TBD | TBD |  |
-| 2 | TBD | TBD | TBD | TBD |  |
-| 5 | TBD | TBD | TBD | TBD |  |
-| 10 | TBD | TBD | TBD | TBD |  |
+| 0 | *K10C* | *K10C* | *K10C* | *K10C* | gross headline in §1 |
+| 0.5 | — | — | — | — | *not run in-tree* |
+| 2 | — | — | — | — | *not run in-tree* |
+| 5 | — | — | — | — | *not run in-tree* |
+| 10 | — | — | — | — | *not run in-tree* |
 
 **Success criterion:** ≥1 frontier point with `max_drawdown ≥ −7%` AND `Δ log-wealth ≥ +0.30`. If K10F delivers that point *and* K10E delivers a fee-aware strategy, we intersect the two (either as a post-hoc α-blend of the K10F frontier or as a combined sweep in a follow-up round).
 
-## 6. Fan-in (after all pods finish)
+## 6. Fan-in (when pod outputs exist)
 
-See `docs/cloud_runbook.md` §17.6 for the explicit merge + cache-refresh + post-hoc-rerun commands. The headline tables in §4 and §5 above will be populated from the pod outputs by re-running `script/posthoc_fee_ranking.py --runs K10A,K10B,K10C,K10D,K10E,K10F` and `script/posthoc_bootstrap_ci.py --runs K10A,K10B,K10C,K10D,K10E,K10F` at that time. This document will then be updated in-place with a new §7 close-out verdict.
+See `docs/cloud_runbook.md` §17.6 for merge + cache-refresh + re-run of `script/posthoc_fee_ranking.py --runs K10A,K10B,K10C,K10D,K10E,K10F` and `script/posthoc_bootstrap_ci.py` with the same list. **As of the default-branch freeze documented in §7, that fan-in has not been applied here.**
 
-## 7. Close-out verdict (to be written at fan-in)
+## 7. Close-out verdict (default branch, evidence in-tree)
 
-*Placeholder.* Fill in after K10D/E/F (and optional M5) complete. Expected structure:
+This section closes Round **using only** §1–3 plus prior K10A/B/C pod caches (`data/round7_cache/`). K10E/K10F **in-optimizer** sweeps are **out of scope for this commit** until artifacts land on `main`.
 
-- **Net-of-fees headline table** — one row per run at fees ∈ {0, 10, 50, 200} bps, Kelly Δ total-log-wealth and Δ Sortino vs baseline.
-- **DD frontier** — K10F's (`dd_penalty`, max_DD, log-wealth Δ) points plus the K10C α-blend trace for comparison, in a single chart.
-- **Best net-of-fees bootstrap CI** — run the circular-block bootstrap on the best K10E net-of-fees config and report the 95% CI + Pr(Δ > 0). A confidence interval that excludes zero at 10 bps is the Round 7 win condition.
-- **Recommendation** — single sentence: "the policy to deploy" or "no strategy survived fees; recommend shelving the Polymarket Kelly thread and pivoting."
+1. **Net-of-fees (post-hoc).** §1 shows K10C's gross log-wealth advantage **reverses at 10 bps** of linear fee on L1 turnover; K10B stays slightly positive at 10 bps but with a smaller gross edge. **No in-tree K10E run** refutes the conclusion that friction-aware *training* is required for any deployment story.
+
+2. **Drawdown (post-hoc).** §2 shows a **fractional-Kelly blend** on K10C improves Sortino and cuts max DD versus pure K10C without new optimizer code. **No in-tree K10F frontier** replaces that; the α-blend is the operational DD diagnostic until K10F metrics exist.
+
+3. **Statistics (gross).** §3: K10C's bootstrap CI **barely** clears zero gross; combined with §1, **net-of-fees significance was not established** on this branch.
+
+4. **Recommendation.** Treat **K10C as a research success and a deployment non-starter** under realistic fees unless K10E-style training (or materially lower turnover) produces a **positive net** log-wealth delta at ≥10 bps with multi-seed confirmation. Mean-variance / Sortino pods through Round 6 already tied equal-weight within seed noise; the Kelly thread is the only clear gross winner, and fees dominate the headline.
+
+5. **Next engineering step (off-main).** Run/fan-in K10D/E/F per §6, then replace the placeholder rows in §4–5 and revise this verdict if new data warrant it.
 
 ## What Round 7 does NOT do
 
-- Does not redo K10D's turnover sweep (already in flight on `ba619f11`).
+- Does not rely on K10D/E/F pod tables **on this branch** until fan-in (§6) is executed and artifacts are committed.
 - Does not try more MVO recipes on the 20-market universe (every Round 4–6 MVO variant tied baseline within the ±0.035 seed-noise band).
 - Does not expand the market universe beyond 40 (data availability + Kelly copula MLP is O(K²) per step).
 - Does not add a CVaR hard constraint inside the Kelly loss (considered but rejected: batch-level CVaR is gradient-noisy on the N_mc scales we use; semivariance is a more stable surrogate for the DD goal).

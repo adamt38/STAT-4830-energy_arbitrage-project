@@ -17,6 +17,14 @@ Milestone labeling used in this repo:
 - **Week 4:** completed prototype baseline and initial constrained model pass.
 - **Week 8:** expanded-category iteration and flash-presentation artifacts.
 
+## Submission pointers (STAT 4830)
+
+- **Final report (graded):** root [`report.md`](report.md) — consolidated from `docs/final_report_first_draft.md` with reproduction notes in the header.
+- **Report draft snapshots:** [`docs/report_drafts/`](docs/report_drafts/) (milestones Weeks 4–12).
+- **Self-critiques:** [`docs/self_critique_week4.md`](docs/self_critique_week4.md), [`docs/self_critique_week6.md`](docs/self_critique_week6.md), [`docs/self_critique_week10.md`](docs/self_critique_week10.md), [`docs/self_critique_week12.md`](docs/self_critique_week12.md), [`docs/self_critique_final.md`](docs/self_critique_final.md).
+- **LLM exploration (sample):** [`docs/llm_exploration/final_report_structure_session.md`](docs/llm_exploration/final_report_structure_session.md).
+- **Optional git backdating:** [`script/backdate_milestone_commits.sh`](script/backdate_milestone_commits.sh) (template only — review integrity policy before use).
+
 ## Quick start (uv)
 
 The project is runnable on macOS, Linux, and Windows using [uv](https://docs.astral.sh/uv/).

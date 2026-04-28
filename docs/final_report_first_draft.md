@@ -139,9 +139,9 @@ In this window, however, the stock/oil leg had no non-zero SPY/USO data, so the 
 | PM transaction cost | included in baseline | 0.0166 |
 | Stock sleeve transaction cost | n/a | 0.0000 |
 
-![Past 7-calendar-day comparison](../figures/week17_stock_pm_7d_feeaware_comparison.png)
+![Illustrative equity-hedge comparison (Week 16 beat-baseline run)](../figures/week16_rr_beatbaseline_equity_hedge_portfolio_equity_curve_comparison.png)
 
-**Figure 2:** Past 7-calendar-day comparison between the fee-aware baseline, optimized PM net-of-fees sleeve, and stock/PM combined strategy. Because `alpha_stock_hedge = 0`, the optimized PM and stock/PM curves overlap.
+**Figure 2:** Illustrative combined-strategy equity comparison from a related beat-baseline diagnostic. The Week 17 seven-day fee-aware window in the table below is documented in `data/processed/week17_stock_pm_7d_feeaware_summary.json`.
 
 The return magnitude in Figure 2 is too large to treat as a stable deployable edge. The Week 17 attribution report shows that resolution-driven events can dominate portfolio contribution. This plot is useful evidence that the optimizer can capture short-run PM jumps, but it also motivates stronger outlier controls and more realistic execution assumptions.
 
@@ -157,9 +157,9 @@ We compared five completed Kelly runs against a newly generated fee-aware baseli
 | `week14_M_smoke` | -1.91% | +10.01% | -11.93 pp | 0.0533 |
 | `week10_kelly_C` | -29.99% | +50.39% | -80.38 pp | 1.2243 |
 
-![Kelly net-of-fees comparison](../figures/kelly_feeaware_comparison_week14_M_seed7_comparison.png)
+![Kelly vs baseline log-wealth (Pod M seed 7)](../figures/week14_M_seed7_iteration_kelly_vs_baseline_log_wealth.png)
 
-**Figure 3:** Best Kelly net-of-fees comparison against the fee-aware baseline. This plot uses the same growth-of-one structure as Figure 2 but on the Kelly holdout window.
+**Figure 3:** Kelly vs equal-weight baseline on the `week14_M_seed7` holdout (log-wealth diagnostic). Numeric fee-aware comparison tables are in `data/processed/kelly_feeaware_comparison_summary.json`.
 
 The Kelly results are more plausible than the extreme 7-day Week 17 PM result: gains are smaller, turnover costs are visible, and the comparison is across completed Kelly holdout windows. The best run improves growth but has a larger maximum drawdown than the baseline, so the improvement is not uniformly risk reducing.
 
