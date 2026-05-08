@@ -1,0 +1,64 @@
+{
+  "generated_at_utc": "2026-04-19T19:13:14.304559+00:00",
+  "artifact_prefix": "week8_C",
+  "config_hash": "224f5d7e4e65519e29712f6558f0c5c982120339eebc34da8f5ddae9dbe7ec91",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build": 46.5550831569999,
+    "baseline": 0.4718780310067814,
+    "exogenous_features": 3.2201407089887653,
+    "constrained_grid_and_holdout": 0.0,
+    "covariance_diagnostics": 0.3078579580032965,
+    "figure_generation": 0.8124668709933758,
+    "week9_report_generation": 0.08992220500658732,
+    "total": 51.45793772400066
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/root/STAT-4830-energy_arbitrage-project/data/raw/week8_C_events_raw.json",
+      "markets_filtered": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_markets_filtered.csv",
+      "price_history": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_price_history.csv",
+      "data_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_data_quality.json",
+      "category_liquidity": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_category_liquidity.csv",
+      "considered_domains": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_considered_domains.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_baseline_timeseries.csv",
+      "baseline_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_baseline_metrics.json"
+    },
+    "exogenous": {
+      "exogenous_features": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_exogenous_features.csv",
+      "exogenous_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_exogenous_quality.json"
+    },
+    "constrained": {
+      "constrained_best_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_macro_explicit_constrained_best_metrics.json",
+      "constrained_best_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_macro_explicit_constrained_best_timeseries.csv"
+    },
+    "covariance": {
+      "category_covariance": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_category_covariance.csv",
+      "category_correlation": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_category_correlation.csv",
+      "top_correlation_pairs": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_top_correlation_pairs.csv",
+      "covariance_summary": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_covariance_summary.json"
+    },
+    "figures": {
+      "equity_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_equity_curve_comparison.png",
+      "drawdown_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_drawdown_comparison.png",
+      "domain_exposure": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_category_exposure_comparison.png",
+      "category_exposure_table": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_C_category_exposure_table.csv",
+      "rolling_mean_return": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_rolling_mean_return_comparison.png",
+      "return_distribution": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_return_distribution_comparison.png",
+      "top_exposure_deltas": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_top_exposure_deltas.png",
+      "risk_return_snapshot": "/root/STAT-4830-energy_arbitrage-project/figures/week8_C_iteration_risk_return_snapshot.png"
+    },
+    "reports": {
+      "week9_diagnostics_report": "/root/STAT-4830-energy_arbitrage-project/docs/week9_diagnostics_report.md"
+    }
+  },
+  "macro_modes_ran": null,
+  "single_macro_integration": "explicit",
+  "joint_macro_mode_search": false,
+  "etf_tracking": true,
+  "optuna_constrained_artifact_suffix": "_macro_explicit",
+  "week9_constrained_artifact_stem": "week8_C_macro_explicit",
+  "git_commit_and_push_requested": true
+}
