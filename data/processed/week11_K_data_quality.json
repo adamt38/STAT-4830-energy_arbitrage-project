@@ -1,0 +1,40 @@
+{
+  "markets_count": 20,
+  "unique_market_ids": 20,
+  "unique_tokens": 20,
+  "history_points": 9966,
+  "market_missing_history": 0,
+  "duplicate_history_points": 0,
+  "non_monotonic_tokens": 0,
+  "domain_coverage": {
+    "nba-champion": 638,
+    "roland-garros": 801,
+    "colombia-election": 914,
+    "primaries": 656,
+    "la-liga": 701,
+    "ligue-1": 689,
+    "uefa-europa-league": 526,
+    "ufc": 706,
+    "best-of-2025": 549,
+    "taylor-swift": 627,
+    "south-dakota-primary": 356,
+    "nba": 370,
+    "airdrops": 384,
+    "league-of-legends": 318,
+    "grooming-gangs": 319,
+    "serie-a": 380,
+    "prediction-markets": 363,
+    "new-mexico-primary": 669
+  },
+  "min_history_days_filter": 24.0,
+  "dropped_by_short_history_days": 4,
+  "dropped_by_short_history_points": 4,
+  "dropped_by_history_request_error": 0,
+  "momentum_screening": {
+    "enabled": true,
+    "lookback_days": 5.0,
+    "top_n": 20,
+    "candidates_before_screening": 192,
+    "selected_after_screening": 20
+  }
+}
