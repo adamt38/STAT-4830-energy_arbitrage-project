@@ -1,0 +1,38 @@
+{
+  "markets_count": 20,
+  "unique_market_ids": 20,
+  "unique_tokens": 20,
+  "history_points": 9852,
+  "market_missing_history": 0,
+  "duplicate_history_points": 0,
+  "non_monotonic_tokens": 0,
+  "domain_coverage": {
+    "nba-champion": 630,
+    "roland-garros": 911,
+    "colombia-election": 903,
+    "la-liga": 1019,
+    "hockey": 329,
+    "ligue-1": 1122,
+    "uefa-europa-league": 522,
+    "best-of-2025": 541,
+    "basketball": 625,
+    "awards": 377,
+    "nba": 401,
+    "primaries": 648,
+    "usdptai": 453,
+    "natural-disasters": 331,
+    "serie-a": 372,
+    "new-mexico-primary": 668
+  },
+  "min_history_days_filter": 24.0,
+  "dropped_by_short_history_days": 5,
+  "dropped_by_short_history_points": 4,
+  "dropped_by_history_request_error": 0,
+  "momentum_screening": {
+    "enabled": true,
+    "lookback_days": 5.0,
+    "top_n": 20,
+    "candidates_before_screening": 191,
+    "selected_after_screening": 20
+  }
+}

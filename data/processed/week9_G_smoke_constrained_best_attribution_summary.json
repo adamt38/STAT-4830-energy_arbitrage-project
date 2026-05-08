@@ -1,0 +1,27 @@
+{
+  "steps": 1371,
+  "asset_count": 20,
+  "total_portfolio_return": 1.3880924381165287,
+  "top_market_by_abs_contribution": {
+    "token_id": "54935126197359005865759470122412489520668573958432708236792605627229004170180",
+    "domain": "tennis",
+    "question": "Will Hubert Hurkacz win the 2026 Men's US Open?",
+    "market_id": "1088491",
+    "market_slug": "will-hubert-hurkacz-win-the-2026-mens-us-open",
+    "mean_weight": 0.05470702255648752,
+    "total_contribution": 0.4233106523299287,
+    "mean_step_contribution": 0.0003087605049817131,
+    "contribution_share_of_total_return": 0.3049585464958727
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "tennis",
+    "total_contribution": 0.4233106523299287,
+    "contribution_share_of_total_return": 0.3049585464958727
+  },
+  "top_abs_corr_pair": {
+    "token_a": "57301498276970257025109591078431189727442302532145853906375186182281603517458",
+    "token_b": "22667617953671803775562636820557023939003625390106866761389646733205014974047",
+    "corr": -0.27770585026668987,
+    "abs_corr": 0.27770585026668987
+  }
+}

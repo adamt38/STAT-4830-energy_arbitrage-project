@@ -1,0 +1,28 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.08272533557276385,
+  "max_drawdown": -0.20517198989184848,
+  "market_count": 20,
+  "exposure_by_domain": {
+    "republican-primary": 0.05555555555555555,
+    "serie-a": 0.05555555555555555,
+    "claude-5": 0.05555555555555555,
+    "economic-policy": 0.05555555555555555,
+    "ligue-1": 0.05555555555555555,
+    "south-carolina-primary": 0.05555555555555555,
+    "grooming-gangs": 0.05555555555555555,
+    "tennis": 0.05555555555555555,
+    "nba-champion": 0.05555555555555555,
+    "airdrops": 0.05555555555555555,
+    "hockey": 0.05555555555555555,
+    "best-of-2025": 0.05555555555555555,
+    "south-dakota-midterm": 0.05555555555555555,
+    "primaries": 0.05555555555555555,
+    "bundesliga": 0.05555555555555555,
+    "nba": 0.05555555555555555,
+    "uefa-europa-league": 0.05555555555555555,
+    "west-virginia-primary": 0.05555555555555555
+  },
+  "mean_return": 0.0005740214544844078,
+  "volatility": 0.0233868891569886
+}

@@ -1,0 +1,83 @@
+{
+  "generated_at_utc": "2026-04-21T13:38:52.351456+00:00",
+  "artifact_prefix": "week9_L_smoke",
+  "config_hash": "4e18bf3e8992de8267508c4905d6b40dffe9ba01a5e6e9061fca3b582053298d",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build": 125.35763337498065,
+    "baseline": 0.4806025829166174,
+    "exogenous_features": 2.3094815410440788,
+    "constrained_grid_and_holdout": 2036.8145805409877,
+    "covariance_diagnostics": 0.3612661249935627,
+    "figure_generation": 0.7959877920802683,
+    "week9_report_generation": 0.08094266697298735,
+    "total": 2166.201500999974
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/raw/week9_L_smoke_events_raw.json",
+      "markets_filtered": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_markets_filtered.csv",
+      "price_history": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_price_history.csv",
+      "data_quality": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_data_quality.json",
+      "category_liquidity": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_category_liquidity.csv",
+      "considered_domains": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_considered_domains.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_baseline_timeseries.csv",
+      "baseline_metrics": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_baseline_metrics.json"
+    },
+    "exogenous": {
+      "exogenous_features": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_exogenous_features.csv",
+      "exogenous_quality": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_exogenous_quality.json"
+    },
+    "constrained": {
+      "constrained_grid": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_experiment_grid.csv",
+      "constrained_best_metrics": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_metrics.json",
+      "constrained_best_timeseries": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_timeseries.csv",
+      "constrained_best_market_return_contributions": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_market_return_contributions.csv",
+      "constrained_best_domain_return_contributions": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_domain_return_contributions.csv",
+      "constrained_best_step_top_contributors": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_step_top_contributors.csv",
+      "constrained_best_top_market_correlation": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_top_market_correlation.csv",
+      "constrained_best_top_market_correlation_pairs": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_top_market_correlation_pairs.csv",
+      "constrained_best_attribution_summary": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_constrained_best_attribution_summary.json"
+    },
+    "covariance": {
+      "category_covariance": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_category_covariance.csv",
+      "category_correlation": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_category_correlation.csv",
+      "top_correlation_pairs": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_top_correlation_pairs.csv",
+      "covariance_summary": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_covariance_summary.json"
+    },
+    "figures": {
+      "equity_curve": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_equity_curve_comparison.png",
+      "drawdown_curve": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_drawdown_comparison.png",
+      "domain_exposure": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_category_exposure_comparison.png",
+      "category_exposure_table": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/data/processed/week9_L_smoke_category_exposure_table.csv",
+      "rolling_mean_return": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_rolling_mean_return_comparison.png",
+      "return_distribution": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_return_distribution_comparison.png",
+      "top_exposure_deltas": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_top_exposure_deltas.png",
+      "risk_return_snapshot": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/figures/week9_L_smoke_iteration_risk_return_snapshot.png"
+    },
+    "reports": {
+      "week9_diagnostics_report": "/Users/colinyu/Documents/STAT-4830-energy_arbitrage-project/docs/week9_diagnostics_report.md"
+    }
+  },
+  "macro_modes_ran": null,
+  "single_macro_integration": "rescale",
+  "joint_macro_mode_search": false,
+  "etf_tracking": false,
+  "momentum_screening": {
+    "enabled": false,
+    "top_n": null,
+    "lookback_days": null
+  },
+  "learnable_inclusion": {
+    "enabled": true,
+    "target_k": 15,
+    "init_gain": 2.0,
+    "lambda_cardinality": 1.0,
+    "lambda_commitment": 0.05
+  },
+  "optuna_constrained_artifact_suffix": "",
+  "week9_constrained_artifact_stem": "week9_L_smoke",
+  "git_commit_and_push_requested": false
+}

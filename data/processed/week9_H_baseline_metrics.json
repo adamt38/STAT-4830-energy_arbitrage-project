@@ -1,0 +1,24 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.08080736743822607,
+  "max_drawdown": -0.26919445795197416,
+  "market_count": 15,
+  "exposure_by_domain": {
+    "republican-primary": 0.07142857142857142,
+    "epstein": 0.07142857142857142,
+    "serie-a": 0.07142857142857142,
+    "claude-5": 0.07142857142857142,
+    "ligue-1": 0.07142857142857142,
+    "celebrities": 0.07142857142857142,
+    "nba": 0.07142857142857142,
+    "tennis": 0.07142857142857142,
+    "nba-champion": 0.07142857142857142,
+    "hockey": 0.07142857142857142,
+    "best-of-2025": 0.07142857142857142,
+    "south-dakota-midterm": 0.07142857142857142,
+    "primaries": 0.07142857142857142,
+    "middle-east": 0.07142857142857142
+  },
+  "mean_return": 0.0007285551368452993,
+  "volatility": 0.03207726264419609
+}

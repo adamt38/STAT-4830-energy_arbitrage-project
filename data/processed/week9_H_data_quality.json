@@ -1,0 +1,36 @@
+{
+  "markets_count": 15,
+  "unique_market_ids": 15,
+  "unique_tokens": 15,
+  "history_points": 7299,
+  "market_missing_history": 0,
+  "duplicate_history_points": 0,
+  "non_monotonic_tokens": 0,
+  "domain_coverage": {
+    "republican-primary": 686,
+    "celebrities": 481,
+    "hockey": 424,
+    "ligue-1": 1144,
+    "best-of-2025": 563,
+    "claude-5": 340,
+    "south-dakota-midterm": 363,
+    "nba-champion": 510,
+    "tennis": 435,
+    "nba": 420,
+    "primaries": 670,
+    "middle-east": 443,
+    "epstein": 428,
+    "serie-a": 392
+  },
+  "min_history_days_filter": 24.0,
+  "dropped_by_short_history_days": 3,
+  "dropped_by_short_history_points": 4,
+  "dropped_by_history_request_error": 0,
+  "momentum_screening": {
+    "enabled": true,
+    "lookback_days": 3.0,
+    "top_n": 15,
+    "candidates_before_screening": 193,
+    "selected_after_screening": 15
+  }
+}

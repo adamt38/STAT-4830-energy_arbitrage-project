@@ -1,0 +1,111 @@
+{
+  "lookback_days": 3.0,
+  "top_n": 15,
+  "selected_markets": [
+    {
+      "token_id": "54935126197359005865759470122412489520668573958432708236792605627229004170180",
+      "market_slug": "will-hubert-hurkacz-win-the-2026-mens-us-open",
+      "question": "Will Hubert Hurkacz win the 2026 Men's US Open?",
+      "domain": "tennis",
+      "momentum": 2.5263157894736845
+    },
+    {
+      "token_id": "107927272895121873896592780561794303301515708678562694349024225854697593171909",
+      "market_slug": "will-wesley-hunt-win-the-2026-republican-primary",
+      "question": "Will Wesley Hunt win the 2026 Texas Republican Primary?",
+      "domain": "republican-primary",
+      "momentum": 2.0
+    },
+    {
+      "token_id": "21892918566477480200155854255443225580146195615682253469077750770879493669279",
+      "market_slug": "will-kamala-harris-announce-a-presidential-run-before-2027",
+      "question": "Will Kamala Harris announce a Presidential run before 2027?",
+      "domain": "celebrities",
+      "momentum": 1.1621621621621623
+    },
+    {
+      "token_id": "63415064977569429650854303533694905713854849186055984415925532647266316927744",
+      "market_slug": "will-theodore-rank-1-among-boy-names-on-the-ssas-official-list-for-2025",
+      "question": "Will Theodore rank #1 among boy names on the SSA\u2019s official list for 2025?",
+      "domain": "best-of-2025",
+      "momentum": -0.8125
+    },
+    {
+      "token_id": "24315108267836543154857233535536136482524552716493402526894829400485516895736",
+      "market_slug": "will-the-phoenix-suns-win-the-nba-western-conference-finals",
+      "question": "Will the Phoenix Suns win the NBA Western Conference Finals?",
+      "domain": "nba",
+      "momentum": -0.7692307692307692
+    },
+    {
+      "token_id": "11966409881281293602137861492007400834690026843003461391578987664208256196909",
+      "market_slug": "will-claude-5-be-released-by-april-30-2026",
+      "question": "Will Claude 5 be released by April 30, 2026?",
+      "domain": "claude-5",
+      "momentum": -0.7647058823529412
+    },
+    {
+      "token_id": "67967023811721834738685695249992484419619114809767608640505747182577663027691",
+      "market_slug": "will-the-democrats-win-the-south-dakota-senate-race-in-2026",
+      "question": "Will the Democrats win the South Dakota Senate race in 2026?",
+      "domain": "south-dakota-midterm",
+      "momentum": -0.7643312101910827
+    },
+    {
+      "token_id": "59261866601270864198456845856841875150453626184437295894384368539724334278520",
+      "market_slug": "will-the-los-angeles-kings-win-the-western-conference-195",
+      "question": "Will the Los Angeles Kings win the Western Conference?",
+      "domain": "hockey",
+      "momentum": -0.7023809523809523
+    },
+    {
+      "token_id": "49662274238485451283220527378586398370959042852997899886824914466317758572224",
+      "market_slug": "will-marseille-win-the-202526-french-ligue-1",
+      "question": "Will Marseille win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "5644679982684846699855787022092402984369447277920326773883608030240292167917",
+      "market_slug": "will-the-philadelphia-76ers-win-the-2026-nba-finals",
+      "question": "Will the Philadelphia 76ers win the 2026 NBA Finals?",
+      "domain": "nba-champion",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "19730444129256957174015889379846911816814301308831812906398054285035177752584",
+      "market_slug": "will-rennes-win-the-202526-french-ligue-1",
+      "question": "Will Rennes win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+      "market_slug": "will-ac-milan-win-the-202526-serie-a-league",
+      "question": "Will AC Milan win the 2025\u201326 Serie A league?",
+      "domain": "serie-a",
+      "momentum": 0.6666666666666666
+    },
+    {
+      "token_id": "7345183309756257693783741573478340128830660331823026035095352170224920670792",
+      "market_slug": "will-connie-chan-receive-the-most-votes-in-the-ca-11-primary",
+      "question": "Will Connie Chan receive the most votes in the CA-11 primary?",
+      "domain": "primaries",
+      "momentum": -0.6238938053097346
+    },
+    {
+      "token_id": "108548893345759572446077602443398325305734327289834850738242401844282632332811",
+      "market_slug": "epstein-client-list-released-by-june-30",
+      "question": "Epstein client list released by June 30?",
+      "domain": "epstein",
+      "momentum": -0.5592592592592593
+    },
+    {
+      "token_id": "92230933527175957699173261837562970961226561473212829507303559647834156802557",
+      "market_slug": "will-israel-strike-4-countries-in-november-2025",
+      "question": "Will Israel strike 4 countries in 2026?",
+      "domain": "middle-east",
+      "momentum": -0.5105386416861827
+    }
+  ]
+}

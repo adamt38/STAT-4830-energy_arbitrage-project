@@ -1,0 +1,26 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.06446764498825765,
+  "max_drawdown": -0.2906668713175744,
+  "market_count": 20,
+  "exposure_by_domain": {
+    "roland-garros": 0.0625,
+    "nba-champion": 0.0625,
+    "hockey": 0.0625,
+    "serie-a": 0.0625,
+    "basketball": 0.0625,
+    "ligue-1": 0.0625,
+    "la-liga": 0.0625,
+    "nba": 0.0625,
+    "new-mexico-primary": 0.0625,
+    "colombia-election": 0.0625,
+    "natural-disasters": 0.0625,
+    "best-of-2025": 0.0625,
+    "primaries": 0.0625,
+    "awards": 0.0625,
+    "uefa-europa-league": 0.0625,
+    "usdptai": 0.0625
+  },
+  "mean_return": 0.00045117909751371906,
+  "volatility": 0.02415262555334788
+}
