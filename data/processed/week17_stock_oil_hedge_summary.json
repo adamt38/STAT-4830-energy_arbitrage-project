@@ -1,0 +1,4 @@
+{
+  "intent": "Blend a long-oil / short-equity daily sleeve with Polymarket returns to hedge episodes where energy shocks and equity moves diverge; correlations are regime-dependent so weights are tunable and optional rolling minimum-variance scaling reduces variance vs. Polymarket alone.",
+  "analyst_overlay": "Optional CSV maps UTC dates to equity_hedge_tilt in [-1,1]: bullish research reduces the short-equity intensity; bearish increases it."
+}

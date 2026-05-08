@@ -1,0 +1,27 @@
+{
+  "steps": 12119,
+  "asset_count": 40,
+  "total_portfolio_return": 3.4228572891558886,
+  "top_market_by_abs_contribution": {
+    "token_id": "46551195771960533081545368009925141952498658652959429196677286705276507790996",
+    "domain": "best-of-2025",
+    "question": "Will Lucas rank #1 among boy names on the SSA\u2019s official list for 2025?",
+    "market_id": "651490",
+    "market_slug": "will-lucas-rank-1-among-boy-names-on-the-ssas-official-list-for-2025",
+    "mean_weight": 0.03293258776882396,
+    "total_contribution": 3.3621216322760765,
+    "mean_step_contribution": 0.0002774256648466108,
+    "contribution_share_of_total_return": 0.9822558606015415
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "best-of-2025",
+    "total_contribution": 3.3621216322760765,
+    "contribution_share_of_total_return": 0.9822558606015415
+  },
+  "top_abs_corr_pair": {
+    "token_a": "82924591030419390649945107956366329459342453014204495918712243498287775914589",
+    "token_b": "105553217293060706571503179519164863553151391260530944399118771327258349812919",
+    "corr": -0.07227095614566728,
+    "abs_corr": 0.07227095614566728
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "regime": "low_vol",
+  "vix_value": 17.940000534057617,
+  "applied_scales": {
+    "variance_penalty": 0.5,
+    "downside_penalty": 1.0,
+    "max_domain_exposure_threshold": 0.18
+  },
+  "risk_regime_zscore": 0.05048794859786015,
+  "dynamic_concentration": {
+    "max_domain_exposure_threshold": 0.12,
+    "concentration_penalty_lambda": 32.0
+  },
+  "merged_concentration_penalty_lambdas": [
+    2.0,
+    5.0,
+    10.0,
+    20.0,
+    32.0,
+    50.0
+  ]
+}

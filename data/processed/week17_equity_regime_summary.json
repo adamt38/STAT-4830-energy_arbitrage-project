@@ -1,0 +1,9 @@
+{
+  "regime": "low_vol",
+  "vix_value": 17.940000534057617,
+  "penalty_scales": {
+    "variance_penalty": 0.5,
+    "downside_penalty": 1.0,
+    "max_domain_exposure_threshold": 0.18
+  }
+}

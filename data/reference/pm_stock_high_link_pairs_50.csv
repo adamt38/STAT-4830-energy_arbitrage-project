@@ -1,0 +1,51 @@
+rank,prediction_market_theme,example_pm_angle,stock_proxy,direction,typical_beta_proxy,scs,notes_scs_formula
+1,Oil price vs threshold,Brent/WTI crude above $X by date,XLE,long_plus_pm_oil_up,1.15,1.22,SCS=link_strength*sqrt(beta); energy equities co-move with oil shocks
+2,Oil price vs threshold,Same with USO/US crude ETF focus,USO,long_plus_pm_oil_up,0.95,1.18,Direct crude exposure
+3,Oil price vs threshold,Oil majors EPS / dividend linked outcomes,XOM,long_plus_pm_oil_up,0.90,1.14,Integrated producer beta to oil
+4,Oil price vs threshold,High-beta producer basket,OXY,long_plus_pm_oil_up,1.25,1.20,Equity oil beta often >1 vs oil
+5,US recession timing,NBER or media-declared recession by date,XLY,inverse_consumer,1.05,1.12,Cyclical discretionary weak in recession PMs
+6,US recession timing,Recession hedge / defensive tilt,XLP,long_defensive,0.65,0.90,Staples outperformance vs cyclicals
+7,US recession timing,Rate-cut / duration hedge on recession PMs,TLT,long_duration,0.85,1.05,Duration rallies when growth breaks
+8,Fed rate path,Fed cuts N times by year-end,TLT,long_both,0.80,1.02,Long bonds rally with cuts
+9,Fed rate path,Fed hikes / hold vs cuts priced wrong,XLF,macro_banks,1.10,1.07,Bank curve sensitivity
+10,Middle East escalation,Regional conflict / strikes headlines,LMT,long_defense,0.85,0.99,Defense primes re-rate on risk
+11,Middle East escalation,Defense + aerospace bid,RTX,long_defense,0.95,1.04,Ditto
+12,Middle East escalation,Broad defense ETF,ITA,long_defense,1.00,1.00,Basket
+13,Middle East escalation,Oil spike leg on supply fear,USO,long_oil,0.95,0.99,Supply shock channel
+14,Tariffs / trade war,Tariffs on China / ADR pain,FXI,short_cn_adrs,1.05,1.06,China ADR index hits on trade tension
+15,Tariffs / trade war,Tariffs targeting Brazil/EWZ narrative,EWZ,short_br_exposure,1.10,1.09,EM FX/equity hit on targeted tariffs
+16,Tariffs / trade war,Japan auto / trade friction,EWJ,short_jp_exposure,0.95,0.98,Export-heavy Japan risk-off on tariffs
+17,Nvidia earnings / AI,NVDA EPS beat or price target PM,NVDA,long_correlated,1.60,1.33,Single-name equity payoff maps to AI PMs
+18,Nvidia earnings / AI,Semiconductor equipment / SOXX beta,SMH,long_correlated,1.25,1.21,Ai capex breadth
+19,Nvidia earnings / AI,3x semi levered hedge / spec,SOXL,long_high_beta,2.20,1.38,High beta amplifier (risk)
+20,Bitcoin price path,BTC above $X by date,IBIT,long_correlated,1.65,1.34,Listed BTC proxy
+21,Bitcoin price path,Corporate BTC treasury bet,MSTR,long_correlated,1.80,1.40,High-beta BTC equity
+22,Bitcoin price path,Exchange / crypto infra,COIN,long_correlated,1.45,1.29,CeFi revenue links to crypto activity
+23,Ethereum / ETH,ETH price or ETF flows,ETHA,long_correlated,1.40,1.27,ETH ETF proxy (ticker availability varies)
+24,US national BTC reserve,Strategic reserve / policy headlines,IBIT,long_policy_btc,1.50,1.30,Policy news moves crypto equities
+25,Gold vs equities 2026,Gold best performer basket,GLD,long_gold,0.70,0.87,Safe-haven / fiat skeptic PMs
+26,Gold vs equities 2026,Gold miners leverage to bullion,NEM,long_miners,1.10,1.07,Equity leverage to gold
+27,Ukraine ceasefire / Europe risk,Reopening / euro industrials,EZU,long_europe,1.00,1.00,Geopolitical relief trade
+28,Ukraine ceasefire / Europe risk,Nat gas collapse on peace,UNG,inverse_gas,0.85,0.95,Supply normalization narrative
+29,SpaceX / IPO,valuation milestones pre/post IPO,RKLB,long_space_comp,1.30,1.21,Space-exposed comp group proxy
+30,Large-cap crown,"Largest company by market cap" PMs,QQQ,long_mega_tech,1.15,1.12,Mega-cap concentration
+31,Large-cap crown,Same theme / Amazon-specific slug,AMZN,long_single,1.20,1.13,Single-name cap race
+32,Large-cap crown,Nvidia-specific cap race,NVDA,long_single,1.60,1.28,AI leader cap outcomes
+33,AI model leader,"Best model end of quarter" PMs,MSFT,long_capex_cloud,1.05,1.05,OpenAI/Azure linkage (narrative)
+34,AI model leader,Big tech advertising / consumer AI,META,long_platform,1.15,1.10,Platform-scale AI monetization
+35,AI model leader,Search / enterprise AI,GOOGL,long_platform,1.10,1.08,Gemini / cloud AI narrative
+36,French election,Macron/Le Pen style outcomes,EWQ,long_france,1.05,1.04,Country ETF
+37,German state elections,Populist / coalition risk,EWG,long_germany,1.00,1.00,Country ETF
+38,Brazil presidential,BRL / domestic policy,EWZ,long_brazil,1.10,1.09,EM policy risk
+39,Colombia presidential,Andean politics,ICOL,long_colombia,1.05,0.99,Single-country (liquidity caveat)
+40,Fed decision binary,CME FedWatch style outcomes,TLT,long_duration,0.80,0.99,Rates complex first principal component
+41,US dollar strength,DXY bullish PMs,UUP,long_dollar,0.75,0.89,Dollar ETF proxy
+42,Copper / industrial cycle,Copper hits $X / China stimulus,XLI,long_cyclical,1.05,1.07,Industrials beta to growth
+43,Housing / mortgage rates,30Y mortgage rate milestones,TLT,inverse_rates_long_bond,0.80,0.99,Mortgage rates track long yields
+44,CRE / office distress,Office default headlines,XLRE,long_reit,0.90,0.97,Listed real estate stress
+45,Regional bank stress,KRE-type outcomes,KRE,long_regional_banks,1.15,1.10,Bank basket beta to credit fear
+46,Yield curve inversion depth,2s10s / recession linkage,TLT,long_duration,0.80,0.99,Curve dynamics map to duration
+47,Crypto pre-market FDV,Token launch FDV hurdles,COIN,long_cefi_spec,1.35,1.24,CeFi correlation to crypto risk
+48,Sports betting handle,BETZ / gambling revenue (theme),BETZ,long_gambling_et_theme,1.10,1.09,Gaming/sportsbooks ETF (verify liquidity)
+49,Trump policy basket,"Trump out / policy shock" headlines,DJT,long_policy_tied,1.40,1.23,Ticker-specific political beta (volatile)
+50,Small-cap risk-on,"Breadth / Russell surge" PMs,IWM,long_smallcap,1.20,1.13,Breadth PMs vs small-cap index

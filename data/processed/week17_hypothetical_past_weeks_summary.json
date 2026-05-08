@@ -1,0 +1,17 @@
+{
+  "params": {
+    "uniform_mix": 0.0,
+    "entropy_lambda": 0.0,
+    "concentration_penalty_lambda": 12.0,
+    "max_weight": 0.22,
+    "hedge_allocation": 0.0,
+    "steps_per_window": 1
+  },
+  "n_steps": 54922,
+  "capital_gain_baseline": 5.094742401643679,
+  "capital_gain_pm": 0.7059733149378429,
+  "capital_gain_combined": 0.7059733149378429,
+  "max_drawdown_baseline": -0.071565121500477,
+  "max_drawdown_pm": -0.19893971029761426,
+  "max_drawdown_combined": -0.19893971029761426
+}

@@ -1,0 +1,466 @@
+{
+  "description": "Polymarket sleeve: mean optimizer weights on each YES token (holdout), grouped by topic (domain). Baseline is not token-level equal \u2014 it is equal *category* weight with equal split within category.",
+  "baseline_category_rule": "weight_on_domain_k = 1/K; each market in domain k gets (1/K)/n_k",
+  "equity_hedge_sleeve_stocks": {
+    "source": "src/stock_oil_hedge.py (Stooq daily, lagged to PM bars)",
+    "spy_proxy": "spy.us (S&P 500 ETF; short leg blends -r_spy with oil)",
+    "oil_proxy": "uso.us (USO as oil proxy)",
+    "optional_risk_free_experiment": "shy.us (see script/run_hedge_riskfree_experiment.py)"
+  },
+  "equity_signal_template_tickers_by_domain": [
+    {
+      "domain": "finance",
+      "ticker": "XLF",
+      "notes": "financial sector proxy"
+    },
+    {
+      "domain": "economy",
+      "ticker": "XLI",
+      "notes": "industrial/economic cycle proxy"
+    },
+    {
+      "domain": "crypto",
+      "ticker": "IBIT",
+      "notes": "bitcoin ETF proxy"
+    },
+    {
+      "domain": "politics",
+      "ticker": "SPY",
+      "notes": "broad market proxy when no sector-specific mapping"
+    },
+    {
+      "domain": "sports",
+      "ticker": "SPY",
+      "notes": "broad market proxy"
+    },
+    {
+      "domain": "science",
+      "ticker": "XLK",
+      "notes": "technology proxy"
+    },
+    {
+      "domain": "culture",
+      "ticker": "XLC",
+      "notes": "communication services proxy"
+    },
+    {
+      "domain": "other",
+      "ticker": "SPY",
+      "notes": "default fallback"
+    }
+  ],
+  "polymarket_topics_in_portfolio": [
+    "2025-predictions",
+    "2026-fifa-world-cup",
+    "airdrops",
+    "anthropic",
+    "arkansas-midterm",
+    "awards",
+    "basketball",
+    "best-of-2025",
+    "big-tech",
+    "bitcoin",
+    "brazil",
+    "bundesliga",
+    "business",
+    "california-midterm",
+    "celebrities",
+    "champions-league",
+    "claude-5",
+    "climate-science",
+    "colombia-election",
+    "colorado-midterm",
+    "commodities",
+    "congress",
+    "crypto-prices",
+    "databricks",
+    "delaware-midterm",
+    "democratic-primary",
+    "economic-policy",
+    "elon-musk",
+    "epstein",
+    "ethereum",
+    "extended",
+    "fdv",
+    "felix",
+    "fifa-world-cup",
+    "formula1",
+    "france",
+    "gemini-3",
+    "gensyn",
+    "geopolitics",
+    "german-elections"
+  ],
+  "polymarket_markets_ranked_by_mean_weight": [
+    {
+      "token_id": "68207341820749052475650610432894562714266620914604033880285153252182288802957",
+      "domain": "celebrities",
+      "question": "Will Rand Paul announce a presidential run before 2027?",
+      "market_slug": "will-rand-paul-announce-a-presidential-run-before-2027",
+      "mean_weight": 0.025185083128003143
+    },
+    {
+      "token_id": "30168634295384984099987626703440157654602987915064535215384295190163901851184",
+      "domain": "extended",
+      "question": "Extended FDV above $300M one day after launch?",
+      "market_slug": "extended-fdv-above-300m-one-day-after-launch-351-333",
+      "mean_weight": 0.025098594580654693
+    },
+    {
+      "token_id": "15394416147421266264002744586901575755411758481406494583013250092373628427765",
+      "domain": "congress",
+      "question": "Will the Republican Party hold exactly 53 Senate seats after the 2026 midterm elections?",
+      "market_slug": "will-the-republican-party-hold-exactly-53-senate-seats-after-the-2026-midterm-elections",
+      "mean_weight": 0.02509724112452588
+    },
+    {
+      "token_id": "67784084156063245454459357229936847964117127235086701895468125487885758601780",
+      "domain": "german-elections",
+      "question": "Will AfD win the most seats in the 2026 Berlin state elections?",
+      "market_slug": "will-afd-win-the-most-seats-in-the-2026-berlin-state-elections",
+      "mean_weight": 0.02509689981394829
+    },
+    {
+      "token_id": "18571303954259773157233385333455041418270179723020753158306812650937565180666",
+      "domain": "crypto-prices",
+      "question": "Will Bitcoin reach $1,000,000 by December 31, 2026?",
+      "market_slug": "will-bitcoin-reach-1000000-by-december-31-2026-946",
+      "mean_weight": 0.02509537240629653
+    },
+    {
+      "token_id": "57301498276970257025109591078431189727442302532145853906375186182281603517458",
+      "domain": "airdrops",
+      "question": "MegaETH market cap (FDV) >$2B one day after launch?",
+      "market_slug": "megaeth-market-cap-fdv-2b-one-day-after-launch-738-867-649-272-765-733",
+      "mean_weight": 0.025093428178909163
+    },
+    {
+      "token_id": "76641034721053425080952855862174690067662519247667787282293691334146019135577",
+      "domain": "fifa-world-cup",
+      "question": "Will Europe win the 2026 FIFA World Cup?",
+      "market_slug": "will-europe-win-the-2026-fifa-world-cup",
+      "mean_weight": 0.02509166677667139
+    },
+    {
+      "token_id": "68194463917260305435439145066031544476540679280823247532132832363696000101185",
+      "domain": "colorado-midterm",
+      "question": "Will the Democrats win the Colorado Senate race in 2026?",
+      "market_slug": "will-the-democrats-win-the-colorado-senate-race-in-2026",
+      "mean_weight": 0.025091252616459725
+    },
+    {
+      "token_id": "11876606915924142133615854761923277060697657209957870741155164849437788272266",
+      "domain": "business",
+      "question": "Will NVIDIA be the largest company in the world by market cap on December 31?",
+      "market_slug": "will-nvidia-be-the-largest-company-in-the-world-by-market-cap-on-december-31-244",
+      "mean_weight": 0.025089528881252255
+    },
+    {
+      "token_id": "89033597404049535329336367676897002196779443515433514040396661411543836790585",
+      "domain": "brazil",
+      "question": "Will Luiz In\u00e1cio Lula da Silva qualify for Brazil's presidential runoff?",
+      "market_slug": "will-luiz-incio-lula-da-silva-qualify-for-brazils-presidential-runoff",
+      "mean_weight": 0.025088875163484854
+    },
+    {
+      "token_id": "47163454224938970320488874259309764809542500890687165913620315329004602524782",
+      "domain": "formula1",
+      "question": "Will Valtteri Bottas be the 2026 F1 Drivers' Champion?",
+      "market_slug": "will-valtteri-bottas-be-the-2026-f1-drivers-champion",
+      "mean_weight": 0.025088742999516845
+    },
+    {
+      "token_id": "113379015922744700109400673843380371641970914885846970213129353605968934558386",
+      "domain": "2026-fifa-world-cup",
+      "question": "Will Haiti win the 2026 FIFA World Cup?",
+      "market_slug": "will-haiti-win-the-2026-fifa-world-cup",
+      "mean_weight": 0.025088669606878358
+    },
+    {
+      "token_id": "68370995073141964079913803663665941780115677360430806954011390499916208708512",
+      "domain": "arkansas-midterm",
+      "question": "Will the Democrats win the Arkansas Senate race in 2026?",
+      "market_slug": "will-the-democrats-win-the-arkansas-senate-race-in-2026",
+      "mean_weight": 0.025088636863324236
+    },
+    {
+      "token_id": "105188205390952172012010105387761577156280984453891621977858640154017819800555",
+      "domain": "france",
+      "question": "Will Mathilde Panot win the 2027 French presidential election?",
+      "market_slug": "will-mathilde-panot-win-the-2027-french-presidential-election",
+      "mean_weight": 0.025088531030431387
+    },
+    {
+      "token_id": "43478780997313571844864646081201368302664941062507392308569466005072068318763",
+      "domain": "champions-league",
+      "question": "Will Club Brugge win the 2025\u201326 Champions League?",
+      "market_slug": "will-club-brugge-win-the-202526-champions-league",
+      "mean_weight": 0.025088431843649412
+    },
+    {
+      "token_id": "79895259217313803731994821165811563835560123915015381398339503448680100356036",
+      "domain": "ethereum",
+      "question": "Will Bitmine announce that it holds more than 7M ETH before 2027?",
+      "market_slug": "will-bitmine-announce-holding-7m-eth-before-2027",
+      "mean_weight": 0.025088410277484367
+    },
+    {
+      "token_id": "104358443379227876934626147273023029208652029800204151319742443007204901768939",
+      "domain": "big-tech",
+      "question": "Will Amazon be the largest company in the world by market cap on March 31?",
+      "market_slug": "will-amazon-be-the-largest-company-in-the-world-by-market-cap-on-march-31-453",
+      "mean_weight": 0.02508840009400085
+    },
+    {
+      "token_id": "86511993606190995539996371064900122466738869186406355817612580895605974257272",
+      "domain": "climate-science",
+      "question": "SpaceX IPO closing market cap above $1T?",
+      "market_slug": "spacex-ipo-closing-market-cap-above-1t-528",
+      "mean_weight": 0.0250882134526385
+    },
+    {
+      "token_id": "100740357893930039073645347304025265904103736920370928783519503167478569691044",
+      "domain": "basketball",
+      "question": "Will the Phoenix Suns make the NBA Playoffs?",
+      "market_slug": "will-the-phoenix-suns-make-the-nba-playoffs-557",
+      "mean_weight": 0.025087761872354744
+    },
+    {
+      "token_id": "51273396751548994017117054764897754414228591289652072971120018616721173971444",
+      "domain": "democratic-primary",
+      "question": "Will Graham Platner be the Democratic nominee for Senate in Maine?",
+      "market_slug": "will-graham-platner-be-the-democratic-nominee-for-senate-in-maine",
+      "mean_weight": 0.025086266621393995
+    },
+    {
+      "token_id": "5906729942132388187374842778427213872782907171873674796265663843960406830445",
+      "domain": "gensyn",
+      "question": "Gensyn FDV above $400M one day after launch?",
+      "market_slug": "gensyn-fdv-above-400m-one-day-after-launch",
+      "mean_weight": 0.02508481906018807
+    },
+    {
+      "token_id": "115563279943088574368475763566308524191598627607680105838058505260056381768939",
+      "domain": "bitcoin",
+      "question": "US national Bitcoin reserve before 2027?",
+      "market_slug": "us-national-bitcoin-reserve-before-2027",
+      "mean_weight": 0.025084687584632927
+    },
+    {
+      "token_id": "59252515735652674747158950210016502214756531287333895140318848923768750410355",
+      "domain": "geopolitics",
+      "question": "Trump out as President before 2027?",
+      "market_slug": "trump-out-as-president-before-2027",
+      "mean_weight": 0.02508332869845998
+    },
+    {
+      "token_id": "32431890167345181985795456212069136470689842825539004695200064630822423107335",
+      "domain": "elon-musk",
+      "question": "Elon Musk trillionaire before 2027?",
+      "market_slug": "elon-musk-trillionaire-before-2027",
+      "mean_weight": 0.025080388781136036
+    },
+    {
+      "token_id": "18791277393217683755628516529477058015186638022373024614300661393042993809537",
+      "domain": "delaware-midterm",
+      "question": "Will the Republicans win the Delaware Senate race in 2026?",
+      "market_slug": "will-the-republicans-win-the-delaware-senate-race-in-2026",
+      "mean_weight": 0.025079989910909792
+    },
+    {
+      "token_id": "4655209727295513535859117642120184432334179761721646415109648555849060899062",
+      "domain": "commodities",
+      "question": "Will Gold have the best performance in 2026?",
+      "market_slug": "will-gold-have-the-best-performance-in-2026-873",
+      "mean_weight": 0.02507879851587364
+    },
+    {
+      "token_id": "56940108685601594440972125972550948538859641414755179784371446688257727053902",
+      "domain": "felix",
+      "question": "Felix Protocol FDV above $2B one day after launch?",
+      "market_slug": "felix-protocol-fdv-above-2b-one-day-after-launch-398-145",
+      "mean_weight": 0.0250778125868589
+    },
+    {
+      "token_id": "108548893345759572446077602443398325305734327289834850738242401844282632332811",
+      "domain": "epstein",
+      "question": "Epstein client list released by June 30?",
+      "market_slug": "epstein-client-list-released-by-june-30",
+      "mean_weight": 0.025059764258114136
+    },
+    {
+      "token_id": "42645635688384173938505005153732536262139883933750646945028210271328873690888",
+      "domain": "fdv",
+      "question": "Opensea FDV above $500M one day after launch?",
+      "market_slug": "opensea-fdv-above-500m-one-day-after-launch-221-468-166-873-514-375",
+      "mean_weight": 0.0250593931406596
+    },
+    {
+      "token_id": "46551195771960533081545368009925141952498658652959429196677286705276507790996",
+      "domain": "best-of-2025",
+      "question": "Will Lucas rank #1 among boy names on the SSA\u2019s official list for 2025?",
+      "market_slug": "will-lucas-rank-1-among-boy-names-on-the-ssas-official-list-for-2025",
+      "mean_weight": 0.02502944576912461
+    },
+    {
+      "token_id": "5254288171817620305899304387173316577587455481755582876905938498730493405588",
+      "domain": "bundesliga",
+      "question": "Will Stuttgart win the 2025\u201326 Bundesliga?",
+      "market_slug": "will-stuttgart-win-the-202526-bundesliga",
+      "mean_weight": 0.02502637629084636
+    },
+    {
+      "token_id": "89694314427486889897766629507723742460669068230376416068996390119126818537632",
+      "domain": "california-midterm",
+      "question": "Will Chad Bianco win the California Governor Election in 2026?",
+      "market_slug": "will-chad-bianco-win-the-california-governor-election-in-2026",
+      "mean_weight": 0.025008211894781664
+    },
+    {
+      "token_id": "63907313656443890447578607530571289622813903996374626191028175281541399992719",
+      "domain": "claude-5",
+      "question": "Will Claude 5 be released by March 31, 2026?",
+      "market_slug": "will-claude-5-be-released-by-march-31-2026-243-489-141-184",
+      "mean_weight": 0.024997184321950947
+    },
+    {
+      "token_id": "111646250931838932302421100465311863857465734768037379595335905351441550302588",
+      "domain": "gemini-3",
+      "question": "Will Meituan have the best AI model at the end of March 2026?",
+      "market_slug": "will-meituan-have-the-best-ai-model-at-the-end-of-march-2026-469",
+      "mean_weight": 0.024991127251269722
+    },
+    {
+      "token_id": "75712298340810272859765060308006832993211601931382911468417184675550881103879",
+      "domain": "colombia-election",
+      "question": "Will Juan Manuel Gal\u00e1n win the 2026 Colombian presidential election?",
+      "market_slug": "will-juan-manuel-galn-win-the-2026-colombian-presidential-election",
+      "mean_weight": 0.024990546144612553
+    },
+    {
+      "token_id": "14018274637090307878372326472471535510234764986484318979992031495866993899114",
+      "domain": "anthropic",
+      "question": "Will Anthropic\u2019s market cap be less than $100B at market close on IPO day?",
+      "market_slug": "will-anthropics-market-cap-be-less-than-100b-at-market-close-on-ipo-day",
+      "mean_weight": 0.024955656669940818
+    },
+    {
+      "token_id": "108547978327958467449318042977006580876058560639743186491243488736783119648127",
+      "domain": "2025-predictions",
+      "question": "MicroStrategy sells any Bitcoin by March 31, 2026?",
+      "market_slug": "microstrategy-sells-any-bitcoin-by-march-31-2026",
+      "mean_weight": 0.024939944053511055
+    },
+    {
+      "token_id": "45014676111572901552217363692090679327003594688155466306257909550735876308571",
+      "domain": "awards",
+      "question": "Will Giannis Antetokounmpo win the 2025\u20132026 NBA MVP?",
+      "market_slug": "will-giannis-antetokounmpo-win-the-20252026-nba-mvp",
+      "mean_weight": 0.02492948428921171
+    },
+    {
+      "token_id": "54073086346734626735797775941991553522163760164405051969883391401961188364109",
+      "domain": "economic-policy",
+      "question": "Will the Fed increase interest rates by 25+ bps after the March 2026 meeting?",
+      "market_slug": "will-the-fed-increase-interest-rates-by-25-bps-after-the-march-2026-meeting",
+      "mean_weight": 0.0247066035125188
+    },
+    {
+      "token_id": "82712470265251700739331694672360544122893066934757473974734613171971970115364",
+      "domain": "databricks",
+      "question": "Will Databricks\u2019 market cap be $250B or greater at market close on IPO day?",
+      "market_slug": "will-databricks-market-cap-be-greater-than-250b-at-market-close-on-ipo-day",
+      "mean_weight": 0.022826468712832254
+    }
+  ],
+  "optimized_category_weights": {
+    "databricks": 0.02282620035111904,
+    "economic-policy": 0.02470656856894493,
+    "celebrities": 0.025185108184814453,
+    "extended": 0.025098644196987152,
+    "congress": 0.025097252801060677,
+    "german-elections": 0.025096893310546875,
+    "crypto-prices": 0.02509538270533085,
+    "airdrops": 0.02509337291121483,
+    "fifa-world-cup": 0.025091636925935745,
+    "colorado-midterm": 0.02509118989109993,
+    "business": 0.02508953958749771,
+    "brazil": 0.025088895112276077,
+    "formula1": 0.025088690221309662,
+    "2026-fifa-world-cup": 0.025088688358664513,
+    "arkansas-midterm": 0.025088602676987648,
+    "france": 0.025088539347052574,
+    "big-tech": 0.025088386610150337,
+    "champions-league": 0.025088386610150337,
+    "ethereum": 0.025088384747505188,
+    "climate-science": 0.02508821338415146,
+    "basketball": 0.02508777566254139,
+    "democratic-primary": 0.025086283683776855,
+    "gensyn": 0.025084763765335083,
+    "bitcoin": 0.02508467249572277,
+    "geopolitics": 0.025083312764763832,
+    "elon-musk": 0.025080306455492973,
+    "delaware-midterm": 0.025079982355237007,
+    "commodities": 0.025078818202018738,
+    "felix": 0.02507779933512211,
+    "awards": 0.024929409846663475,
+    "2025-predictions": 0.024939952418208122,
+    "epstein": 0.025059793144464493,
+    "fdv": 0.025059456005692482,
+    "anthropic": 0.02495565451681614,
+    "best-of-2025": 0.02502943016588688,
+    "bundesliga": 0.025026381015777588,
+    "colombia-election": 0.024990633130073547,
+    "gemini-3": 0.024991147220134735,
+    "california-midterm": 0.025008201599121094,
+    "claude-5": 0.024997176602482796
+  },
+  "baseline_category_weights": {
+    "databricks": 0.025,
+    "economic-policy": 0.025,
+    "celebrities": 0.025,
+    "extended": 0.025,
+    "congress": 0.025,
+    "german-elections": 0.025,
+    "crypto-prices": 0.025,
+    "airdrops": 0.025,
+    "fifa-world-cup": 0.025,
+    "colorado-midterm": 0.025,
+    "business": 0.025,
+    "brazil": 0.025,
+    "formula1": 0.025,
+    "2026-fifa-world-cup": 0.025,
+    "arkansas-midterm": 0.025,
+    "france": 0.025,
+    "big-tech": 0.025,
+    "champions-league": 0.025,
+    "ethereum": 0.025,
+    "climate-science": 0.025,
+    "basketball": 0.025,
+    "democratic-primary": 0.025,
+    "gensyn": 0.025,
+    "bitcoin": 0.025,
+    "geopolitics": 0.025,
+    "elon-musk": 0.025,
+    "delaware-midterm": 0.025,
+    "commodities": 0.025,
+    "felix": 0.025,
+    "awards": 0.025,
+    "2025-predictions": 0.025,
+    "epstein": 0.025,
+    "fdv": 0.025,
+    "anthropic": 0.025,
+    "best-of-2025": 0.025,
+    "bundesliga": 0.025,
+    "colombia-election": 0.025,
+    "gemini-3": 0.025,
+    "california-midterm": 0.025,
+    "claude-5": 0.025
+  },
+  "artifact_paths": {
+    "category_comparison_csv": "/Users/xiaz/STAT-4830-energy_arbitrage-project-main/data/processed/week8_category_baseline_vs_optimized.csv",
+    "category_comparison_plot": "/Users/xiaz/STAT-4830-energy_arbitrage-project-main/figures/week8_category_baseline_vs_optimized_equity_hedge.png",
+    "constrained_best_metrics": "/Users/xiaz/STAT-4830-energy_arbitrage-project-main/data/processed/week8_constrained_best_metrics.json",
+    "market_contributions": "/Users/xiaz/STAT-4830-energy_arbitrage-project-main/data/processed/week8_constrained_best_market_return_contributions.csv"
+  }
+}
