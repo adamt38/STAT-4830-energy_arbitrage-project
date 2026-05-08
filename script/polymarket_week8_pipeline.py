@@ -502,18 +502,24 @@ def _load_cached_dataset_artifacts(
     if not markets_rows or not price_rows:
         raise RuntimeError(
             "Cached dataset artifacts exist but are empty. "
-            "A previous failed fetch likely overwrote week8 processed files."
+            "A previous failed fetch likely overwrote the processed files for this artifact prefix."
         )
     return artifacts
 
 
-def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
+def _make_figures(
+    project_root: pathlib.Path,
+    *,
+    artifact_prefix: str = "week8",
+    constrained_suffix: str = "",
+) -> dict[str, pathlib.Path]:
     processed = project_root / "data" / "processed"
     figures_dir = project_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    baseline_series = _read_series(processed / "week8_baseline_timeseries.csv")
-    constrained_series = _read_series(processed / "week8_constrained_best_timeseries.csv")
+    cstem = f"{artifact_prefix}{constrained_suffix}"
+    baseline_series = _read_series(processed / f"{artifact_prefix}_baseline_timeseries.csv")
+    constrained_series = _read_series(processed / f"{cstem}_constrained_best_timeseries.csv")
     if constrained_series:
         # Align baseline and constrained plots to the same holdout horizon.
         baseline_series = baseline_series[-len(constrained_series) :]
@@ -540,7 +546,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_equity.set_xlabel("Step")
     ax_equity.set_ylabel("Growth of $1")
     ax_equity.legend()
-    equity_path = figures_dir / "week8_iteration_equity_curve_comparison.png"
+    equity_path = figures_dir / f"{artifact_prefix}_iteration_equity_curve_comparison.png"
     fig_equity.savefig(equity_path, dpi=120)
     plt.close(fig_equity)
 
@@ -551,13 +557,13 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_dd.set_xlabel("Step")
     ax_dd.set_ylabel("Drawdown")
     ax_dd.legend()
-    dd_path = figures_dir / "week8_iteration_drawdown_comparison.png"
+    dd_path = figures_dir / f"{artifact_prefix}_iteration_drawdown_comparison.png"
     fig_dd.savefig(dd_path, dpi=120)
     plt.close(fig_dd)
 
-    with (processed / "week8_baseline_metrics.json").open("r", encoding="utf-8") as handle:
+    with (processed / f"{artifact_prefix}_baseline_metrics.json").open("r", encoding="utf-8") as handle:
         baseline_metrics = json.load(handle)
-    with (processed / "week8_constrained_best_metrics.json").open("r", encoding="utf-8") as handle:
+    with (processed / f"{cstem}_constrained_best_metrics.json").open("r", encoding="utf-8") as handle:
         constrained_metrics = json.load(handle)
 
     baseline_exp = baseline_metrics.get("exposure_by_domain", {})
@@ -572,7 +578,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
         }
         for domain in all_domains
     ]
-    exposure_table_path = processed / "week8_category_exposure_table.csv"
+    exposure_table_path = processed / f"{artifact_prefix}_category_exposure_table.csv"
     with exposure_table_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -606,7 +612,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_exp.set_xticks(list(x))
     ax_exp.set_xticklabels(ranked_domains, rotation=35, ha="right")
     ax_exp.legend()
-    exposure_path = figures_dir / "week8_iteration_category_exposure_comparison.png"
+    exposure_path = figures_dir / f"{artifact_prefix}_iteration_category_exposure_comparison.png"
     fig_exp.tight_layout()
     fig_exp.savefig(exposure_path, dpi=120)
     plt.close(fig_exp)
@@ -636,7 +642,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_roll.set_xlabel("Step")
     ax_roll.set_ylabel("Mean Return")
     ax_roll.legend()
-    rolling_path = figures_dir / "week8_iteration_rolling_mean_return_comparison.png"
+    rolling_path = figures_dir / f"{artifact_prefix}_iteration_rolling_mean_return_comparison.png"
     fig_roll.tight_layout()
     fig_roll.savefig(rolling_path, dpi=120)
     plt.close(fig_roll)
@@ -651,7 +657,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_hist.set_xlabel("Step Return")
     ax_hist.set_ylabel("Frequency")
     ax_hist.legend()
-    hist_path = figures_dir / "week8_iteration_return_distribution_comparison.png"
+    hist_path = figures_dir / f"{artifact_prefix}_iteration_return_distribution_comparison.png"
     fig_hist.tight_layout()
     fig_hist.savefig(hist_path, dpi=120)
     plt.close(fig_hist)
@@ -668,7 +674,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_delta.set_xticklabels(exp_labels, rotation=35, ha="right")
     ax_delta.set_title("Top Category Exposure Deltas (Constrained - Baseline)")
     ax_delta.set_ylabel("Delta Weight")
-    exposure_delta_path = figures_dir / "week8_iteration_top_exposure_deltas.png"
+    exposure_delta_path = figures_dir / f"{artifact_prefix}_iteration_top_exposure_deltas.png"
     fig_delta.tight_layout()
     fig_delta.savefig(exposure_delta_path, dpi=120)
     plt.close(fig_delta)
@@ -685,7 +691,7 @@ def _make_figures(project_root: pathlib.Path) -> dict[str, pathlib.Path]:
     ax_scatter.set_xlabel("Volatility")
     ax_scatter.set_ylabel("Mean Step Return")
     ax_scatter.legend()
-    risk_return_path = figures_dir / "week8_iteration_risk_return_snapshot.png"
+    risk_return_path = figures_dir / f"{artifact_prefix}_iteration_risk_return_snapshot.png"
     fig_scatter.tight_layout()
     fig_scatter.savefig(risk_return_path, dpi=120)
     plt.close(fig_scatter)
@@ -746,6 +752,13 @@ def main() -> None:
         "Use -1 for auto (cpu_count). On many-core pods, try 16–32 with OMP_NUM_THREADS=1 TORCH_NUM_THREADS=1.",
     )
     parser.add_argument(
+        "--skip-optuna",
+        action="store_true",
+        help="Skip the Optuna search stage entirely and resume the pipeline from covariance "
+        "diagnostics onward, reusing previously-written *_constrained_best_*.json/csv artifacts. "
+        "Use this when an earlier run finished Optuna but crashed in a downstream stage.",
+    )
+    parser.add_argument(
         "--git-commit-and-push",
         action="store_true",
         help="After a successful run: git add data/processed figures docs, commit, "
@@ -767,6 +780,69 @@ def main() -> None:
         default=None,
         metavar="MSG",
         help="Commit message for --git-commit-and-push. Default: timestamped auto message.",
+    )
+    parser.add_argument(
+        "--artifact-prefix",
+        default="week8",
+        help="Stem for every artifact this run writes (raw cache, processed CSV/JSON, "
+        "figures, manifest, week 9 report). Use unique values per pod when running "
+        "experiments in parallel (e.g. week8_A, week8_B, ...) so branches merge cleanly.",
+    )
+    parser.add_argument(
+        "--top-k-bagging",
+        type=int,
+        default=1,
+        help="Average the holdout portfolio returns of the top-K Optuna trials (by walk-forward "
+        "objective) instead of using a single best trial. K=1 (default) preserves legacy behavior. "
+        "Reduces selection bias from many-trial Sobol search; recommended K=5–10.",
+    )
+    parser.add_argument(
+        "--baseline-shrinkage",
+        action="store_true",
+        help="Add baseline_alpha ∈ [0, 1] as an Optuna hyperparameter. Final per-step return is "
+        "alpha * r_constrained + (1 - alpha) * r_equalweight; Optuna picks alpha. Acts as "
+        "shrinkage-to-uniform at the portfolio level.",
+    )
+    parser.add_argument(
+        "--beat-baseline-objective",
+        action="store_true",
+        help="Change the Optuna objective from Sortino(constrained) to "
+        "Sortino(constrained) - Sortino(equal-weight) on the same walk-forward folds. "
+        "Pushes the search toward configurations that *beat* equal-weight rather than just "
+        "maximizing absolute Sortino.",
+    )
+    parser.add_argument(
+        "--reduced-search",
+        action="store_true",
+        help="Narrow the Optuna search space to ranges around the values that converged across "
+        "Round 1 pods (drops outer extremes for lr, domain_limit, max_weight, variance/downside "
+        "penalties; fixes entropy_lambda at 0). Same trial count → denser Sobol coverage.",
+    )
+    parser.add_argument(
+        "--momentum-screening",
+        action="store_true",
+        help="Pre-screen markets by absolute recent price momentum before the optimizer sees them. "
+        "Ranks candidate markets by |return over the last N days| and keeps only the top-K movers. "
+        "Addresses the 'weak signal / dead-weight markets' problem diagnosed in the Week 9 synthesis: "
+        "reduces parameter count so constraint thresholds become binding and per-market tilts are "
+        "large enough to rise above gradient noise. Combines cleanly with --reduced-search, "
+        "--top-k-bagging, and the macro modes (orthogonal lever).",
+    )
+    parser.add_argument(
+        "--momentum-top-n",
+        type=int,
+        default=20,
+        help="Number of markets to retain after momentum screening (default 20). "
+        "Only used when --momentum-screening is set. Must be <= --max-markets; if not set, "
+        "defaults to 20.",
+    )
+    parser.add_argument(
+        "--momentum-lookback-days",
+        type=float,
+        default=5.0,
+        help="Window (in days) for computing per-market momentum (default 5.0). "
+        "Only used when --momentum-screening is set. Shorter windows (e.g. 3.0) capture "
+        "very recent price action; longer windows (e.g. 7.0) smooth out noise.",
     )
     args = parser.parse_args()
 
@@ -792,12 +868,17 @@ def main() -> None:
             "pre-market",
             "rewards-20-4pt5-50",
         ),
-        artifact_prefix="week8",
+        artifact_prefix=args.artifact_prefix,
         history_interval="max",
-        history_fidelity=10,
+        history_fidelity=60,
         use_cached_events_if_available=True,
         history_priority_enabled=True,
         history_priority_oversample_factor=5,
+        momentum_screening_enabled=bool(args.momentum_screening),
+        momentum_lookback_days=float(args.momentum_lookback_days),
+        momentum_top_n=(
+            int(args.momentum_top_n) if args.momentum_screening else None
+        ),
     )
     # ── Toggle: set QUICK_SANITY_CHECK = False for the full Optuna run ──
     QUICK_SANITY_CHECK = False
@@ -814,8 +895,8 @@ def main() -> None:
     experiment_config = ExperimentConfig(
         learning_rates=(0.005, 0.01, 0.02, 0.05, 0.1, 0.2),
         penalties_lambda=(0.25, 0.5, 1.0, 2.0),
-        rolling_windows=(24, 48, 96, 144, 288),
-        steps_per_window=5,
+        rolling_windows=(24, 48, 96),
+        steps_per_window=3,
         objective="mean_downside",
         variance_penalty=1.0,
         downside_penalty=2.0,
@@ -856,6 +937,18 @@ def main() -> None:
         experiment_config = replace(experiment_config, macro_integration=args.macro_integration)
     if args.etf_tracking:
         experiment_config = replace(experiment_config, use_etf_tracking=True)
+    if args.reduced_search:
+        experiment_config = replace(
+            experiment_config,
+            learning_rates=(0.005, 0.01, 0.02, 0.05),
+            penalties_lambda=(0.25, 0.5, 1.0),
+            domain_limits=(0.08, 0.12),
+            max_weights=(0.04, 0.06, 0.10),
+            entropy_lambdas=(0.0,),
+            variance_penalties=(1.0, 2.0),
+            downside_penalties=(2.0, 3.0),
+            uniform_mixes=(0.0, 0.05, 0.1),
+        )
     config_hash = _config_hash(base_build_config, experiment_config)
 
     def _stage_banner(name: str) -> None:
@@ -864,6 +957,13 @@ def main() -> None:
         print(f"  PIPELINE STAGE: {name}", flush=True)
         print(f"  (total elapsed: {elapsed_total / 60:.1f}m)", flush=True)
         print(f"{'#'*60}\n", flush=True)
+
+    if args.momentum_screening:
+        print(
+            f"\n[CONFIG] momentum screening ENABLED: "
+            f"top_n={args.momentum_top_n}, lookback_days={args.momentum_lookback_days}",
+            flush=True,
+        )
 
     _stage_banner("Data Build")
     stage_started = time.perf_counter()
@@ -888,8 +988,8 @@ def main() -> None:
 
     _stage_banner("Equal-Weight Baseline")
     stage_started = time.perf_counter()
-    baseline_result = run_equal_weight_baseline(project_root, artifact_prefix="week8")
-    baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix="week8")
+    baseline_result = run_equal_weight_baseline(project_root, artifact_prefix=args.artifact_prefix)
+    baseline_artifacts = save_baseline_outputs(project_root, baseline_result, artifact_prefix=args.artifact_prefix)
     baseline_sec = time.perf_counter() - stage_started
     print(f"Baseline complete in {baseline_sec:.1f}s")
     print(f"- markets: {baseline_result.market_count}")
@@ -901,7 +1001,7 @@ def main() -> None:
     _stage_banner("Exogenous Yahoo features")
     stage_started = time.perf_counter()
     exogenous_artifacts: dict[str, pathlib.Path] = {}
-    ap = "week8"
+    ap = args.artifact_prefix
     markets_p = project_root / "data" / "processed" / f"{ap}_markets_filtered.csv"
     history_p = project_root / "data" / "processed" / f"{ap}_price_history.csv"
     baseline_ts_p = project_root / "data" / "processed" / f"{ap}_baseline_timeseries.csv"
@@ -929,58 +1029,110 @@ def main() -> None:
         print(f"- {key}: {value}")
 
     n_trials_opt = args.optuna_trials if args.optuna_trials is not None else OPTUNA_N_TRIALS
-    _stage_banner(f"Optuna quasi-random search ({n_trials_opt} trials, QMCSampler)")
-    stage_started = time.perf_counter()
     manifest_constrained_flat: dict[str, str] = {}
     last_optuna_suffix = ""
     constrained_artifacts: dict[str, pathlib.Path] = {}
+    constrained_sec = 0.0
 
-    if macro_modes_list:
-        constrained_sec_total = 0.0
-        for m in macro_modes_list:
-            suf = "" if m == "rescale" else f"_macro_{m}"
-            cfg_m = replace(experiment_config, macro_integration=m)
-            t0 = time.perf_counter()
-            arts = run_optuna_search(
-                project_root,
-                artifact_prefix="week8",
-                config=cfg_m,
-                n_trials=n_trials_opt,
-                joint_macro_mode_search=False,
-                output_artifact_suffix=suf,
-            )
-            constrained_sec_total += time.perf_counter() - t0
-            for k, v in arts.items():
-                manifest_constrained_flat[f"{m}__{k}"] = str(v)
-            constrained_artifacts = arts
-            last_optuna_suffix = suf
-        constrained_sec = constrained_sec_total
-    else:
-        suf_single = args.optuna_artifact_suffix
-        if suf_single is None:
-            suf_single = (
+    def _resume_suffix_from_args() -> str:
+        if macro_modes_list:
+            last_mode = macro_modes_list[-1]
+            return "" if last_mode == "rescale" else f"_macro_{last_mode}"
+        suf = args.optuna_artifact_suffix
+        if suf is None:
+            suf = (
                 ""
                 if (args.joint_macro_mode_search or args.macro_integration == "rescale")
                 else f"_macro_{args.macro_integration}"
             )
-        constrained_artifacts = run_optuna_search(
-            project_root,
-            artifact_prefix="week8",
-            config=experiment_config,
-            n_trials=n_trials_opt,
-            joint_macro_mode_search=args.joint_macro_mode_search,
-            output_artifact_suffix=suf_single,
-        )
-        constrained_sec = time.perf_counter() - stage_started
+        return suf
+
+    def _reconstruct_artifacts_from_disk(suffix: str) -> dict[str, pathlib.Path]:
+        processed_dir = project_root / "data" / "processed"
+        stem = f"{args.artifact_prefix}{suffix}"
+        candidates = {
+            "constrained_grid": processed_dir / f"{args.artifact_prefix}_constrained_experiment_grid.csv",
+            "constrained_best_metrics": processed_dir / f"{stem}_constrained_best_metrics.json",
+            "constrained_best_timeseries": processed_dir / f"{stem}_constrained_best_timeseries.csv",
+        }
+        return {k: v for k, v in candidates.items() if v.exists()}
+
+    if args.skip_optuna:
+        _stage_banner("Optuna quasi-random search (SKIPPED — resuming from disk)")
+        last_optuna_suffix = _resume_suffix_from_args()
+        constrained_artifacts = _reconstruct_artifacts_from_disk(last_optuna_suffix)
         manifest_constrained_flat = {k: str(v) for k, v in constrained_artifacts.items()}
-        last_optuna_suffix = suf_single
-    print(f"\nOptuna search complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
+        required = (
+            project_root
+            / "data"
+            / "processed"
+            / f"{args.artifact_prefix}{last_optuna_suffix}_constrained_best_metrics.json"
+        )
+        if not required.exists():
+            raise SystemExit(
+                f"--skip-optuna requested but {required} is missing. "
+                "Cannot resume; rerun without --skip-optuna or check --macro-integration / --macro-modes."
+            )
+        print(f"Reusing constrained artifacts with suffix {last_optuna_suffix!r}:")
+    else:
+        _stage_banner(f"Optuna quasi-random search ({n_trials_opt} trials, QMCSampler)")
+        stage_started = time.perf_counter()
+        if macro_modes_list:
+            constrained_sec_total = 0.0
+            for m in macro_modes_list:
+                suf = "" if m == "rescale" else f"_macro_{m}"
+                cfg_m = replace(experiment_config, macro_integration=m)
+                t0 = time.perf_counter()
+                arts = run_optuna_search(
+                    project_root,
+                    artifact_prefix=args.artifact_prefix,
+                    config=cfg_m,
+                    n_trials=n_trials_opt,
+                    joint_macro_mode_search=False,
+                    output_artifact_suffix=suf,
+                    top_k_bagging=int(args.top_k_bagging),
+                    baseline_shrinkage=bool(args.baseline_shrinkage),
+                    beat_baseline_objective=bool(args.beat_baseline_objective),
+                )
+                constrained_sec_total += time.perf_counter() - t0
+                for k, v in arts.items():
+                    manifest_constrained_flat[f"{m}__{k}"] = str(v)
+                constrained_artifacts = arts
+                last_optuna_suffix = suf
+            constrained_sec = constrained_sec_total
+        else:
+            suf_single = args.optuna_artifact_suffix
+            if suf_single is None:
+                suf_single = (
+                    ""
+                    if (args.joint_macro_mode_search or args.macro_integration == "rescale")
+                    else f"_macro_{args.macro_integration}"
+                )
+            constrained_artifacts = run_optuna_search(
+                project_root,
+                artifact_prefix=args.artifact_prefix,
+                config=experiment_config,
+                n_trials=n_trials_opt,
+                joint_macro_mode_search=args.joint_macro_mode_search,
+                output_artifact_suffix=suf_single,
+                top_k_bagging=int(args.top_k_bagging),
+                baseline_shrinkage=bool(args.baseline_shrinkage),
+                beat_baseline_objective=bool(args.beat_baseline_objective),
+            )
+            constrained_sec = time.perf_counter() - stage_started
+            manifest_constrained_flat = {k: str(v) for k, v in constrained_artifacts.items()}
+            last_optuna_suffix = suf_single
+        print(f"\nOptuna search complete in {constrained_sec / 60:.1f}m ({constrained_sec / 3600:.1f}h)")
     for key, value in constrained_artifacts.items():
         print(f"- {key}: {value}")
 
     _stage_banner("Covariance Diagnostics")
     stage_started = time.perf_counter()
-    covariance_artifacts = run_covariance_diagnostics(project_root, artifact_prefix="week8")
+    covariance_artifacts = run_covariance_diagnostics(
+        project_root,
+        artifact_prefix=args.artifact_prefix,
+        constrained_suffix=last_optuna_suffix,
+    )
     covariance_sec = time.perf_counter() - stage_started
     print(f"Covariance diagnostics complete in {covariance_sec:.1f}s")
     for key, value in covariance_artifacts.items():
@@ -988,7 +1140,11 @@ def main() -> None:
 
     _stage_banner("Figure Generation")
     stage_started = time.perf_counter()
-    figure_artifacts = _make_figures(project_root)
+    figure_artifacts = _make_figures(
+        project_root,
+        artifact_prefix=args.artifact_prefix,
+        constrained_suffix=last_optuna_suffix,
+    )
     figures_sec = time.perf_counter() - stage_started
     print(f"Figures complete in {figures_sec:.1f}s")
     for key, value in figure_artifacts.items():
@@ -996,12 +1152,12 @@ def main() -> None:
 
     _stage_banner("Week 9 Diagnostics Report")
     stage_started = time.perf_counter()
-    week9_cstem = f"week8{last_optuna_suffix}" if last_optuna_suffix else "week8"
+    week9_cstem = f"{args.artifact_prefix}{last_optuna_suffix}" if last_optuna_suffix else args.artifact_prefix
     week9_report_path = _make_week9_diagnostics_report(
         project_root=project_root,
-        artifact_prefix="week8",
+        artifact_prefix=args.artifact_prefix,
         min_history_days_used=used_min_history_days,
-        constrained_artifact_stem=week9_cstem if week9_cstem != "week8" else None,
+        constrained_artifact_stem=week9_cstem if week9_cstem != args.artifact_prefix else None,
     )
     report_sec = time.perf_counter() - stage_started
     print(f"Report complete in {report_sec:.1f}s")
@@ -1009,7 +1165,7 @@ def main() -> None:
 
     manifest_path = _write_run_manifest(
         project_root=project_root,
-        artifact_prefix="week8",
+        artifact_prefix=args.artifact_prefix,
         config_hash=config_hash,
         stage_durations_sec={
             "data_build": data_sec,
@@ -1040,6 +1196,11 @@ def main() -> None:
             ),
             "joint_macro_mode_search": args.joint_macro_mode_search,
             "etf_tracking": args.etf_tracking,
+            "momentum_screening": {
+                "enabled": bool(args.momentum_screening),
+                "top_n": int(args.momentum_top_n) if args.momentum_screening else None,
+                "lookback_days": float(args.momentum_lookback_days) if args.momentum_screening else None,
+            },
             "optuna_constrained_artifact_suffix": last_optuna_suffix,
             "week9_constrained_artifact_stem": week9_cstem,
             "git_commit_and_push_requested": bool(args.git_commit_and_push),

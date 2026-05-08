@@ -1,0 +1,27 @@
+{
+  "steps": 1550,
+  "asset_count": 20,
+  "total_portfolio_return": 0.5732669736063669,
+  "top_market_by_abs_contribution": {
+    "token_id": "43730668550917761725713780192382120243054780302570603837017194778854370301083",
+    "domain": "best-of-2025",
+    "question": "Will James rank #1 among boy names on the SSA\u2019s official list for 2025?",
+    "market_id": "651486",
+    "market_slug": "will-james-rank-1-among-boy-names-on-the-ssas-official-list-for-2025",
+    "mean_weight": 0.04979058350153984,
+    "total_contribution": 0.1988403257855273,
+    "mean_step_contribution": 0.0001282840811519531,
+    "contribution_share_of_total_return": 0.3468546679649834
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "best-of-2025",
+    "total_contribution": 0.1988403257855273,
+    "contribution_share_of_total_return": 0.3468546679649834
+  },
+  "top_abs_corr_pair": {
+    "token_a": "57301498276970257025109591078431189727442302532145853906375186182281603517458",
+    "token_b": "24315108267836543154857233535536136482524552716493402526894829400485516895736",
+    "corr": 0.09737648482360144,
+    "abs_corr": 0.09737648482360144
+  }
+}
