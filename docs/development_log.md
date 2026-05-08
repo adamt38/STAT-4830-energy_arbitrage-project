@@ -436,3 +436,60 @@ Priority order: **S4 > S1 > S5**, with S2/S3 fired the moment either S1 or S5 fa
 - **Kelly × tight caps.** The Round 7 K10D-tight experiment (re-run `polymarket_week10_kelly_pipeline.py` with `--max-weights 0.04 --concentration-penalty-lambdas 2.0` and dynamic copula on) requires a GPU pod — not in the current five-pod budget. Held for the next round.
 - **Regime-dependent penalties.** A mixture objective switching penalty strengths on SPY z-score would use `src.equity_signal.compute_risk_regime_zscore` (ported in §14.8). Candidate for Round 7 if Round 6 validates the equity signal via Pod S2.
 - **Tilt / spread inside the optimizer.** If Pods S2 / S3 clear their success bar, fold the relevant overlay into `_run_online_pass` so it's optimized jointly with the penalties rather than applied post-hoc. Until then, post-hoc evaluation is the right test.
+
+## Branch integration log (May 2026)
+
+### Scope
+
+- **Goal:** Fold non-redundant remote **tip** branches into `main` so code and artifacts live on one line of history, **without deleting any remote branches** (they remain on GitHub).
+- **Tip detection:** A branch is merged only if no other remote branch strictly contains its commits (see [docs/branch_integration_targets.txt](branch_integration_targets.txt) and merge order [docs/branch_merge_order.txt](branch_merge_order.txt)).
+- **Pytest:** Repository smoke tests (`tests/`); they do **not** re-run full cloud Optuna / Kelly grids.
+
+### Merge commits (`Merge branch '…' into main`)
+
+| Merge commit | Branch |
+|--------------|--------|
+| `86f8f02` | `cloud-runs-I4` |
+| `9f32e9d` | `cloud-runs-S5` |
+| `4da6446` | `cloud-runs-K4` |
+| `c05786c` | `cloud-runs-S1` |
+| `e5479c1` | `cloud-runs-Q5` |
+| `547a32a` | `cloud-runs-S4` |
+| `a2d21c8` | `cloud-runs-L4` |
+| `4b3bb7d` | `cloud-runs-B2` |
+| `756a65e` | `cloud-runs-C` |
+| `2b22464` | `cloud-runs-A` |
+| `b3fc1b3` | `cloud-runs-C2` |
+| `6ed0c54` | `cloud-runs-A2` |
+| `3f6217f` | `cloud-runs-B` |
+| `7ca7615` | `cloud-runs-F2` |
+| `be17557` | `cloud-runs-D` |
+| `140d243` | `cloud-runs-D2` |
+| `7a10889` | `cloud-runs-F` |
+| `44cecb3` | `cloud-runs-M4` |
+| `ce9863a` | `cloud-runs-E2` |
+| `bf71916` | `direction-B` |
+| `2a5cf1e` | `learnable-selection` |
+| `eab31cc` | `option-B-kelly-momentum` |
+| `a145f57` | `cloud-runs-K10A` |
+| `350018d` | `cloud-runs-K10B` |
+| `a57bd7d` | `cloud-runs-K10C` |
+| `ed9731c` | `cloud-runs-K10D` |
+| `146bd25` | `stock-PM-combined-strategy` |
+| `886095d` | `feature/momentum-screening` |
+
+Follow-up fixup: `2b2b6ba` (tests + small `src` helpers + merge automation scripts under `script/`).
+
+### Conflict resolution notes
+
+- **`docs/week9_diagnostics_report.md`:** Each pod’s single-run report is **appended** as a new `## Run: …` section (incoming `##` headings demoted to `###`) via `script/append_incoming_week9_diagnostics.sh`. First manual merge (`cloud-runs-S5`) combined `week11_I` and `week13_S5` by hand before the helper existed.
+- **`docs/week10_kelly_diagnostics_report.md`:** Same append pattern for `cloud-runs-K10A`–`K10D` via `script/append_incoming_week10_kelly_diagnostics.sh`.
+- **`learnable-selection`:** Combined Round-6 CLI flags with `learnable-selection`’s `--seed` / `--learnable-inclusion` block in `script/polymarket_week8_pipeline.py` in one argparse section.
+- **`stock-PM-combined-strategy`:** Kept **current `main`** version of `script/polymarket_week8_pipeline.py` (their branch removed large portions of the pipeline). Brought in data, figures, and extra tests; then **`2b2b6ba`** added `baseline_static_token_weights`, `src/baseline_vs_hedge_figures.py`, removed `tests/test_constrained_excess_objective.py` (required optimizer kwargs not on `main`), pointed `test_pm_risk_overlay` at `week11_I_category_correlation.csv`, and **skipped** `test_equity_domain_tilt_multiplier_changes_weights` until `equity_domain_tilt_multiplier` exists on `_run_online_pass`.
+- **`feature/momentum-screening`:** For conflicting `data/processed/week8_*` and `src/polymarket_data.py`, kept **ours** so `main` stays consistent with the already-integrated momentum path.
+
+### Pytest (final, all merges applied)
+
+- **Command:** `.venv/bin/python -m pytest tests/ -v --tb=short`
+- **Result:** `41 passed, 1 skipped` in ~1.8s (skipped: equity-domain tilt test pending optimizer support).
+- **Interpretation:** Smoke / unit coverage only; cloud experiment correctness is still governed by the per-pod JSON/CSV artifacts merged above.
