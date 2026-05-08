@@ -1,0 +1,9 @@
+domain,ticker,notes
+finance,XLF,financial sector proxy
+economy,XLI,industrial/economic cycle proxy
+crypto,IBIT,bitcoin ETF proxy
+politics,SPY,broad market proxy when no sector-specific mapping
+sports,SPY,broad market proxy
+science,XLK,technology proxy
+culture,XLC,communication services proxy
+other,SPY,default fallback
