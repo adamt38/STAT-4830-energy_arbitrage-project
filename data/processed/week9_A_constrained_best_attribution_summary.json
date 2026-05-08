@@ -1,0 +1,27 @@
+{
+  "steps": 2096,
+  "asset_count": 40,
+  "total_portfolio_return": -0.05903996739717944,
+  "top_market_by_abs_contribution": {
+    "token_id": "36553834009124167357981460132800746681781045509640776189348736916365216865880",
+    "domain": "colombia-election",
+    "question": "Will Daniel Quintero win the 2026 Colombian presidential election?",
+    "market_id": "569369",
+    "market_slug": "will-daniel-quintero-win-the-2026-colombian-presidential-election",
+    "mean_weight": 0.028199810278102092,
+    "total_contribution": 0.049655984590450924,
+    "mean_step_contribution": 2.3690832342772388e-05,
+    "contribution_share_of_total_return": -0.8410571140122813
+  },
+  "top_domain_by_abs_contribution": {
+    "domain": "colombia-election",
+    "total_contribution": 0.049655984590450924,
+    "contribution_share_of_total_return": -0.8410571140122813
+  },
+  "top_abs_corr_pair": {
+    "token_a": "94195159380649683762164114216519545499991614727769221572315275622082093227806",
+    "token_b": "3783874556587832518151104525711027133710881159533628607061884012946071097261",
+    "corr": 0.7555009833477128,
+    "abs_corr": 0.7555009833477128
+  }
+}

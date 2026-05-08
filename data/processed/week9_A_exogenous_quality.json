@@ -1,0 +1,42 @@
+{
+  "tickers": [
+    "SPY",
+    "QQQ",
+    "XLE",
+    "TLT",
+    "BTC-USD"
+  ],
+  "intervals_used": {
+    "SPY": "1h",
+    "QQQ": "1h",
+    "XLE": "1h",
+    "TLT": "1h",
+    "BTC-USD": "1h"
+  },
+  "merge_buffer_sec": 300,
+  "stale_threshold_sec": 7200,
+  "stale_rule": "daily_threshold_if_any_ticker_1d_else_hourly",
+  "any_ticker_daily": false,
+  "fetch_start_utc": "2026-02-02T22:00:27+00:00",
+  "fetch_end_utc": "2026-04-20T21:38:41+00:00",
+  "poly_range_start_utc": "2026-03-19T22:00:27+00:00",
+  "poly_range_end_utc": "2026-04-19T21:38:41+00:00",
+  "row_count": 10478,
+  "missingness_fraction_approx": 0.0,
+  "stale_fraction": 0.0,
+  "equity_open_fraction": 0.17026150028631418,
+  "z_score_params": {
+    "split_idx": 8382,
+    "train_rows_used": 8382,
+    "means": {
+      "risk_on_raw": -0.003549822768532727,
+      "energy_raw": 1.5086764760896667e-05,
+      "rates_raw": -6.112770258700936e-05
+    },
+    "stds": {
+      "risk_on_raw": 0.0009453065147489729,
+      "energy_raw": 0.0018206220122967858,
+      "rates_raw": 0.0004743429945584663
+    }
+  }
+}
