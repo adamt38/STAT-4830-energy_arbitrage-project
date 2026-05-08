@@ -1,0 +1,108 @@
+{
+  "strategy": "constrained_optuna_mean_downside_rescale",
+  "best_params": {
+    "learning_rate": 0.01525263945133513,
+    "lambda_penalty": 0.87109375,
+    "rolling_window": 96,
+    "domain_limit": 0.10062499999999999,
+    "max_weight": 0.0540625,
+    "uniform_mix": 0.010937500000000001,
+    "evaluation_mode": "online",
+    "weight_parameterization": "projected_simplex",
+    "concentration_penalty_lambda": 42.997337756503796,
+    "covariance_penalty_lambda": 9.542702976692379,
+    "covariance_shrinkage": 0.05875,
+    "entropy_lambda": 0.0,
+    "variance_penalty": 1.296875,
+    "downside_penalty": 2.109375,
+    "regime_k": 0.4625,
+    "macro_integration": "rescale",
+    "lambda_macro_explicit": 0.0,
+    "lambda_etf_tracking": 0.0,
+    "selection_source": "optuna_qmc",
+    "holdout_sortino_ratio": 0.16233547707788043,
+    "holdout_max_drawdown": -0.16509402722815125,
+    "holdout_mean_return": 0.0006944895328562936,
+    "holdout_volatility": 0.021061702454901573,
+    "max_domain_exposure": 0.09679549932479858,
+    "baseline_holdout_sortino": 0.16400842304660698,
+    "holdout_sortino_minus_baseline": -0.0016729459687265524,
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      47,
+      65,
+      42,
+      21,
+      99
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "best_trial_baseline_alpha": 1.0
+  },
+  "domain_exposure": {
+    "roland-garros": 0.05099795386195183,
+    "nba-champion": 0.09400930255651474,
+    "epstein": 0.050850678235292435,
+    "serie-a": 0.05147687345743179,
+    "comex-gold-futures": 0.05180496722459793,
+    "ligue-1": 0.0954931303858757,
+    "la-liga": 0.09679549932479858,
+    "nba": 0.05061935633420944,
+    "league-of-legends": 0.05149953439831734,
+    "new-mexico-primary": 0.051854752004146576,
+    "tennis": 0.04863022640347481,
+    "middle-east": 0.04889484867453575,
+    "airdrops": 0.05194932967424393,
+    "primaries": 0.05160655453801155,
+    "colombia-election": 0.050389666110277176,
+    "stanley-cup": 0.05170244723558426,
+    "hockey": 0.05142487213015556
+  },
+  "feasibility_filter": {
+    "applied_threshold": 0.12,
+    "feasible_solution_found": true
+  },
+  "data_split": {
+    "tuning_steps": 5108,
+    "holdout_steps_total": 1277,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48
+  },
+  "optuna_summary": {
+    "n_trials": 100,
+    "n_jobs": 4,
+    "completed_trials": 98,
+    "pruned_trials": 2,
+    "best_trial_number": 47,
+    "search_time_sec": 14090.32480308297,
+    "sampler": "QMCSampler(sobol)",
+    "joint_macro_mode_search": false,
+    "output_artifact_suffix": "",
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      47,
+      65,
+      42,
+      21,
+      99
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "objective_value_best": 0.1378285561301533
+  }
+}

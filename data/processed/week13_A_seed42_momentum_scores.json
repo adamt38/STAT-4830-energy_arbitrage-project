@@ -1,0 +1,146 @@
+{
+  "lookback_days": 5.0,
+  "top_n": 20,
+  "selected_markets": [
+    {
+      "token_id": "95140346952277551620015228752585531762813913098320669805735291271863965388665",
+      "market_slug": "will-the-orlando-magic-win-the-2026-nba-finals",
+      "question": "Will the Orlando Magic win the 2026 NBA Finals?",
+      "domain": "nba-champion",
+      "momentum": 2.6666666666666665
+    },
+    {
+      "token_id": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+      "market_slug": "will-ac-milan-win-the-202526-serie-a-league",
+      "question": "Will AC Milan win the 2025\u201326 Serie A league?",
+      "domain": "serie-a",
+      "momentum": 1.3333333333333333
+    },
+    {
+      "token_id": "88657857917663921842097927058013051966750383205171131721194307619909198186324",
+      "market_slug": "will-real-madrid-win-the-202526-la-liga",
+      "question": "Will Real Madrid win the 2025\u201326 La Liga?",
+      "domain": "la-liga",
+      "momentum": 1.1666666666666667
+    },
+    {
+      "token_id": "54935126197359005865759470122412489520668573958432708236792605627229004170180",
+      "market_slug": "will-hubert-hurkacz-win-the-2026-mens-us-open",
+      "question": "Will Hubert Hurkacz win the 2026 Men's US Open?",
+      "domain": "tennis",
+      "momentum": 0.8421052631578949
+    },
+    {
+      "token_id": "59261866601270864198456845856841875150453626184437295894384368539724334278520",
+      "market_slug": "will-the-los-angeles-kings-win-the-western-conference-195",
+      "question": "Will the Los Angeles Kings win the Western Conference?",
+      "domain": "hockey",
+      "momentum": -0.7951807228915663
+    },
+    {
+      "token_id": "24315108267836543154857233535536136482524552716493402526894829400485516895736",
+      "market_slug": "will-the-phoenix-suns-win-the-nba-western-conference-finals",
+      "question": "Will the Phoenix Suns win the NBA Western Conference Finals?",
+      "domain": "nba",
+      "momentum": -0.7692307692307692
+    },
+    {
+      "token_id": "16762206059532490206526748978074790856743627357242377760896424862385852889561",
+      "market_slug": "nba-2025-26-clutch-player-of-the-year-jamal-murray",
+      "question": "Will Jamal Murray win the 2025\u20132026 NBA Clutch Player of the Year?",
+      "domain": "basketball",
+      "momentum": -0.75
+    },
+    {
+      "token_id": "31317702573839002987249831884538721320741670016050389364356636973937868446333",
+      "market_slug": "will-duke-rodriguez-win-the-2026-new-mexico-governor-republican-primary-election",
+      "question": "Will Duke Rodriguez win the 2026 New Mexico Governor Republican primary election?",
+      "domain": "new-mexico-primary",
+      "momentum": -0.7171717171717171
+    },
+    {
+      "token_id": "115394635451048754011327777276076337527696490170069916864086987480603951060926",
+      "market_slug": "will-the-ottawa-senators-win-the-eastern-conference",
+      "question": "Will the Ottawa Senators win the Eastern Conference?",
+      "domain": "hockey",
+      "momentum": -0.7024390243902439
+    },
+    {
+      "token_id": "57301498276970257025109591078431189727442302532145853906375186182281603517458",
+      "market_slug": "megaeth-market-cap-fdv-2b-one-day-after-launch-738-867-649-272-765-733",
+      "question": "MegaETH market cap (FDV) >$2B one day after launch?",
+      "domain": "airdrops",
+      "momentum": 0.7000000000000001
+    },
+    {
+      "token_id": "2317130722330994677503722994963086323403276367952762140016618274858179343506",
+      "market_slug": "will-villarreal-win-the-202526-la-liga",
+      "question": "Will Villarreal win the 2025\u201326 La Liga?",
+      "domain": "la-liga",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "49662274238485451283220527378586398370959042852997899886824914466317758572224",
+      "market_slug": "will-marseille-win-the-202526-french-ligue-1",
+      "question": "Will Marseille win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "19730444129256957174015889379846911816814301308831812906398054285035177752584",
+      "market_slug": "will-rennes-win-the-202526-french-ligue-1",
+      "question": "Will Rennes win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "13894075309136465288344590624962399806634179813543146659957916315803696399619",
+      "market_slug": "si-hit-200-high-jun-2026-446-464-464",
+      "question": "Will Silver (SI) hit (HIGH) $200 by end of June?",
+      "domain": "comex-silver-futures",
+      "momentum": 0.6511627906976744
+    },
+    {
+      "token_id": "7345183309756257693783741573478340128830660331823026035095352170224920670792",
+      "market_slug": "will-connie-chan-receive-the-most-votes-in-the-ca-11-primary",
+      "question": "Will Connie Chan receive the most votes in the CA-11 primary?",
+      "domain": "primaries",
+      "momentum": -0.6194690265486726
+    },
+    {
+      "token_id": "108548893345759572446077602443398325305734327289834850738242401844282632332811",
+      "market_slug": "epstein-client-list-released-by-june-30",
+      "question": "Epstein client list released by June 30?",
+      "domain": "epstein",
+      "momentum": -0.5580645161290322
+    },
+    {
+      "token_id": "103950812176015306889097643332505690876545410954871160290129574415932884036868",
+      "market_slug": "will-taylor-fritz-win-the-2026-mens-french-open",
+      "question": "Will Taylor Fritz win the 2026 Men's French Open?",
+      "domain": "roland-garros",
+      "momentum": -0.5454545454545454
+    },
+    {
+      "token_id": "73768610008619570600930429495180540710817177537162503586781057110775077618432",
+      "market_slug": "will-nikola-jokic-win-the-20252026-nba-mvp",
+      "question": "Will Nikola Jokic win the 2025\u20132026 NBA MVP?",
+      "domain": "awards",
+      "momentum": 0.49999999999999983
+    },
+    {
+      "token_id": "38980554868563368105197970502286544690071489173012608306074305645705239965852",
+      "market_slug": "will-brion-win-the-lck-2026-season-playoffs",
+      "question": "Will BRION win the LCK 2026 season playoffs?",
+      "domain": "league-of-legends",
+      "momentum": -0.47058823529411775
+    },
+    {
+      "token_id": "65396033350506725313266693161572493847482432654933099338943748693899562511370",
+      "market_slug": "will-dusty-johnson-win-the-2026-south-dakota-governor-republican-primary-election",
+      "question": "Will Dusty Johnson win the 2026 South Dakota Governor Republican primary election?",
+      "domain": "south-dakota-primary",
+      "momentum": 0.4507042253521128
+    }
+  ]
+}

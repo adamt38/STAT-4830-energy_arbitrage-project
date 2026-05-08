@@ -1,0 +1,27 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.058157164529672255,
+  "max_drawdown": -0.20334757292223404,
+  "market_count": 20,
+  "exposure_by_domain": {
+    "roland-garros": 0.058823529411764705,
+    "epstein": 0.058823529411764705,
+    "hockey": 0.058823529411764705,
+    "serie-a": 0.058823529411764705,
+    "comex-silver-futures": 0.058823529411764705,
+    "basketball": 0.058823529411764705,
+    "ligue-1": 0.058823529411764705,
+    "la-liga": 0.058823529411764705,
+    "nba": 0.058823529411764705,
+    "new-mexico-primary": 0.058823529411764705,
+    "league-of-legends": 0.058823529411764705,
+    "tennis": 0.058823529411764705,
+    "airdrops": 0.058823529411764705,
+    "south-dakota-primary": 0.058823529411764705,
+    "primaries": 0.058823529411764705,
+    "awards": 0.058823529411764705,
+    "nba-champion": 0.058823529411764705
+  },
+  "mean_return": 0.00037349110265671385,
+  "volatility": 0.012839576503373553
+}

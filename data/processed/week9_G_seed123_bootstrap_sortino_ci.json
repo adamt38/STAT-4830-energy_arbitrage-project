@@ -1,0 +1,11 @@
+{
+  "observed_delta": -0.008307097543669983,
+  "mean_delta": -0.008527116526593591,
+  "ci_lower": -0.0733887282595896,
+  "ci_upper": 0.03834617448410146,
+  "frac_positive": 0.4082,
+  "bl_sortino_holdout": 0.1706425746215504,
+  "co_sortino_holdout": 0.16233547707788043,
+  "n_bootstrap": 5000,
+  "n_holdout_steps": 1277
+}

@@ -856,8 +856,8 @@ Round 5 opened three more deferred levers, all now implemented and used in §16 
   Every flag mirrors the `--rolling-windows` / `--lr-values` pattern: comma-separated floats (or one int for `--seed-override`), applied **after** `--reduced-search`, backwards-compatible default (flag unset → existing behavior).
 - **Port of teammate Colin's `src/pm_risk_overlay.py` + `src/equity_signal.py`.** Two standalone modules cherry-picked verbatim from `origin/stock-PM-combined-strategy` onto `cloud-runs-R6` (no modifications to the teammate branch). `pm_risk_overlay` provides `build_equity_domain_tilt_multiplier` (SPY-driven domain tilts via `yfinance`), `pm_category_spread_returns` + `top_negative_correlation_pairs` (zero-investment PM-category pairs trading), and resolution-shock multipliers. `equity_signal` provides the PM-domain ↔ equity-sector pair-ranking diagnostics they depend on. All four `data/external/*_template.csv` files (domain-ticker map, cross-asset mapping, analyst features, options prior) ported with them for easy reuse.
 - **Two post-hoc overlay evaluators** (same `posthoc_alpha_blend.py` convention):
-  - `script/posthoc_overlay_tilt.py` — reads `{prefix}_markets_filtered.csv` + `{prefix}_price_history.csv`, applies `build_equity_domain_tilt_multiplier` at a sweep of `--tilt-strengths`, and compares the tilted domain-equal portfolio to the pure equal-weight baseline. Requires network access + a populated `--ticker-map CSV`. Used by Pod S2.
-  - `script/posthoc_overlay_spread.py` — reads `{prefix}_category_correlation.csv` (already produced by `covariance_diagnostics`), identifies the top-N negatively correlated domain pairs at `--corr-threshold`, and sweeps `--max-pairs` × `--spread-lambdas` combinations. No network required. Smoke-tested on `week8`: interior argmax at (max_pairs=5, λ=0.1) beats the pure baseline by +0.0014 Sortino, confirming the overlay extracts a tiny-but-real signal. Used by Pod S3.
+  - `script/posthoc_overlay_tilt.py` — reads `{prefix}_markets_filtered.csv` + `{prefix}_price_history.csv`, applies `build_equity_domain_tilt_multiplier` at a sweep of `--tilt-strengths`, and compares the tilted domain-equal portfolio to the pure equal-weight baseline. Requires network access + a populated `--ticker-map CSV`. Used by the **S2 laptop overlay** (no pod needed — see §16.5).
+  - `script/posthoc_overlay_spread.py` — reads `{prefix}_category_correlation.csv` (already produced by `covariance_diagnostics`), identifies the top-N negatively correlated domain pairs at `--corr-threshold`, and sweeps `--max-pairs` × `--spread-lambdas` combinations. No network required. Smoke-tested on `week8`: interior argmax at (max_pairs=5, λ=0.1) beats the pure baseline by +0.0014 Sortino, confirming the overlay extracts a tiny-but-real signal. Used by the **S3 laptop overlay** (no pod needed — see §16.5).
 
 Use these in §16 Round 6 below.
 
@@ -1110,11 +1110,11 @@ Three corrected takeaways drive §16 Round 6:
 
 ## 16. Round 6 — Risk-aware objective port + equity / PM overlays
 
-**Status: ready to launch.** Five CPU-only pods available (same class as Round 4/5). All code ships on `origin/cloud-runs-R6`; teammate branch `origin/stock-PM-combined-strategy` is left untouched. The new levers wired in §14.8 above expose the risk-aware objective terms already inside `constrained_optimizer` but previously hidden from the CLI, plus two post-hoc overlay evaluators that test teammate Colin's equity-tilt and PM-category-spread ideas on our data without modifying the inner loop.
+**Status: ready to launch.** Round 6 uses **three CPU-only training pods (S1, S4, S5)** plus **two local post-hoc overlays (S2, S3) run on the laptop**. The post-hoc overlays are ~2-minute pure-numpy scripts — no Optuna, no PyTorch, no GPU — so spinning up a pod for them is overkill. See §16.5 for the local setup. All code ships on `origin/cloud-runs-R6`; teammate branch `origin/stock-PM-combined-strategy` is left untouched. The new levers wired in §14.8 above expose the risk-aware objective terms already inside `constrained_optimizer` but previously hidden from the CLI.
 
-### 16.0. Step-by-step: from a fresh pod to a running experiment
+### 16.0. Step-by-step: from a fresh pod to a running experiment (S1 / S4 / S5 only)
 
-Run these **in order**, once per pod. Each pod runs exactly one of S1 / S4 / S5 — do NOT combine multiple experiments on one pod. S2 and S3 are post-hoc (§16.5–16.6) and run on a pod that already has fan-in artifacts available; they can share a pod with each other but not with a training run.
+Run these **in order**, once per pod. Each pod runs exactly one of S1 / S4 / S5 — do NOT combine multiple experiments on one pod. **S2 and S3 do not use this procedure** — they run locally on your laptop after fan-in (see §16.5).
 
 Before you start, you'll need **two things** ready on your laptop:
 
@@ -1163,11 +1163,9 @@ source .venv/bin/activate
 
 # scipy is required by Optuna QMCSampler but not in requirements.txt
 uv pip install scipy
-
-# yfinance is required *only* for Pod S2 (equity-domain tilt). Safe to skip
-# on S1/S4/S5 pods; installing anyway is fine and costs ~8 MB.
-uv pip install yfinance
 ```
+
+(yfinance is **not** needed on S1/S4/S5 pods — it's only used by the S2 post-hoc script, which runs locally on your laptop per §16.5.)
 
 Sanity-check the venv — this must print a path inside `.venv/bin/`:
 
@@ -1239,8 +1237,8 @@ nproc
 | **S1** (full risk-aware objective sweep) | §16.2 below |
 | **S4** (multi-seed I4 robustness, 5 sequential runs) | §16.4 below |
 | **S5** (sizing-frontier grid on I4) | §16.3 below |
-| **S2** (post-hoc equity tilt, runs after S1/S5 fan-in) | §16.5 below |
-| **S3** (post-hoc PM-category spread, runs after S1/S5 fan-in) | §16.6 below |
+
+S2 and S3 are laptop-local (§16.5) — they are not run on a pod.
 
 Within a few seconds of pasting you should see Optuna's progress lines like `[I 2026-04-19 ...] Trial 0 finished with value: 0.0823` streaming to the pane. If nothing prints for more than 60 seconds, something is wrong — see Step 10.
 
@@ -1267,7 +1265,6 @@ When the run finishes you'll see the final `Training complete. Pushing to cloud-
 |---|---|---|
 | `error: unable to access ... 403` on push | PAT missing `Contents: Read and write` | regenerate PAT, redo Step 4 |
 | `ModuleNotFoundError: No module named 'scipy'` | skipped Step 3 | `source .venv/bin/activate && uv pip install scipy` |
-| `ModuleNotFoundError: No module named 'yfinance'` on S2 | skipped the yfinance install | `uv pip install yfinance` |
 | `unrecognized arguments: --variance-penalty-values` (or any Round 6 flag) | wrong branch — you're on plain `cloud-runs`, not `cloud-runs-R6` | redo Step 2 with the correct branch name |
 | tmux detaches but run is gone when you reattach | ran without tmux, or the pod rebooted | restart from Step 5; any partial artifacts in `data/processed/` are safe to overwrite |
 | "Only 1/200 trials finished in 2 hours" | threading misconfigured (OMP × n_jobs ≠ nproc) | `Ctrl-c` to kill, fix `OMP_NUM_THREADS` per §3a, restart from Step 6 |
@@ -1282,10 +1279,10 @@ When the run finishes you'll see the final `Training complete. Pushing to cloud-
 | **S4** (promoted) | σ(Δ) across seeds is small enough (< 0.004) that I4's Δ +0.0077 is a real signal, not noise. Or it isn't, in which case we need the multi-seed **mean Δ** for I4 as the actual reportable. Diagnostic, gates the rest. | **Pod-I4 recipe** × 5 seeds `{3, 7, 101, 202, 303}`. Swapped from G (known loser) to I4 (our only individual-seed win). |
 | **S1** | A richer objective (variance + downside + covariance penalties + sizing caps sized *around* our winners, not tighter than any of them) captures the bulk of the teammate's Δ = +0.1018 edge. | Full 8-lever objective sweep with sizing bracketed between I4's defaults and the teammate's caps. Explicitly keeps I4's winning `rw=24` in the rolling-window search. |
 | **S5** | Progressive tightening beyond I4's defaults moves us along a Sortino/DD frontier — how much DD can we buy per unit Sortino we spend? A *grid*, not a pin. | Pod-I4 recipe + 2D grid `max_weight × domain_limit × concentration_penalty_lambda` (3×3×3 = 27 combinations Optuna samples). |
-| **S2** | The equity-domain tilt signal (SPY-informed) adds risk-adjusted value on top of a domain-equal baseline. Run *after* S1/S5 fan-in, post-hoc. | `script/posthoc_overlay_tilt.py` with `tilt_strengths = {0, 5, 10, 20, 33.3}`. |
-| **S3** | Zero-investment PM-category spreads on the top negatively correlated pairs add uncorrelated alpha. Post-hoc. | `script/posthoc_overlay_spread.py` sweeping `max_pairs × spread_lambda`. |
+| **S2** *(local)* | The equity-domain tilt signal (SPY-informed) adds risk-adjusted value on top of a domain-equal baseline. Run *after* S1/S5 fan-in, post-hoc, **on your laptop** — no pod needed. | `script/posthoc_overlay_tilt.py` with `tilt_strengths = {0, 5, 10, 20, 33.3}`. |
+| **S3** *(local)* | Zero-investment PM-category spreads on the top negatively correlated pairs add uncorrelated alpha. Post-hoc, **on your laptop** — no pod needed. | `script/posthoc_overlay_spread.py` sweeping `max_pairs × spread_lambda`. |
 
-**Priority order if any pod slips: S4 > S1 > S5 > S2 > S3.** S4 is first because without a noise floor no other pod's result is interpretable — a +0.02 Sortino Δ from S1 is exciting only if σ(Δ) is clearly below that. S1 is second because it has the highest upside (the teammate's +0.1018 benchmark) but also the highest variance (eight simultaneously-swept levers). S5 is third as an ablation that isolates *sizing* from *objective change*. S2/S3 are minutes-long post-hoc evaluators that piggyback on whichever training pod finishes first.
+**Priority order if any pod slips: S4 > S1 > S5.** S4 is first because without a noise floor no other pod's result is interpretable — a +0.02 Sortino Δ from S1 is exciting only if σ(Δ) is clearly below that. S1 is second because it has the highest upside (the teammate's +0.1018 benchmark) but also the highest variance (eight simultaneously-swept levers). S5 is third as an ablation that isolates *sizing* from *objective change*. S2 and S3 are laptop-local (§16.5) and take ~2 minutes each — they never compete for pod slots.
 
 **What changed vs the earlier version of this section.** The earlier matrix had S1 pinning `max_weight 0.03–0.06` (tighter than any of our Round-4/5 winners, which used defaults ≈0.10) and `rolling_windows 96,144,288` (dropping I4's winning `rw=24`); S5 pinning three sizing knobs to single values (no frontier); S4 running five seeds of the G recipe (a known Round-5 loser, Δ=−0.034). All three have been revised below.
 
@@ -1393,34 +1390,81 @@ done
 
 Budget. 5 seeds × 100 trials × 4 jobs ≈ same compute as one 200-trial pod. Artifact set is `week13_S4_seed{3,7,101,202,303}_*`. After fan-in, compute `mean ± std` of `holdout_sortino_minus_baseline` (from each diagnostics report) across the five seeds.
 
-### 16.5. Pod S2 command (post-hoc equity-domain tilt sweep)
+### 16.5. S2 and S3 — local post-hoc overlays (laptop, no pod)
 
-Runs after S1 or S5 fan-in. Any prefix whose `_markets_filtered.csv` and `_price_history.csv` exist under `data/processed/` works. Requires network (`yfinance`) and a populated `--ticker-map` (start from the template, map your top domains to matching ETFs: e.g. `crypto-prices → BITO`, `bigtech → QQQ`, `fifa-world-cup → SPY` as a catch-all).
+Both post-hoc scripts are pure-numpy, finish in ~2 minutes, and never need a GPU or a training pod. Run them on your laptop after at least one of S1 / S5 has been fanned in (§16.7). They are read-only against `data/processed/` — running one never corrupts another pod's artifacts.
+
+#### Step A — One-time laptop setup
+
+Do this once, ever. If you've already run smoke tests locally, skip to Step B.
 
 ```bash
-source .venv/bin/activate
+# On your laptop (NOT on a pod). Use your existing clone of the repo.
+cd /path/to/STAT-4830-energy_arbitrage-project
 
-# Edit data/external/domain_ticker_map_template.csv (or copy it) first — the
-# template has a few sample rows. Only domains present in your universe will
-# be tilted; the rest stay at multiplier = 1.0.
+# Make sure cloud-runs has the S1/S5 artifacts you want to evaluate against.
+git fetch origin
+git checkout cloud-runs
+git pull --ff-only origin cloud-runs
 
+# Activate (or create) the virtualenv.
+source .venv/bin/activate       # if it already exists
+# or, first-time setup:
+#   bash script/install.sh && source .venv/bin/activate
+
+# yfinance is required only by S2 (the equity-tilt script); S3 does not need it.
+uv pip install yfinance scipy
+```
+
+Sanity-check both packages import:
+
+```bash
+python -c "import yfinance, scipy; print('OK')"
+```
+
+#### Step B — Populate the ticker map (S2 only)
+
+S2 uses a CSV that maps each Polymarket domain to a matching equity ticker. The repo ships a template with a few sample rows; you need to copy it and fill in entries for the top domains in *your* fanned-in universe.
+
+```bash
+cp data/external/domain_ticker_map_template.csv data/external/domain_ticker_map_local.csv
+```
+
+Open `data/external/domain_ticker_map_local.csv` in your editor. It's two columns: `pm_domain` and `ticker`. Add one row per top domain you care about — examples (adjust to your universe):
+
+```
+pm_domain,ticker
+crypto-prices,BITO
+bigtech,QQQ
+oil-gas,XLE
+politics-us,SPY
+sports,SPY
+```
+
+Rule of thumb: any domain you leave out stays at multiplier 1.0 (no tilt applied). Covering your top ~10 domains by portfolio weight is enough to get a meaningful signal; you don't need every domain mapped.
+
+#### Step C — Run S2 (equity-domain tilt sweep)
+
+Replace `week13_S1` with whichever prefix you fanned in (e.g. `week13_S5` works too).
+
+```bash
 python script/posthoc_overlay_tilt.py \
   --artifact-prefix week13_S1 \
-  --ticker-map data/external/domain_ticker_map_template.csv \
+  --ticker-map data/external/domain_ticker_map_local.csv \
   --tilt-strengths 0,5,10,20,33.3 \
   --max-multiplier 2.0 \
   --output-stem week13_S1_equity_tilt
 ```
 
-Success looks like: an interior argmax at `tilt_strength > 0` that beats the `tilt_strength = 0` row by ≥ +0.01 Sortino. That unlocks Round 7 where the tilt multiplier is folded into the optimizer's inner loop (currently it only multiplies a domain-equal allocation post-hoc).
+Wall-clock: roughly 2 minutes, dominated by the yfinance downloads. The script writes `data/processed/week13_S1_equity_tilt.csv` + `_summary.md` and prints a JSON summary to stdout with the argmax row.
 
-### 16.6. Pod S3 command (post-hoc PM-category spread sweep)
+**Success looks like:** an interior argmax at `tilt_strength > 0` that beats the `tilt_strength = 0` row by ≥ +0.01 Sortino. That unlocks Round 7 where the tilt multiplier is folded into the optimizer's inner loop (currently it only multiplies a domain-equal allocation post-hoc).
 
-Runs after S1 or S5 fan-in. No network needed; reads `{prefix}_category_correlation.csv` (written by `covariance_diagnostics` in every Round 4+ pod).
+#### Step D — Run S3 (PM-category negative-correlation spread sweep)
+
+No network needed, no ticker map needed — this one is pure local arithmetic.
 
 ```bash
-source .venv/bin/activate
-
 python script/posthoc_overlay_spread.py \
   --artifact-prefix week13_S1 \
   --max-pairs 0,2,5,10 \
@@ -1429,31 +1473,58 @@ python script/posthoc_overlay_spread.py \
   --output-stem week13_S1_pm_spread
 ```
 
-Sanity-test baseline on `week8` showed the overlay extracts Δ = +0.0014 Sortino at `(max_pairs=5, λ=0.1)`. For this to clear the noise floor reported by Pod S4, we'd want Δ ≥ +0.01 on at least one row.
+Wall-clock: under a minute. Writes `data/processed/week13_S1_pm_spread.csv` + `_summary.md`. Sanity-test on `week8` artifacts: the overlay extracts Δ = +0.0014 Sortino at `(max_pairs=5, λ=0.1)`. For this to clear the noise floor reported by Pod S4, we'd want Δ ≥ +0.01 on at least one row of the sweep.
 
-### 16.7. What each Round 6 pod writes
+#### Step E — Commit the results back to `cloud-runs`
 
-- **S1, S5** — standard constrained pipeline outputs: `{prefix}_constrained_best_metrics.json`, `_constrained_best_timeseries.csv`, `_baseline_metrics.json`, `_run_manifest.json`, plus the full `{prefix}_category_correlation.csv` that S3 will consume.
-- **S4** — five independent constrained pipeline outputs, one per seed, prefixed `week13_S4_seed{3,7,101,202,303}_*`.
-- **S2** — `data/processed/{output_stem}.csv` (one row per tilt strength) and `..._summary.md`. Also prints a JSON summary to stdout with the argmax row.
-- **S3** — `data/processed/{output_stem}.csv` (one row per `max_pairs × spread_lambda` combo) and `..._summary.md`. Stdout JSON includes the list of selected negative-correlation pairs.
-
-### 16.8. Fan-back-in to `cloud-runs` (mirrors §8 and §13.5)
+The overlay outputs are small (a few KB each) and are part of the Round 6 record. Commit them directly from your laptop:
 
 ```bash
-# Local, after each S-pod finishes and pushes:
+git add data/processed/week13_S1_equity_tilt.csv \
+        data/processed/week13_S1_equity_tilt_summary.md \
+        data/processed/week13_S1_pm_spread.csv \
+        data/processed/week13_S1_pm_spread_summary.md \
+        data/external/domain_ticker_map_local.csv
+
+git commit -m "Round 6 S2/S3: post-hoc overlay sweeps on week13_S1"
+git push origin cloud-runs
+```
+
+#### Common S2/S3 failure modes
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `FileNotFoundError: week13_S1_markets_filtered.csv` | S1 (or S5) hasn't been fanned into `cloud-runs` yet | finish the fan-in in §16.7, then pull again |
+| `ModuleNotFoundError: yfinance` | skipped Step A | `uv pip install yfinance` |
+| S2 prints "0 domains matched" | ticker map has wrong domain names | open `{prefix}_markets_filtered.csv` and copy actual domain strings into the ticker-map CSV |
+| S2 yfinance call hangs / 429s | Yahoo rate-limited you | wait 5 minutes and rerun; the script only hits 5–10 tickers so bans are rare |
+| S3 prints "0 negatively-correlated pairs" | `--corr-threshold` too strict for this universe | loosen to `-0.001` or `0.0` |
+
+### 16.6. What each Round 6 experiment writes
+
+- **S1, S5 (pod)** — standard constrained pipeline outputs: `{prefix}_constrained_best_metrics.json`, `_constrained_best_timeseries.csv`, `_baseline_metrics.json`, `_run_manifest.json`, plus the full `{prefix}_category_correlation.csv` that S3 will consume.
+- **S4 (pod)** — five independent constrained pipeline outputs, one per seed, prefixed `week13_S4_seed{3,7,101,202,303}_*`.
+- **S2 (laptop)** — `data/processed/{output_stem}.csv` (one row per tilt strength) and `..._summary.md`. Also prints a JSON summary to stdout with the argmax row.
+- **S3 (laptop)** — `data/processed/{output_stem}.csv` (one row per `max_pairs × spread_lambda` combo) and `..._summary.md`. Stdout JSON includes the list of selected negative-correlation pairs.
+
+### 16.7. Fan-back-in to `cloud-runs` (mirrors §8 and §13.5)
+
+Only S1, S4, S5 need a pod-branch fan-in — S2 and S3 are already on `cloud-runs` (they were committed from your laptop per §16.5 Step E).
+
+```bash
+# On your laptop, after each training pod finishes and pushes:
 git fetch origin
 git checkout cloud-runs
 git merge --no-ff origin/cloud-runs-S1 -m "Fan-in: Round 6 Pod S1 (full risk-aware objective)"
-# repeat for S4, S5; S2/S3 outputs are post-hoc artifacts and can be fanned
-# in by committing them directly from the pod running the overlay script.
+git merge --no-ff origin/cloud-runs-S4 -m "Fan-in: Round 6 Pod S4 (multi-seed I4 robustness)"
+git merge --no-ff origin/cloud-runs-S5 -m "Fan-in: Round 6 Pod S5 (sizing-frontier grid)"
 git push origin cloud-runs
 
 # Optional cleanup once merged:
 git push origin --delete cloud-runs-S1 cloud-runs-S4 cloud-runs-S5
 ```
 
-### 16.9. Quick "did Round 6 beat baseline?" peek
+### 16.8. Quick "did Round 6 beat baseline?" peek
 
 After S1 / S4 / S5 land in `cloud-runs`:
 
@@ -1475,17 +1546,17 @@ PY
 done
 ```
 
-### 16.10. Success criteria
+### 16.9. Success criteria
 
 1. **S1 or S5** produces `holdout_max_drawdown` better (less negative) than −15%. Currently every Round 4/5 pod sits in −17% to −32%. Closing the DD gap is a load-bearing outcome even if Sortino Δ stays near zero.
 2. **S1** produces `holdout_sortino_minus_baseline` ≥ +0.02 — one full order of magnitude above the all-time best of +0.0019 (G2). Below +0.02 is noise; above it is the first credible alpha we've observed on this universe.
 3. **S4** produces a Sortino-Δ 5-seed distribution that lets the writeup quote `mean ± std` and declare a noise floor. Even if all seeds are < 0, that's information: we can then state quantitatively that any reported Δ below the std is not evidence of skill.
 4. **S2 and/or S3** show an interior Sortino argmax with Δ ≥ +0.01 vs the no-overlay row. If yes, the overlay graduates to a Round 7 candidate to fold inside the inner loop; if no, that lever is closed.
 
-### 16.11. Open levers for Round 7+
+### 16.10. Open levers for Round 7+
 
-- **Tilt inside the optimizer.** If Pod S2 clears bar 4 above, wire `build_equity_domain_tilt_multiplier` into `_run_online_pass` so the tilt is optimized *jointly* with the other penalties instead of applied on top. Roughly a 50-line change in `src.constrained_optimizer`.
-- **PM-category spread inside the objective.** Same for Pod S3: add a `spread_lambda * r_spread_t` term to the per-step objective.
+- **Tilt inside the optimizer.** If the S2 laptop overlay clears bar 4 above, wire `build_equity_domain_tilt_multiplier` into `_run_online_pass` so the tilt is optimized *jointly* with the other penalties instead of applied on top. Roughly a 50-line change in `src.constrained_optimizer`.
+- **PM-category spread inside the objective.** Same for the S3 overlay: add a `spread_lambda * r_spread_t` term to the per-step objective.
 - **Kelly × tight caps (K10D-tight).** The one Round 6 experiment we *cannot* run on CPU pods because of compute budget: re-run the Kelly pipeline with `--max-weights 0.04 --concentration-penalty-lambdas 2.0` and dynamic copula *on*. Holds until a GPU pod frees up.
 - **Regime-dependent objective.** Two-regime mixture: one set of (variance, downside, covariance) penalties when the SPY z-score is positive, another when it's negative. Would use `src.equity_signal.compute_risk_regime_zscore` (already ported in §14.8).
 

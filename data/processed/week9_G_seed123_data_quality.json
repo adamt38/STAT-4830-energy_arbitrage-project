@@ -1,0 +1,39 @@
+{
+  "markets_count": 20,
+  "unique_market_ids": 20,
+  "unique_tokens": 20,
+  "history_points": 9569,
+  "market_missing_history": 0,
+  "duplicate_history_points": 0,
+  "non_monotonic_tokens": 0,
+  "domain_coverage": {
+    "nba-champion": 987,
+    "colombia-election": 570,
+    "comex-gold-futures": 636,
+    "la-liga": 1013,
+    "ligue-1": 1115,
+    "league-of-legends": 407,
+    "tennis": 411,
+    "roland-garros": 433,
+    "stanley-cup": 512,
+    "nba": 394,
+    "primaries": 642,
+    "hockey": 373,
+    "airdrops": 370,
+    "middle-east": 311,
+    "epstein": 403,
+    "serie-a": 368,
+    "new-mexico-primary": 624
+  },
+  "min_history_days_filter": 24.0,
+  "dropped_by_short_history_days": 4,
+  "dropped_by_short_history_points": 4,
+  "dropped_by_history_request_error": 0,
+  "momentum_screening": {
+    "enabled": true,
+    "lookback_days": 5.0,
+    "top_n": 20,
+    "candidates_before_screening": 192,
+    "selected_after_screening": 20
+  }
+}
