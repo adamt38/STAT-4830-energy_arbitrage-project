@@ -1,0 +1,46 @@
+## Branch integration targets (2026-05-08T02:55:31Z)
+
+### Tips (merge these into main; non-redundant under strict ancestry)
+- cloud-runs-A
+- cloud-runs-A2
+- cloud-runs-B
+- cloud-runs-B2
+- cloud-runs-C
+- cloud-runs-C2
+- cloud-runs-D
+- cloud-runs-D2
+- cloud-runs-E2
+- cloud-runs-F
+- cloud-runs-F2
+- cloud-runs-I4
+- cloud-runs-K10A
+- cloud-runs-K10B
+- cloud-runs-K10C
+- cloud-runs-K10D
+- cloud-runs-K4
+- cloud-runs-L4
+- cloud-runs-M4
+- cloud-runs-Q5
+- cloud-runs-S1
+- cloud-runs-S4
+- cloud-runs-S5
+- direction-B
+- feature/momentum-screening
+- learnable-selection
+- option-B-kelly-momentum
+- stock-PM-combined-strategy
+
+### Superseded for merge only (commits contained in a tip above; keep on GitHub)
+- cloud-runs
+- cloud-runs-A-seed123
+- cloud-runs-A-seed42
+- cloud-runs-A-seed7
+- cloud-runs-G-seed123
+- cloud-runs-G-seed42
+- cloud-runs-G2
+- cloud-runs-H2
+- cloud-runs-L
+- cloud-runs-M-seed7
+- cloud-runs-R6
+- cloud-runs-R7
+- momentum-lever

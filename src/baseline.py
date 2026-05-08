@@ -83,6 +83,19 @@ def _compute_returns(price_matrix: np.ndarray) -> np.ndarray:
     return returns
 
 
+def baseline_static_token_weights(domains: list[str]) -> np.ndarray:
+    """Equal total weight per domain label; split evenly across tokens in that domain."""
+    from collections import Counter
+
+    if not domains:
+        return np.array([], dtype=np.float64)
+    unique = list(dict.fromkeys(domains))
+    n_cats = len(unique)
+    share = 1.0 / float(n_cats)
+    counts = Counter(domains)
+    return np.array([share / float(counts[d]) for d in domains], dtype=np.float64)
+
+
 def _dynamic_portfolio_returns(returns_matrix: np.ndarray, base_weights: np.ndarray) -> np.ndarray:
     """Compute returns with time-varying available asset set."""
     if returns_matrix.size == 0 or base_weights.size == 0:

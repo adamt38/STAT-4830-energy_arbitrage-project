@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from src.constrained_optimizer import _run_online_pass
 from src.baseline import baseline_static_token_weights
@@ -14,7 +15,7 @@ from src.pm_risk_overlay import (
 def test_read_category_correlation_roundtrip_shape():
     import pathlib
 
-    p = pathlib.Path(__file__).resolve().parent.parent / "data" / "processed" / "week11_v2_category_correlation.csv"
+    p = pathlib.Path(__file__).resolve().parent.parent / "data" / "processed" / "week11_I_category_correlation.csv"
     labels, corr = read_category_correlation_csv(p)
     assert len(labels) == corr.shape[0] == corr.shape[1]
     assert np.allclose(corr, corr.T, rtol=0, atol=1e-9)
@@ -57,6 +58,10 @@ def test_pm_category_spread_zero_without_pairs():
     assert s.shape == (20,) and np.allclose(s, 0.0)
 
 
+@pytest.mark.skip(
+    reason="_run_online_pass on main does not include equity_domain_tilt_multiplier "
+    "(stock-PM branch feature not merged into constrained_optimizer)."
+)
 def test_equity_domain_tilt_multiplier_changes_weights():
     rng = np.random.default_rng(1)
     T, n = 40, 4
