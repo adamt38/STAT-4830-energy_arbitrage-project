@@ -1,0 +1,26 @@
+{
+  "strategy": "equal_weight_baseline",
+  "sortino_ratio": 0.017038347018076615,
+  "max_drawdown": -0.22057992188945652,
+  "market_count": 20,
+  "exposure_by_domain": {
+    "2026-nfl-draft-top-10": 0.0625,
+    "roland-garros": 0.0625,
+    "epstein": 0.0625,
+    "hockey": 0.0625,
+    "serie-a": 0.0625,
+    "basketball": 0.0625,
+    "ligue-1": 0.0625,
+    "la-liga": 0.0625,
+    "nba": 0.0625,
+    "claude-5": 0.0625,
+    "league-of-legends": 0.0625,
+    "gensyn": 0.0625,
+    "south-dakota-primary": 0.0625,
+    "primaries": 0.0625,
+    "nba-champion": 0.0625,
+    "airdrops": 0.0625
+  },
+  "mean_return": 0.00010235187688508766,
+  "volatility": 0.006482433633370779
+}

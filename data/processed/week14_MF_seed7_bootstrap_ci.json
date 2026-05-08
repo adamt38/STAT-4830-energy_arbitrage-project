@@ -1,0 +1,13 @@
+{
+  "observed_sortino_delta": -0.01637573891581509,
+  "ci_lower": -0.05624262739761653,
+  "ci_upper": 0.02325721642310646,
+  "frac_positive": 0.201,
+  "bl_sortino": 0.05908463949462838,
+  "co_sortino": 0.04270890057881329,
+  "observed_log_wealth_delta": -0.05923029483709952,
+  "bl_final_log_wealth": 0.32094696357185104,
+  "co_final_log_wealth": 0.2617166687347515,
+  "n_bootstrap": 5000,
+  "n_holdout_steps": 1535
+}

@@ -101,3 +101,29 @@ The constrained model currently does **not** beat baseline on risk-adjusted qual
 - baseline category exposure: **equal at 1.25% per category**
 - baseline Sortino: **0.0730**
 - baseline max drawdown: **-4.73%**
+
+---
+
+## Week 11 — Round 7 (Final Kelly Squeeze) Status
+
+Full details live in [`docs/week11_round7_diagnostics_report.md`](docs/week11_round7_diagnostics_report.md). This section is a one-page status for the rolling report.
+
+### Headline from Round 3 that Round 7 is testing
+
+K10C (Kelly + dynamic copula, `script/polymarket_week10_kelly_pipeline.py`) is the only pipeline result that clearly clears baseline on the Kelly objective: **+0.46 total log-wealth, +58 pp CAGR**, max DD −11.7%. Every MVO variant (Round 4–6: I4, Q5, S1, S4, S5) ties baseline within a ±0.035 seed-noise band.
+
+### Round 7 laptop post-hocs (completed on 2026-04-19)
+
+1. **Net-of-fees re-ranking** (`script/posthoc_fee_ranking.py`, output `data/processed/round7_fee_ranking.md`). K10C's break-even fee is only **~3.76 bps** per unit L1 turnover — its gross +0.46 log-wealth edge flips to **−0.76** at 10 bps. K10B is **3× more fee-robust** (break-even 10.93 bps) because its turnover is ~4.6× lower.
+2. **Fractional-Kelly α-blend on K10C** (`script/posthoc_alpha_blend.py`, output `data/processed/week10_kelly_C_alpha_blend_summary.md`). Sortino argmax at **α ≈ 0.60**; α = 0.5 keeps ~75% of K10C's gross log-wealth gain (+0.647) while cutting max DD from −11.7% to −7.6%. This tells us K10C is over-levered on a risk-adjusted basis.
+3. **Circular-block bootstrap** (`script/posthoc_bootstrap_ci.py`, output `data/processed/round7_bootstrap_ci.md`; 1 000 replicates, block = 50). K10C 95% CI `[+0.005, +0.973]`, `Pr(Δ > 0) = 0.975`, `z = +1.91` — just barely excludes zero gross. K10A and K10B CIs both straddle zero.
+
+### Round 7 pod arms (branch `cloud-runs-R7`, launch blocks in `docs/cloud_runbook.md` §17)
+
+- **K10E fee-aware Kelly:** `src/kelly_copula_optimizer.py::_run_kelly_online_pass` now adds `fee_rate · turnover` to the training loss and subtracts `fee_rate · step_turnover_l1` from each step's realized return. New CLI flag `--fee-rate-values`. Sweep: `fee_rate ∈ {0, 10, 50, 200 bps}` × default `turnover_lambdas`. Target: net Δ log-wealth ≥ +0.10 at 10 bps.
+- **K10F drawdown-controlled Kelly:** same file adds `dd_penalty · mean(relu(−ρ_mc)²)` (downside semivariance on the MC-sample tensor) to the loss. New CLI flag `--dd-penalty-values`. Sweep: `dd_penalty ∈ {0, 0.5, 2, 5, 10}`. Target: frontier point with `max_DD ≥ −7%` AND `Δ log-wealth ≥ +0.30`.
+- **M5 (optional):** `script/polymarket_week8_pipeline.py` with S1 best config at `--market-count-override 40` — tests whether the S1 Sortino whisper survives a 2× universe.
+
+### Close-out verdict
+
+*Pending pod fan-in.* The diagnostics report §7 will be finalized once K10D (already running on pod `ba619f11`), K10E, K10F (and optional M5) complete and are merged into `cloud-runs-R7-fanin`. The win condition for Round 7 is a net-of-fees bootstrap CI on the best K10E config that excludes zero at 10 bps with `Pr(Δ > 0) ≥ 0.95`. If that condition fails across all of K10D/E/F, Round 7 closes the Kelly thread and the project pivots.

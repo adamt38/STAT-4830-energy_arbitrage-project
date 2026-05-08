@@ -569,8 +569,19 @@ def _make_week10_diagnostics_report(
         f"| Straight-through Bernoulli temperature | `{_to_float(bp.get('copula_temperature', 0.0)):.3f}` |",
         f"| Concentration penalty `lambda_conc` | `{_to_float(bp.get('concentration_penalty_lambda', 0.0)):.3f}` |",
         f"| Per-asset cap (`max_weight`) | `{_to_float(bp.get('max_weight', 0.0)):.3f}` |",
+        f"| Transaction fee rate (`fee_rate`) | `{_to_float(bp.get('fee_rate', 0.0)):.5f}` ({_to_float(bp.get('fee_rate', 0.0)) * 10_000:.1f} bps per unit L1 turnover) |",
+        f"| Downside penalty (`dd_penalty`) | `{_to_float(bp.get('dd_penalty', 0.0)):.3f}` |",
         "",
         "## Holdout Log-Wealth Growth (Kelly objective, primary metric)",
+        "",
+        (
+            "> Kelly columns are **net of fees** (realized return has "
+            "``fee_rate * turnover`` deducted per step before log-wealth is "
+            "accumulated). Baseline is gross; its per-step turnover is zero so "
+            "baseline net = baseline gross."
+            if _to_float(bp.get("fee_rate", 0.0)) > 0.0
+            else "> Kelly columns are gross of fees (``fee_rate = 0``)."
+        ),
         "",
         "| Metric | Equal-Weight Baseline | Dynamic-Copula Kelly OGD | Delta |",
         "|--------|-----------------------|--------------------------|-------|",
@@ -670,10 +681,74 @@ def main() -> None:
         help="Pin the L1 turnover penalty for every Optuna trial.",
     )
     parser.add_argument(
+        "--fee-rate-values",
+        type=str,
+        default=None,
+        metavar="F1,F2,...",
+        help="Comma-separated fee_rate sweep values (decimals; 0.0010 = 10 bps). "
+        "Overrides the default ``(0.0,)`` and enables a categorical Optuna "
+        "dimension. Each value is applied in BOTH the training loss "
+        "(+ fee_rate * ||Delta w||_1) and the reported realized return "
+        "(r_net = r_gross - fee_rate * turnover). Round 7 K10E sweep: "
+        "--fee-rate-values 0,0.0010,0.0050,0.0200.",
+    )
+    parser.add_argument(
+        "--fee-rate-override",
+        type=float,
+        default=None,
+        help="Pin a single fee_rate for every Optuna trial (decimal).",
+    )
+    parser.add_argument(
+        "--dd-penalty-values",
+        type=str,
+        default=None,
+        metavar="D1,D2,...",
+        help="Comma-separated dd_penalty sweep values. Adds "
+        "``dd_penalty * mean(relu(-rho_mc)**2)`` to the Kelly training "
+        "objective (downside-semivariance on MC-sampled per-step returns). "
+        "Round 7 K10F sweep: --dd-penalty-values 0,0.5,2,5,10.",
+    )
+    parser.add_argument(
+        "--dd-penalty-override",
+        type=float,
+        default=None,
+        help="Pin a single dd_penalty for every Optuna trial.",
+    )
+    parser.add_argument(
         "--no-exogenous",
         action="store_true",
         help="Disable the dynamic copula (force R_t = I). Useful sanity baseline that "
         "isolates the Kelly + L1-turnover gain from the copula contribution.",
+    )
+    # --- Momentum screening (Option B: ported from week8 pipeline) ---
+    # Reduces the candidate universe to the top-K markets by absolute recent
+    # price momentum before the Kelly optimizer ever sees them. Addresses the
+    # same dead-weight-market problem the week8 pipeline does: with fewer
+    # parameters the optimizer has better T/N ratio and constraint thresholds
+    # become meaningful. Only active when --rebuild-data is also set (momentum
+    # is a data-build-time filter, not a runtime lever).
+    parser.add_argument(
+        "--momentum-screening",
+        action="store_true",
+        help="Pre-screen the Polymarket universe by absolute recent price momentum "
+        "before the Kelly optimizer. Ranks candidate markets by |return over the "
+        "last N days| and keeps only the top-K movers. Must be used with "
+        "--rebuild-data (the filter runs during dataset build). Combines "
+        "cleanly with --fee-rate-values, --dd-penalty-values, --no-exogenous.",
+    )
+    parser.add_argument(
+        "--momentum-top-n",
+        type=int,
+        default=20,
+        help="Number of markets to retain after momentum screening (default 20). "
+        "Only used with --momentum-screening.",
+    )
+    parser.add_argument(
+        "--momentum-lookback-days",
+        type=float,
+        default=5.0,
+        help="Window (in days) for computing per-market momentum (default 5.0). "
+        "Only used with --momentum-screening.",
     )
     parser.add_argument(
         "--reduced-search",
@@ -724,7 +799,29 @@ def main() -> None:
         use_cached_events_if_available=True,
         history_priority_enabled=True,
         history_priority_oversample_factor=5,
+        momentum_screening_enabled=bool(args.momentum_screening),
+        momentum_lookback_days=float(args.momentum_lookback_days),
+        momentum_top_n=(
+            int(args.momentum_top_n) if args.momentum_screening else None
+        ),
     )
+
+    if args.momentum_screening:
+        if not args.rebuild_data:
+            print(
+                "[WARNING] --momentum-screening was set but --rebuild-data is NOT. "
+                "Momentum screening is a data-build-time filter; the cached "
+                f"--input-artifact-prefix={args.input_artifact_prefix} dataset will "
+                "be used AS-IS (no momentum filter applied). Pass --rebuild-data "
+                "to force a fresh build with momentum screening active.",
+                flush=True,
+            )
+        else:
+            print(
+                f"[CONFIG] Momentum screening ENABLED: top_n={args.momentum_top_n}, "
+                f"lookback_days={args.momentum_lookback_days}",
+                flush=True,
+            )
 
     QUICK_SANITY_CHECK = False
     OPTUNA_N_TRIALS = 5 if QUICK_SANITY_CHECK else 100
@@ -735,6 +832,18 @@ def main() -> None:
     else:
         walkforward_train_steps = 240
         walkforward_test_steps = 48
+
+    def _parse_float_csv(raw: str | None, default: tuple[float, ...]) -> tuple[float, ...]:
+        if raw is None:
+            return default
+        parts = [x.strip() for x in raw.split(",") if x.strip()]
+        try:
+            return tuple(float(x) for x in parts) or default
+        except ValueError as exc:
+            raise SystemExit(f"Invalid float in {raw!r}: {exc}") from None
+
+    fee_rates_cfg = _parse_float_csv(args.fee_rate_values, (0.0,))
+    dd_penalty_cfg = _parse_float_csv(args.dd_penalty_values, (0.0,))
 
     experiment_config = KellyExperimentConfig(
         learning_rates_w=(0.005, 0.01, 0.02, 0.05),
@@ -747,6 +856,8 @@ def main() -> None:
         mlp_hidden_dims=(8, 16, 32),
         concentration_penalty_lambdas=(2.0, 10.0, 50.0),
         max_weights=(0.04, 0.06, 0.10, 0.15),
+        fee_rates=fee_rates_cfg,
+        dd_penalty_lambdas=dd_penalty_cfg,
         steps_per_window=3,
         weight_parameterization="projected_simplex",
         optimizer_type="adam",
@@ -948,6 +1059,8 @@ def main() -> None:
             n_trials=n_trials,
             mc_samples_override=args.mc_samples_override,
             turnover_lambda_override=args.lambda_turnover_override,
+            fee_rate_override=args.fee_rate_override,
+            dd_penalty_override=args.dd_penalty_override,
             disable_copula=bool(args.no_exogenous),
         )
         kelly_sec = time.perf_counter() - stage_started
@@ -1006,6 +1119,10 @@ def main() -> None:
             "no_exogenous": bool(args.no_exogenous),
             "mc_samples_override": args.mc_samples_override,
             "lambda_turnover_override": args.lambda_turnover_override,
+            "fee_rate_override": args.fee_rate_override,
+            "fee_rate_values": list(fee_rates_cfg),
+            "dd_penalty_override": args.dd_penalty_override,
+            "dd_penalty_values": list(dd_penalty_cfg),
             "git_commit_and_push_requested": bool(args.git_commit_and_push),
         },
     )
