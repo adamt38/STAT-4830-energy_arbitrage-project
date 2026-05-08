@@ -1,0 +1,62 @@
+{
+  "generated_at_utc": "2026-04-21T02:13:37.958662+00:00",
+  "artifact_prefix": "week10_kelly_B",
+  "config_hash": "e05d57d22e9d760f036e0dd65410db0383dbb7d5d19de2ff3580246bf1e1705d",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build_or_reuse": 0.4282858209999745,
+    "baseline": 2.8702137839999864,
+    "exogenous_features": 9.003446536000013,
+    "kelly_search": 87382.809475539,
+    "figure_generation": 2.637794321999536,
+    "week10_report_generation": 0.12396797000837978,
+    "total": 87397.874050391
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/root/STAT-4830-energy_arbitrage-project/data/raw/week8_events_raw.json",
+      "markets_filtered": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_markets_filtered.csv",
+      "price_history": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_price_history.csv",
+      "data_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_data_quality.json",
+      "category_liquidity": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_category_liquidity.csv",
+      "considered_domains": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_considered_domains.json",
+      "copied_kelly_B_events_raw": "/root/STAT-4830-energy_arbitrage-project/data/raw/week10_kelly_B_events_raw.json",
+      "copied_kelly_B_markets_filtered": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_markets_filtered.csv",
+      "copied_kelly_B_price_history": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_price_history.csv",
+      "copied_kelly_B_data_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_data_quality.json",
+      "copied_kelly_B_category_liquidity": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_category_liquidity.csv",
+      "copied_kelly_B_considered_domains": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_considered_domains.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_baseline_timeseries.csv",
+      "baseline_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_baseline_metrics.json"
+    },
+    "exogenous": {
+      "exogenous_features": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_exogenous_features.csv",
+      "exogenous_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_exogenous_quality.json"
+    },
+    "kelly": {
+      "kelly_grid": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_kelly_experiment_grid.csv",
+      "kelly_best_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_kelly_best_metrics.json",
+      "kelly_best_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_kelly_best_timeseries.csv",
+      "kelly_best_weights": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_kelly_best_weights.csv",
+      "kelly_copula_diagnostics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week10_kelly_B_kelly_copula_diagnostics.json"
+    },
+    "figures": {
+      "log_wealth_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week10_kelly_B_iteration_log_wealth_curve.png",
+      "turnover_per_step": "/root/STAT-4830-energy_arbitrage-project/figures/week10_kelly_B_iteration_turnover_per_step.png",
+      "drawdown_comparison": "/root/STAT-4830-energy_arbitrage-project/figures/week10_kelly_B_iteration_drawdown_comparison.png",
+      "kelly_vs_baseline_log_wealth": "/root/STAT-4830-energy_arbitrage-project/figures/week10_kelly_B_iteration_kelly_vs_baseline_log_wealth.png",
+      "copula_corr_heatmap": "/root/STAT-4830-energy_arbitrage-project/figures/week10_kelly_B_iteration_copula_corr_heatmap.png"
+    },
+    "reports": {
+      "week10_kelly_diagnostics_report": "/root/STAT-4830-energy_arbitrage-project/docs/week10_kelly_diagnostics_report.md"
+    }
+  },
+  "input_artifact_prefix": "week8",
+  "rebuild_data": false,
+  "no_exogenous": true,
+  "mc_samples_override": null,
+  "lambda_turnover_override": null,
+  "git_commit_and_push_requested": true
+}
