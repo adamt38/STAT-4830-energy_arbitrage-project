@@ -1,0 +1,106 @@
+{
+  "strategy": "constrained_optuna_mean_downside_both",
+  "best_params": {
+    "learning_rate": 0.0388682515119388,
+    "lambda_penalty": 0.37890625,
+    "rolling_window": 96,
+    "domain_limit": 0.11875,
+    "max_weight": 0.044687500000000005,
+    "uniform_mix": 0.026562500000000003,
+    "evaluation_mode": "online",
+    "weight_parameterization": "projected_simplex",
+    "concentration_penalty_lambda": 0.691954940981916,
+    "covariance_penalty_lambda": 0.4686445722896932,
+    "covariance_shrinkage": 0.056249999999999994,
+    "entropy_lambda": 0.0,
+    "variance_penalty": 1.48046875,
+    "downside_penalty": 2.2578125,
+    "regime_k": 0.037500000000000006,
+    "macro_integration": "both",
+    "lambda_macro_explicit": 1.484375,
+    "lambda_etf_tracking": 0.0,
+    "selection_source": "optuna_qmc",
+    "holdout_sortino_ratio": 0.07559560181964138,
+    "holdout_max_drawdown": -0.21488531781092268,
+    "holdout_mean_return": 0.00028900795273851886,
+    "holdout_volatility": 0.008150198081166115,
+    "max_domain_exposure": 0.09999687597155571,
+    "baseline_holdout_sortino": 0.07648392232356963,
+    "holdout_sortino_minus_baseline": -0.0008883205039282444,
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      62,
+      37,
+      193,
+      31,
+      180
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "best_trial_baseline_alpha": 1.0
+  },
+  "domain_exposure": {
+    "roland-garros": 0.04995964840054512,
+    "nba-champion": 0.09972839802503586,
+    "hockey": 0.050008513033390045,
+    "serie-a": 0.050483036786317825,
+    "ligue-1": 0.0996725894510746,
+    "la-liga": 0.09973294287919998,
+    "nba": 0.04991518706083298,
+    "new-mexico-primary": 0.09968311339616776,
+    "colombia-election": 0.09999687597155571,
+    "middle-east": 0.05001804977655411,
+    "airdrops": 0.050331324338912964,
+    "primaries": 0.04991275072097778,
+    "awards": 0.05022089555859566,
+    "uefa-europa-league": 0.05034967511892319,
+    "stanley-cup": 0.04998692497611046
+  },
+  "feasibility_filter": {
+    "applied_threshold": 0.12,
+    "feasible_solution_found": true
+  },
+  "data_split": {
+    "tuning_steps": 5829,
+    "holdout_steps_total": 1458,
+    "holdout_fraction": 0.2,
+    "walkforward_train_steps": 240,
+    "walkforward_test_steps": 48
+  },
+  "optuna_summary": {
+    "n_trials": 200,
+    "n_jobs": 4,
+    "completed_trials": 42,
+    "pruned_trials": 158,
+    "best_trial_number": 62,
+    "search_time_sec": 16923.978426238988,
+    "sampler": "QMCSampler(sobol)",
+    "joint_macro_mode_search": false,
+    "output_artifact_suffix": "_macro_both",
+    "top_k_bagging": 5,
+    "baseline_shrinkage": false,
+    "beat_baseline_objective": false,
+    "bagged_trial_numbers": [
+      62,
+      37,
+      193,
+      31,
+      180
+    ],
+    "bagged_alphas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "objective_value_best": 0.11292081830458206
+  }
+}

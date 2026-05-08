@@ -1,0 +1,146 @@
+{
+  "lookback_days": 5.0,
+  "top_n": 20,
+  "selected_markets": [
+    {
+      "token_id": "56988329823452841666931131821080687228531160724161634353621608700010586706540",
+      "market_slug": "will-israel-strike-11-countries-in-2026",
+      "question": "Will Israel strike 11 countries in 2026?",
+      "domain": "middle-east",
+      "momentum": 1.3846153846153848
+    },
+    {
+      "token_id": "11843131838379676792721059608342146205696413823676149302931627463939711085828",
+      "market_slug": "will-ac-milan-win-the-202526-serie-a-league",
+      "question": "Will AC Milan win the 2025\u201326 Serie A league?",
+      "domain": "serie-a",
+      "momentum": 1.3333333333333333
+    },
+    {
+      "token_id": "81085168149210534701056807267483472863288984314426354863145129521956049193057",
+      "market_slug": "will-nottm-forest-win-the-2025-26-uefa-europa-league",
+      "question": "Will Nott'm Forest win the 2025-26 UEFA Europa League?",
+      "domain": "uefa-europa-league",
+      "momentum": 1.1413612565445024
+    },
+    {
+      "token_id": "73768610008619570600930429495180540710817177537162503586781057110775077618432",
+      "market_slug": "will-nikola-jokic-win-the-20252026-nba-mvp",
+      "question": "Will Nikola Jokic win the 2025\u20132026 NBA MVP?",
+      "domain": "awards",
+      "momentum": 0.9130434782608695
+    },
+    {
+      "token_id": "50252300898375978140712321807178556639478099096013757990329224333771594910605",
+      "market_slug": "will-greg-hull-win-the-2026-new-mexico-governor-republican-primary-election",
+      "question": "Will Greg Hull win the 2026 New Mexico Governor Republican primary election?",
+      "domain": "new-mexico-primary",
+      "momentum": 0.823529411764706
+    },
+    {
+      "token_id": "24315108267836543154857233535536136482524552716493402526894829400485516895736",
+      "market_slug": "will-the-phoenix-suns-win-the-nba-western-conference-finals",
+      "question": "Will the Phoenix Suns win the NBA Western Conference Finals?",
+      "domain": "nba",
+      "momentum": -0.7692307692307692
+    },
+    {
+      "token_id": "31317702573839002987249831884538721320741670016050389364356636973937868446333",
+      "market_slug": "will-duke-rodriguez-win-the-2026-new-mexico-governor-republican-primary-election",
+      "question": "Will Duke Rodriguez win the 2026 New Mexico Governor Republican primary election?",
+      "domain": "new-mexico-primary",
+      "momentum": -0.7352941176470588
+    },
+    {
+      "token_id": "115394635451048754011327777276076337527696490170069916864086987480603951060926",
+      "market_slug": "will-the-ottawa-senators-win-the-eastern-conference",
+      "question": "Will the Ottawa Senators win the Eastern Conference?",
+      "domain": "hockey",
+      "momentum": -0.6965174129353234
+    },
+    {
+      "token_id": "75712298340810272859765060308006832993211601931382911468417184675550881103879",
+      "market_slug": "will-juan-manuel-galn-win-the-2026-colombian-presidential-election",
+      "question": "Will Juan Manuel Gal\u00e1n win the 2026 Colombian presidential election?",
+      "domain": "colombia-election",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "2317130722330994677503722994963086323403276367952762140016618274858179343506",
+      "market_slug": "will-villarreal-win-the-202526-la-liga",
+      "question": "Will Villarreal win the 2025\u201326 La Liga?",
+      "domain": "la-liga",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "49662274238485451283220527378586398370959042852997899886824914466317758572224",
+      "market_slug": "will-marseille-win-the-202526-french-ligue-1",
+      "question": "Will Marseille win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "36553834009124167357981460132800746681781045509640776189348736916365216865880",
+      "market_slug": "will-daniel-quintero-win-the-2026-colombian-presidential-election",
+      "question": "Will Daniel Quintero win the 2026 Colombian presidential election?",
+      "domain": "colombia-election",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "19730444129256957174015889379846911816814301308831812906398054285035177752584",
+      "market_slug": "will-rennes-win-the-202526-french-ligue-1",
+      "question": "Will Rennes win the 2025\u201326 French Ligue 1?",
+      "domain": "ligue-1",
+      "momentum": -0.6666666666666666
+    },
+    {
+      "token_id": "7345183309756257693783741573478340128830660331823026035095352170224920670792",
+      "market_slug": "will-connie-chan-receive-the-most-votes-in-the-ca-11-primary",
+      "question": "Will Connie Chan receive the most votes in the CA-11 primary?",
+      "domain": "primaries",
+      "momentum": -0.6228070175438597
+    },
+    {
+      "token_id": "103950812176015306889097643332505690876545410954871160290129574415932884036868",
+      "market_slug": "will-taylor-fritz-win-the-2026-mens-french-open",
+      "question": "Will Taylor Fritz win the 2026 Men's French Open?",
+      "domain": "roland-garros",
+      "momentum": -0.5833333333333334
+    },
+    {
+      "token_id": "88657857917663921842097927058013051966750383205171131721194307619909198186324",
+      "market_slug": "will-real-madrid-win-the-202526-la-liga",
+      "question": "Will Real Madrid win the 2025\u201326 La Liga?",
+      "domain": "la-liga",
+      "momentum": 0.5555555555555557
+    },
+    {
+      "token_id": "96156230578747105661476819749931380321917772151891667564189808442987244872145",
+      "market_slug": "will-the-boston-bruins-win-the-2026-nhl-stanley-cup",
+      "question": "Will the Boston Bruins win the 2026 NHL Stanley Cup?",
+      "domain": "stanley-cup",
+      "momentum": -0.5405405405405405
+    },
+    {
+      "token_id": "57301498276970257025109591078431189727442302532145853906375186182281603517458",
+      "market_slug": "megaeth-market-cap-fdv-2b-one-day-after-launch-738-867-649-272-765-733",
+      "question": "MegaETH market cap (FDV) >$2B one day after launch?",
+      "domain": "airdrops",
+      "momentum": 0.5333333333333334
+    },
+    {
+      "token_id": "106572879185916710503631021854572801471104977091252507745096331167318654083650",
+      "market_slug": "will-the-phoenix-suns-win-the-2026-nba-finals",
+      "question": "Will the Phoenix Suns win the 2026 NBA Finals?",
+      "domain": "nba-champion",
+      "momentum": -0.4
+    },
+    {
+      "token_id": "82402823484466457361170410951601106261368113664328436062375970009969959380598",
+      "market_slug": "will-the-portland-trail-blazers-win-the-2026-nba-finals",
+      "question": "Will the Portland Trail Blazers win the 2026 NBA Finals?",
+      "domain": "nba-champion",
+      "momentum": -0.4
+    }
+  ]
+}
