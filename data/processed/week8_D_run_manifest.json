@@ -1,0 +1,64 @@
+{
+  "generated_at_utc": "2026-04-19T19:17:37.616232+00:00",
+  "artifact_prefix": "week8_D",
+  "config_hash": "586c45f06d1b8074eea4fa24a32ed7e18422bb19ad81bd8b4d22317101e6ddd0",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build": 47.46055930299917,
+    "baseline": 0.4999693449935876,
+    "exogenous_features": 2.8363114449894056,
+    "constrained_grid_and_holdout": 0.0,
+    "covariance_diagnostics": 0.32774638300179504,
+    "figure_generation": 0.8085633169976063,
+    "week9_report_generation": 0.09137215999362525,
+    "total": 52.02508161398873
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/root/STAT-4830-energy_arbitrage-project/data/raw/week8_D_events_raw.json",
+      "markets_filtered": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_markets_filtered.csv",
+      "price_history": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_price_history.csv",
+      "data_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_data_quality.json",
+      "category_liquidity": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_category_liquidity.csv",
+      "considered_domains": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_considered_domains.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_baseline_timeseries.csv",
+      "baseline_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_baseline_metrics.json"
+    },
+    "exogenous": {
+      "exogenous_features": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_exogenous_features.csv",
+      "exogenous_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_exogenous_quality.json"
+    },
+    "constrained": {
+      "constrained_best_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_macro_both_constrained_best_metrics.json",
+      "constrained_best_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_macro_both_constrained_best_timeseries.csv"
+    },
+    "covariance": {
+      "category_covariance": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_category_covariance.csv",
+      "category_correlation": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_category_correlation.csv",
+      "top_correlation_pairs": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_top_correlation_pairs.csv",
+      "covariance_summary": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_covariance_summary.json"
+    },
+    "figures": {
+      "equity_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_equity_curve_comparison.png",
+      "drawdown_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_drawdown_comparison.png",
+      "domain_exposure": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_category_exposure_comparison.png",
+      "category_exposure_table": "/root/STAT-4830-energy_arbitrage-project/data/processed/week8_D_category_exposure_table.csv",
+      "rolling_mean_return": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_rolling_mean_return_comparison.png",
+      "return_distribution": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_return_distribution_comparison.png",
+      "top_exposure_deltas": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_top_exposure_deltas.png",
+      "risk_return_snapshot": "/root/STAT-4830-energy_arbitrage-project/figures/week8_D_iteration_risk_return_snapshot.png"
+    },
+    "reports": {
+      "week9_diagnostics_report": "/root/STAT-4830-energy_arbitrage-project/docs/week9_diagnostics_report.md"
+    }
+  },
+  "macro_modes_ran": null,
+  "single_macro_integration": "both",
+  "joint_macro_mode_search": false,
+  "etf_tracking": true,
+  "optuna_constrained_artifact_suffix": "_macro_both",
+  "week9_constrained_artifact_stem": "week8_D_macro_both",
+  "git_commit_and_push_requested": true
+}
