@@ -1,0 +1,71 @@
+{
+  "generated_at_utc": "2026-04-20T02:54:12.462341+00:00",
+  "artifact_prefix": "week9_F",
+  "config_hash": "fc69c620d0558e89269fd0a3f2ccc46d6179f21d6e2c8bd39eba8a2a8dfd8cd9",
+  "min_history_days_used": 24.0,
+  "stage_durations_sec": {
+    "data_build": 63.56543158799468,
+    "baseline": 0.5186728330008918,
+    "exogenous_features": 2.900429945002543,
+    "constrained_grid_and_holdout": 24215.692410379997,
+    "covariance_diagnostics": 0.3337049989931984,
+    "figure_generation": 0.7195055490010418,
+    "week9_report_generation": 0.10130660799040925,
+    "total": 24283.831937052993
+  },
+  "artifacts": {
+    "data": {
+      "events_raw": "/root/STAT-4830-energy_arbitrage-project/data/raw/week9_F_events_raw.json",
+      "markets_filtered": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_markets_filtered.csv",
+      "price_history": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_price_history.csv",
+      "data_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_data_quality.json",
+      "category_liquidity": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_category_liquidity.csv",
+      "considered_domains": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_considered_domains.json"
+    },
+    "baseline": {
+      "baseline_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_baseline_timeseries.csv",
+      "baseline_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_baseline_metrics.json"
+    },
+    "exogenous": {
+      "exogenous_features": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_exogenous_features.csv",
+      "exogenous_quality": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_exogenous_quality.json"
+    },
+    "constrained": {
+      "constrained_grid": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_experiment_grid.csv",
+      "constrained_best_metrics": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_metrics.json",
+      "constrained_best_timeseries": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_timeseries.csv",
+      "constrained_best_market_return_contributions": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_market_return_contributions.csv",
+      "constrained_best_domain_return_contributions": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_domain_return_contributions.csv",
+      "constrained_best_step_top_contributors": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_step_top_contributors.csv",
+      "constrained_best_top_market_correlation": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_top_market_correlation.csv",
+      "constrained_best_top_market_correlation_pairs": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_top_market_correlation_pairs.csv",
+      "constrained_best_attribution_summary": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_constrained_best_attribution_summary.json"
+    },
+    "covariance": {
+      "category_covariance": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_category_covariance.csv",
+      "category_correlation": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_category_correlation.csv",
+      "top_correlation_pairs": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_top_correlation_pairs.csv",
+      "covariance_summary": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_covariance_summary.json"
+    },
+    "figures": {
+      "equity_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_equity_curve_comparison.png",
+      "drawdown_curve": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_drawdown_comparison.png",
+      "domain_exposure": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_category_exposure_comparison.png",
+      "category_exposure_table": "/root/STAT-4830-energy_arbitrage-project/data/processed/week9_F_category_exposure_table.csv",
+      "rolling_mean_return": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_rolling_mean_return_comparison.png",
+      "return_distribution": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_return_distribution_comparison.png",
+      "top_exposure_deltas": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_top_exposure_deltas.png",
+      "risk_return_snapshot": "/root/STAT-4830-energy_arbitrage-project/figures/week9_F_iteration_risk_return_snapshot.png"
+    },
+    "reports": {
+      "week9_diagnostics_report": "/root/STAT-4830-energy_arbitrage-project/docs/week9_diagnostics_report.md"
+    }
+  },
+  "macro_modes_ran": null,
+  "single_macro_integration": null,
+  "joint_macro_mode_search": true,
+  "etf_tracking": false,
+  "optuna_constrained_artifact_suffix": "",
+  "week9_constrained_artifact_stem": "week9_F",
+  "git_commit_and_push_requested": true
+}
