@@ -13,13 +13,17 @@ This repository is now focused on **Cross-Domain Portfolio Optimization on Polym
 Primary implementation artifacts:
 - `src/polymarket_data.py` (ingestion, filtering, tagging, caching, data-quality checks)
 - `src/baseline.py` (equal-weight baseline + Sortino/drawdown/exposure metrics)
-- `src/constrained_optimizer.py` (first constrained OGD/SGD experiments)
-- `script/polymarket_week8_pipeline.py` (end-to-end run for Week 8 artifacts)
-- `notebooks/week8_iteration_flash_results.ipynb` (Week 8 flash-presentation notebook)
+- `src/constrained_optimizer.py` (MVO / mean-downside online optimization experiments)
+- `src/kelly_copula_optimizer.py` (Kelly log-wealth objective with dynamic Gaussian copula)
+- `src/equity_signal.py`, `src/pm_risk_overlay.py`, and `src/stock_oil_hedge.py` (equity/regime/hedge overlays)
+- `script/polymarket_week8_pipeline.py` (MVO and cross-pod experiment entrypoint)
+- `script/polymarket_week10_kelly_pipeline.py` (Kelly/copula experiment entrypoint)
+- `script/multiplatform_pipeline.py` (Polymarket/Kalshi alignment and arbitrage workflow)
 
 Milestone labeling used in this repo:
 - **Week 4:** completed prototype baseline and initial constrained model pass.
 - **Week 8:** expanded-category iteration and flash-presentation artifacts.
+- **Weeks 9-17:** cloud-run MVO ablations, Kelly/copula pivot, fee/turnover post-hocs, stock/PM overlay diagnostics, and final presentation assets.
 
 ## Submission pointers (STAT 4830)
 
@@ -40,6 +44,15 @@ Milestone labeling used in this repo:
 - **Self-critiques:** [`self_critique_week4.md`](docs/milestones/self_critiques/self_critique_week4.md), [`self_critique_week6.md`](docs/milestones/self_critiques/self_critique_week6.md), [`self_critique_week10.md`](docs/milestones/self_critiques/self_critique_week10.md), [`self_critique_week12.md`](docs/milestones/self_critiques/self_critique_week12.md), [`self_critique_final.md`](docs/milestones/self_critiques/self_critique_final.md).
 - **LLM exploration:** [`docs/llm_exploration/week4_log.md`](docs/llm_exploration/week4_log.md) (index) + [`docs/llm_exploration/final_report_structure_session.md`](docs/llm_exploration/final_report_structure_session.md).
 - **Optional git backdating:** [`script/backdate_milestone_commits.sh`](script/backdate_milestone_commits.sh) (template only — review integrity policy before use).
+
+### Final artifact index
+
+For the fastest non-report grading path, use [`docs/final_artifact_index.md`](docs/final_artifact_index.md). It points to:
+- the current test command and latest verification result (`41 passed, 1 skipped`),
+- the main implementation entrypoints,
+- cached MVO, Kelly, fee, momentum, and stock/PM artifacts,
+- development-process and critique documents,
+- final-presentation Q&A material and generated figures.
 
 ## Quick start (uv)
 

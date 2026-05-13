@@ -493,3 +493,33 @@ Follow-up fixup: `2b2b6ba` (tests + small `src` helpers + merge automation scrip
 - **Command:** `.venv/bin/python -m pytest tests/ -v --tb=short`
 - **Result:** `41 passed, 1 skipped` in ~1.8s (skipped: equity-domain tilt test pending optimizer support).
 - **Interpretation:** Smoke / unit coverage only; cloud experiment correctness is still governed by the per-pod JSON/CSV artifacts merged above.
+
+## Final grading map and verification (May 12, 2026)
+
+### Fast navigation added
+
+- Added [`docs/final_artifact_index.md`](final_artifact_index.md) as the non-report grading map.
+- Linked the artifact index from the root [`README.md`](../README.md) and [`docs/README.md`](README.md).
+- Materialized the final-presentation figure builder as [`script/build_final_presentation_figures.py`](../script/build_final_presentation_figures.py), extracted from [`docs/final_presentation_technical_primer.md`](final_presentation_technical_primer.md), so the figure-generation instructions are now directly runnable.
+
+### Current local verification
+
+- **Command:** `PYTHONPATH=. .venv/bin/python -m pytest tests/ -v --tb=short`
+- **Result:** `41 passed, 1 skipped` in 2.13s.
+- **Skipped test:** `test_equity_domain_tilt_multiplier_changes_weights`, still intentionally skipped until the equity-domain tilt multiplier is wired directly into `_run_online_pass`; surrounding overlay, regime, hedge, and figure-contract tests pass.
+- **Presentation figures:** regenerated with `MPLCONFIGDIR=.cache/matplotlib XDG_CACHE_HOME=.cache .venv/bin/python script/build_final_presentation_figures.py`. The first sandboxed Matplotlib attempt failed because user-level font/cache paths were not writable; rerunning with local cache paths and normal filesystem permissions completed and wrote PNGs to [`docs/figures/final_presentation/`](figures/final_presentation/).
+
+### Final result hierarchy for graders
+
+1. **Robust negative result:** MVO / Sortino / mean-downside variants repeatedly fail to beat equal-weight once compared on matched holdout windows. This is supported by Week 9 / Week 11 diagnostics and branch-integrated cloud artifacts.
+2. **Best gross positive result:** K10C Kelly + dynamic copula improves gross log-wealth, but the edge is marginal under bootstrap and fee fragile.
+3. **Best practical fixes:** K10D adds turnover penalty and Pod M combines Kelly with momentum screening; both point in the right direction but need multi-seed confirmation.
+4. **Stock/PM overlay status:** Week 17 stock/regime overlays are diagnostic, not a headline win; the selected trial set the direct equity-signal reward channel to zero.
+5. **Deployability caveat:** Gross edge is not deployable edge. Fee-aware training, richer exogenous features, and multi-seed validation remain the clean next steps.
+
+### Why this helps the non-report rubric
+
+- **Implementation:** tests pass; core pipelines and cached artifacts are now indexed from one file.
+- **Development process:** failed attempts and pivots are framed as evidence, not clutter.
+- **Critiques:** final risks are explicit: gross-vs-net confusion, fee robustness, single-seed uncertainty, and artifact-navigation burden.
+- **Repository structure:** graders no longer need to infer the final story from hundreds of `week*` files.

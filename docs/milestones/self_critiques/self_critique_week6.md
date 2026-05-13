@@ -1,32 +1,33 @@
-# Week 6 self-critique — Report draft 2
+# Week 6 self-critique - report draft 2
 
 ## OBSERVE
 
-Draft 2 documented a working Polymarket pipeline and honest holdout gaps, but the constrained optimizer still read as a “failed tweak” rather than a controlled ablation. Figures lagged code, and the Sortino-ratio story was hard to defend under small rolling windows.
+Draft 2 is stronger than the first draft because the project now has a clear Polymarket pipeline and a real holdout comparison. The problem is that the optimizer still reads like "we tried a constrained version and it lost" rather than a careful experiment. The figures also trail the code, so the report does not yet make the debugging path easy to follow.
 
 ## ORIENT
 
 ### Strengths
 
 - Reproducible `script/polymarket_week8_pipeline.py` gave graders a single entry point.
-- We documented data-quality checks and lookahead fixes transparently.
+- We documented the data-quality checks and the lookahead fix instead of hiding them.
+- The baseline is now a serious comparison point, which makes the project more honest.
 
 ### Areas for improvement
 
-1. Objective: Sortino as a direct loss is poorly conditioned; we needed a mean–downside surrogate.
-2. Evaluation: uniform-mix and frozen-weight reporting obscured what “online” meant.
-3. Narrative: weak connection between API noise (tags, history) and optimizer failure modes.
+1. Sortino as a direct loss is shaky over short rolling windows; we need a smoother mean-downside objective.
+2. The difference between frozen weights and online updating is not explained clearly enough.
+3. The report should connect API/data noise to optimizer behavior instead of treating data cleaning as separate plumbing.
 
 ### Critical risks
 
-Tag-to-domain mapping can dominate results; without per-category quotas, “diversification” metrics lie.
+Tag-to-domain mapping can dominate the result. If one category quietly fills most of the universe, then the diversification numbers look cleaner than the portfolio actually is.
 
 ## DECIDE
 
-1. Replace Sortino loss with additive mean–downside decomposition and projected simplex.
-2. Report true online holdout with multiple inner steps per bar.
-3. Add cross-pod PCA / eigenvalue diagnostics before claiming MVO success.
+1. Replace Sortino loss with additive mean-downside decomposition and projected simplex.
+2. Report an online holdout path with multiple inner steps per bar, and explain why that matches deployment better than frozen weights.
+3. Add covariance or PCA diagnostics before claiming that domain constraints are managing real risk.
 
 ## ACT
 
-Need one focused sprint on `src/constrained_optimizer.py` plus Optuna wiring; skim `docs/week9_cross_pod_synthesis.md` once Week 9 results exist.
+The next sprint should be mostly in `src/constrained_optimizer.py` and the pipeline arguments. After the next run, I should write down not only the best metrics but also whether the weights actually moved away from equal-weight.

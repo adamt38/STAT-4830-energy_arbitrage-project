@@ -2,6 +2,8 @@
 docs/figures/*
 !docs/figures/*.png
 !docs/figures/*.tex
+!docs/figures/final_presentation/
+!docs/figures/final_presentation/*.png
 
 local/
 
