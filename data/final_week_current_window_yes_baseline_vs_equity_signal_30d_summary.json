@@ -1,0 +1,64 @@
+{
+  "baseline_name": "current_window_feeaware_yes_baseline",
+  "baseline_description": "Equal-domain YES-token baseline filtered to exclude markets whose event_end is before the evaluation-window start.",
+  "days": 30,
+  "fee_rate": 0.001,
+  "window_start_utc": "2026-04-10T23:44:23+00:00",
+  "market_count_after_filter": 39,
+  "domain_count_after_filter": 39,
+  "per_market_weight_after_filter": 0.02564102564102564,
+  "removed_markets": [
+    {
+      "event_slug": "microstrategy-sell-any-bitcoin-in-2025",
+      "market_slug": "microstrategy-sells-any-bitcoin-by-june-30-2026",
+      "domain": "2025-predictions",
+      "question": "MicroStrategy sells any Bitcoin by June 30, 2026?",
+      "event_end": "2025-12-31T12:00:00Z"
+    }
+  ],
+  "alignment_note": "Aligned first 2152 rows against existing equity-signal timeseries from final_week_stock_signal_pm_feeaware_30d_timeseries.csv. baseline_rows=2152, equity_rows=2152.",
+  "metrics": {
+    "current_window_yes_baseline": {
+      "steps": 2152,
+      "compound_gain": 61.712522841940036,
+      "growth_of_1": 62.712522841940036,
+      "log_wealth": 4.138561154042956,
+      "mean_return": 0.003130988720816566,
+      "volatility": 0.07782826610798307,
+      "sortino": 0.5993673699688938,
+      "max_drawdown": -0.11647884373523776
+    },
+    "equity_signal_pm": {
+      "steps": 2152,
+      "compound_gain": 46.26057457009986,
+      "growth_of_1": 47.26057457009986,
+      "log_wealth": 3.8556764293255634,
+      "mean_return": 0.002911779235587587,
+      "volatility": 0.07950770956217959,
+      "sortino": 0.46862103418284234,
+      "max_drawdown": -0.1927230497768726
+    },
+    "optimized_pm_net": {
+      "steps": 2152,
+      "compound_gain": 21.46146204439479,
+      "growth_of_1": 22.46146204439479,
+      "log_wealth": 3.111801042667847,
+      "mean_return": 0.002691531274482345,
+      "volatility": 0.08587603234549797,
+      "sortino": 0.4290651809660538,
+      "max_drawdown": -0.1927230497768727
+    }
+  },
+  "deltas_equity_signal_minus_baseline": {
+    "compound_gain": -15.451948271840173,
+    "growth_of_1": -15.451948271840173,
+    "log_wealth": -0.2828847247173929,
+    "sortino": -0.1307463357860515,
+    "max_drawdown": -0.07624420604163484
+  },
+  "artifacts": {
+    "timeseries_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_30d_timeseries.csv",
+    "comparison_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_30d_comparison.csv",
+    "comparison_plot": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/figures/final_week_current_window_yes_baseline_vs_equity_signal_30d.png"
+  }
+}

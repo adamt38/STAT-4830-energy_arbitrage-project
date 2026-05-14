@@ -1,0 +1,235 @@
+{
+  "baseline_name": "current_window_feeaware_yes_baseline",
+  "days": 14,
+  "fee_rate": 0.001,
+  "window_start_utc": "2026-04-26T23:44:23+00:00",
+  "first_row_utc": "2026-04-26T23:50:05+00:00",
+  "last_row_utc": "2026-05-10T23:44:23+00:00",
+  "sampled_steps": 1771,
+  "max_endpoints": 2000,
+  "market_count_after_filter": 39,
+  "domain_count_after_filter": 39,
+  "per_market_weight_after_filter": 0.02564102564102564,
+  "removed_markets": [
+    {
+      "event_slug": "microstrategy-sell-any-bitcoin-in-2025",
+      "market_slug": "microstrategy-sells-any-bitcoin-by-june-30-2026",
+      "domain": "2025-predictions",
+      "question": "MicroStrategy sells any Bitcoin by June 30, 2026?",
+      "event_end": "2025-12-31T12:00:00Z"
+    }
+  ],
+  "strategy": {
+    "description": "Optimized PM YES-token sleeve plus SPY lagged-return risk-on/risk-off enhancer sleeve on the same cleaned 14d universe.",
+    "selected_alpha_base": 0.5,
+    "risk_on_fraction": 0.7323546019198193,
+    "mean_effective_alpha": 0.36617730095990964,
+    "pm_in_enhancer": 0.85,
+    "stock_in_enhancer": 0.15,
+    "risk_signal": "strict-past 24 sampled-step rolling mean of lagged SPY daily return > 0"
+  },
+  "metrics": {
+    "current_window_yes_baseline": {
+      "steps": 1771,
+      "compound_gain": 30.502550521930296,
+      "growth_of_1": 31.502550521930296,
+      "log_wealth": 3.4500685115039462,
+      "mean_return": 0.0034780338349245155,
+      "volatility": 0.08983486422720192,
+      "sortino": 0.7252629037403083,
+      "max_drawdown": -0.1672924007093075
+    },
+    "equity_signal_pm": {
+      "steps": 1771,
+      "compound_gain": 12.347092830018653,
+      "growth_of_1": 13.347092830018653,
+      "log_wealth": 2.591298595590224,
+      "mean_return": 0.0026929375383378954,
+      "volatility": 0.08607388462758607,
+      "sortino": 0.48025401664068906,
+      "max_drawdown": -0.1200784478858764
+    },
+    "optimized_pm_net": {
+      "steps": 1771,
+      "compound_gain": 6.749094646290953,
+      "growth_of_1": 7.749094646290953,
+      "log_wealth": 2.04757601670786,
+      "mean_return": 0.0025216048285164857,
+      "volatility": 0.09300940211292433,
+      "sortino": 0.4706553036862483,
+      "max_drawdown": -0.19399085538414973
+    }
+  },
+  "deltas_equity_signal_minus_baseline": {
+    "compound_gain": -18.155457691911643,
+    "growth_of_1": -18.155457691911643,
+    "log_wealth": -0.8587699159137223,
+    "sortino": -0.24500888709961927,
+    "max_drawdown": 0.047213952823431105
+  },
+  "crossover": {
+    "first_cross_rows": [
+      16,
+      193
+    ],
+    "sustained_overtake": null
+  },
+  "segments": [
+    {
+      "steps": "0-441",
+      "start_utc": "2026-04-26T23:50:05+00:00",
+      "end_utc": "2026-04-30T12:50:05+00:00",
+      "baseline_growth_segment": 14.574776592505858,
+      "equity_signal_growth_segment": 6.308911310250499,
+      "optimized_pm_growth_segment": 6.219430523528213,
+      "equity_minus_baseline_log_return": -0.8373292763549118
+    },
+    {
+      "steps": "442-884",
+      "start_utc": "2026-04-30T13:00:07+00:00",
+      "end_utc": "2026-05-04T05:40:03+00:00",
+      "baseline_growth_segment": 1.7160499162503837,
+      "equity_signal_growth_segment": 1.728355664164299,
+      "optimized_pm_growth_segment": 1.5302126538231666,
+      "equity_minus_baseline_log_return": 0.007145384005428523
+    },
+    {
+      "steps": "885-1327",
+      "start_utc": "2026-05-04T06:00:04+00:00",
+      "end_utc": "2026-05-07T23:30:06+00:00",
+      "baseline_growth_segment": 1.238217872028866,
+      "equity_signal_growth_segment": 1.0823061799774338,
+      "optimized_pm_growth_segment": 0.8715285932944437,
+      "equity_minus_baseline_log_return": -0.13457902953401887
+    },
+    {
+      "steps": "1328-1770",
+      "start_utc": "2026-05-07T23:40:04+00:00",
+      "end_utc": "2026-05-10T23:44:23+00:00",
+      "baseline_growth_segment": 1.017224532824915,
+      "equity_signal_growth_segment": 1.1309645788857725,
+      "optimized_pm_growth_segment": 0.9342581939380323,
+      "equity_minus_baseline_log_return": 0.10599300596978226
+    }
+  ],
+  "costs": {
+    "baseline_total_turnover_l1": 0.0,
+    "baseline_total_transaction_cost": 0.0,
+    "pm_total_turnover_l1": 42.457015028961436,
+    "pm_total_transaction_cost": 0.04245701502896144,
+    "sleeve_total_turnover_l1": 6.0,
+    "sleeve_total_transaction_cost": 0.006
+  },
+  "top_pm_avg_holdings": [
+    {
+      "domain": "french-election",
+      "question": "Will Cl\u00e9mence Guett\u00e9 win the 2027 French presidential election?",
+      "weight": 0.03781241084381155
+    },
+    {
+      "domain": "colombia-election",
+      "question": "Will Roy Barreras win the 2026 Colombian presidential election?",
+      "weight": 0.037623989322700786
+    },
+    {
+      "domain": "2026-fifa-world-cup",
+      "question": "Will Iraq win the 2026 FIFA World Cup?",
+      "weight": 0.03749285500974119
+    },
+    {
+      "domain": "champions-league",
+      "question": "Will Arsenal win the 2025\u201326 Champions League?",
+      "weight": 0.037212426533879434
+    },
+    {
+      "domain": "formula1",
+      "question": "Will Liam Lawson be the 2026 F1 Drivers' Champion?",
+      "weight": 0.03648611930670808
+    },
+    {
+      "domain": "big-tech",
+      "question": "Will Tesla be the largest company in the world by market cap on June 30?",
+      "weight": 0.036182940203984666
+    },
+    {
+      "domain": "california-midterm",
+      "question": "Will Betty Yee win the California Governor Election in 2026?",
+      "weight": 0.035826874073579165
+    },
+    {
+      "domain": "anthropic",
+      "question": "Will Anthropic\u2019s market cap be between $100B and $200B at market close on IPO day?",
+      "weight": 0.034333826981880304
+    },
+    {
+      "domain": "geopolitics",
+      "question": "Will Donald Trump win the Nobel Peace Prize in 2026?",
+      "weight": 0.03336252990485463
+    },
+    {
+      "domain": "german-elections",
+      "question": "Will AfD win the most seats in the 2026 Berlin state elections?",
+      "weight": 0.032487374098666165
+    }
+  ],
+  "top_pm_final_holdings": [
+    {
+      "domain": "2026-nhl-playoffs",
+      "question": "Will the Montreal Canadiens win the 2026 NHL Stanley Cup?",
+      "weight": 0.0403020866215229
+    },
+    {
+      "domain": "comex-gold-futures",
+      "question": "Will Gold (GC) hit (HIGH) $6,000 by end of June?",
+      "weight": 0.04027462750673294
+    },
+    {
+      "domain": "base",
+      "question": "Base FDV above $10B one day after launch?",
+      "weight": 0.040237050503492355
+    },
+    {
+      "domain": "colorado-midterm",
+      "question": "Will the Republicans win the Colorado Senate race in 2026?",
+      "weight": 0.040146615356206894
+    },
+    {
+      "domain": "big-tech",
+      "question": "Will Tesla be the largest company in the world by market cap on June 30?",
+      "weight": 0.040120091289281845
+    },
+    {
+      "domain": "colombia-election",
+      "question": "Will Roy Barreras win the 2026 Colombian presidential election?",
+      "weight": 0.040005046874284744
+    },
+    {
+      "domain": "bernie-sanders",
+      "question": "Will Bernie endorse Antonio Delgado for NY-Gov by Nov 2 2026 ET?",
+      "weight": 0.03999614343047142
+    },
+    {
+      "domain": "abraham-accords",
+      "question": "Will Oman join the Abraham Accords before 2027?",
+      "weight": 0.0399562232196331
+    },
+    {
+      "domain": "brazil",
+      "question": "Will Tarcisio de Frietas qualify for Brazil's presidential runoff?",
+      "weight": 0.03993293270468712
+    },
+    {
+      "domain": "business",
+      "question": "Will Tesla be the largest company in the world by market cap on December 31?",
+      "weight": 0.039911672472953796
+    }
+  ],
+  "artifacts": {
+    "summary_json": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_14d_summary.json",
+    "timeseries_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_14d_timeseries.csv",
+    "comparison_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_14d_comparison.csv",
+    "alpha_sweep_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_14d_alpha_sweep.csv",
+    "holdings_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_14d_holdings.csv",
+    "comparison_plot": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/figures/final_week_current_window_yes_baseline_vs_equity_signal_14d.png"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "baseline_name": "current_window_feeaware_yes_baseline",
+  "baseline_description": "Equal-domain YES-token baseline filtered to exclude markets whose event_end is before the evaluation-window start.",
+  "days": 7,
+  "fee_rate": 0.001,
+  "window_start_utc": "2026-05-03T23:44:23+00:00",
+  "market_count_after_filter": 38,
+  "domain_count_after_filter": 38,
+  "per_market_weight_after_filter": 0.02631578947368421,
+  "removed_markets": [
+    {
+      "event_slug": "microstrategy-sell-any-bitcoin-in-2025",
+      "market_slug": "microstrategy-sells-any-bitcoin-by-june-30-2026",
+      "domain": "2025-predictions",
+      "question": "MicroStrategy sells any Bitcoin by June 30, 2026?",
+      "event_end": "2025-12-31T12:00:00Z"
+    },
+    {
+      "event_slug": "claude-5-released-by",
+      "market_slug": "will-claude-5-be-released-by-may-31-2026",
+      "domain": "claude-5",
+      "question": "Will Claude 5 be released by May 31, 2026?",
+      "event_end": "2026-04-30T00:00:00Z"
+    }
+  ],
+  "alignment_note": "Aligned first 1440 rows against existing equity-signal timeseries from final_week_stock_signal_pm_feeaware_timeseries.csv. baseline_rows=1440, equity_rows=1440.",
+  "metrics": {
+    "current_window_yes_baseline": {
+      "steps": 1440,
+      "compound_gain": 0.4885348832725376,
+      "growth_of_1": 1.4885348832725376,
+      "log_wealth": 0.3977923363838677,
+      "mean_return": 0.00029677797524415217,
+      "volatility": 0.0066141686051875296,
+      "sortino": 0.1196235439602637,
+      "max_drawdown": -0.0735132795400063
+    },
+    "equity_signal_pm": {
+      "steps": 1440,
+      "compound_gain": 0.619667125111196,
+      "growth_of_1": 1.619667125111196,
+      "log_wealth": 0.48222064980430845,
+      "mean_return": 0.00034312251112942385,
+      "volatility": 0.004092961747743456,
+      "sortino": 0.1193959257659975,
+      "max_drawdown": -0.08081499570971662
+    },
+    "optimized_pm_net": {
+      "steps": 1440,
+      "compound_gain": -0.15610816105912428,
+      "growth_of_1": 0.8438918389408757,
+      "log_wealth": -0.16973094551211979,
+      "mean_return": -0.00010900380431448496,
+      "volatility": 0.004256568610479858,
+      "sortino": -0.04243339009844873,
+      "max_drawdown": -0.20592206529239376
+    }
+  },
+  "deltas_equity_signal_minus_baseline": {
+    "compound_gain": 0.13113224183865846,
+    "growth_of_1": 0.13113224183865846,
+    "log_wealth": 0.08442831342044077,
+    "sortino": -0.00022761819426619923,
+    "max_drawdown": -0.007301716169710315
+  },
+  "artifacts": {
+    "timeseries_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_7d_timeseries.csv",
+    "comparison_csv": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/data/processed/final_week_current_window_yes_baseline_vs_equity_signal_7d_comparison.csv",
+    "comparison_plot": "/Users/xiaz/Desktop/STAT-4830-energy_arbitrage-project/figures/final_week_current_window_yes_baseline_vs_equity_signal_7d.png"
+  }
+}
